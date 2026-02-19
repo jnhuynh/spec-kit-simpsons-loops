@@ -6,7 +6,7 @@ Analyze spec artifacts for inconsistencies, gaps, and quality issues. Fix ALL fi
 
 ## Phase 0: Analyze
 
-Run `/speckit.analyze` to generate findings. This produces a read-only Specification Analysis Report with a findings table, coverage summary, and metrics.
+Run `/speckit.analyze Remediate all findings at the highest severity present without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates all findings at the highest severity level.
 
 ## Phase 1: Assess
 
@@ -15,24 +15,16 @@ Run `/speckit.analyze` to generate findings. This produces a read-only Specifica
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. Otherwise, identify the **highest** severity level present as the remediation target
-4. List the findings at the target severity level that will be remediated
+3. Otherwise, confirm remediation was applied to the correct severity level
 
-## Phase 2: Remediate
-
-1. Fix **ALL** findings at the target severity level (highest severity present)
-2. Only modify files in `{FEATURE_DIR}/` — never modify constitution.md
-3. Apply fixes directly to the artifact files (spec.md, plan.md, tasks.md)
-4. Keep fixes minimal and focused on resolving the specific finding
-
-## Phase 3: Validate
+## Phase 2: Validate
 
 1. Re-read all modified files
 2. Verify each fix resolved its finding
 3. Check no new same-or-higher severity issues were introduced
 4. If new issues at the same severity were introduced, fix them now
 
-## Phase 4: Commit & Exit
+## Phase 3: Commit & Exit
 
 1. Commit all changes:
    ```bash
@@ -43,13 +35,13 @@ Run `/speckit.analyze` to generate findings. This produces a read-only Specifica
 
 ## Guardrails
 
-| # | Rule |
-|---|------|
-| 999 | **One severity level per iteration** — Fix all findings at the highest level, then exit |
+| #   | Rule                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------ |
+| 999 | **One severity level per iteration** — Fix all findings at the highest level, then exit          |
 | 998 | **Constitution is authoritative** — Never modify constitution.md; adjust spec/plan/tasks instead |
-| 997 | **Spec artifacts only** — Only modify files within `{FEATURE_DIR}/` |
-| 996 | **Validate after fixing** — Re-read modified files and verify fixes before committing |
-| 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW |
+| 997 | **Spec artifacts only** — Only modify files within `{FEATURE_DIR}/`                              |
+| 996 | **Validate after remediation** — Re-read modified files and verify fixes before committing       |
+| 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW         |
 
 ## File Paths
 
