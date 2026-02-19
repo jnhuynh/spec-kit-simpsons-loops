@@ -15,7 +15,22 @@ Both loops invoke `claude -p` with a fresh context per iteration, which avoids c
 
 ## Setup
 
-### 1. Copy files into your project
+### Option A: Automated (recommended)
+
+From the root of your target project, run the setup script:
+
+```bash
+bash <path-to-simpsons-loops>/setup.sh
+```
+
+This copies all files, makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
+
+### Option B: Manual
+
+<details>
+<summary>Click to expand manual steps</summary>
+
+#### 1. Copy files into your project
 
 From the root of your project, copy each file to its destination:
 
@@ -33,14 +48,14 @@ cp <path-to-simpsons-loops>/speckit.ralph.implement.md   .claude/commands/specki
 cp <path-to-simpsons-loops>/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
 ```
 
-### 2. Make scripts executable
+#### 2. Make scripts executable
 
 ```bash
 chmod +x .specify/scripts/bash/ralph-loop.sh
 chmod +x .specify/scripts/bash/lisa-loop.sh
 ```
 
-### 3. Update `.gitignore`
+#### 3. Update `.gitignore`
 
 Append the entries from the included `gitignore` file to your project's `.gitignore`:
 
@@ -58,7 +73,7 @@ Append the entries from the included `gitignore` file to your project's `.gitign
 *.specify/logs/*        # All log files
 ```
 
-### 4. Allow loop scripts in Claude Code permissions
+#### 4. Allow loop scripts in Claude Code permissions
 
 Add the loop scripts to your `.claude/settings.local.json` allow list so Claude Code can run them without prompting:
 
@@ -72,6 +87,8 @@ Add the loop scripts to your `.claude/settings.local.json` allow list so Claude 
   }
 }
 ```
+
+</details>
 
 ## File mapping reference
 
