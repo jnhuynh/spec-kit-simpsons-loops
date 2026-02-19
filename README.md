@@ -75,14 +75,14 @@ Add the loop scripts to your `.claude/settings.local.json` allow list so Claude 
 
 ## File mapping reference
 
-| Source file                    | Destination                                        | Purpose                        |
-| ------------------------------ | -------------------------------------------------- | ------------------------------ |
-| `ralph-loop.sh`                | `.specify/scripts/bash/ralph-loop.sh`              | Bash orchestrator for Ralph    |
-| `lisa-loop.sh`                 | `.specify/scripts/bash/lisa-loop.sh`               | Bash orchestrator for Lisa     |
-| `ralph-prompt.template.md`     | `.specify/templates/ralph-prompt.template.md`      | Prompt template for Ralph      |
-| `lisa-prompt.template.md`      | `.specify/templates/lisa-prompt.template.md`       | Prompt template for Lisa       |
-| `speckit.ralph.implement.md`   | `.claude/commands/speckit.ralph.implement.md`       | Claude Code slash command      |
-| `speckit.lisa.analyze.md`      | `.claude/commands/speckit.lisa.analyze.md`          | Claude Code slash command      |
+| Source file                  | Destination                                   | Purpose                     |
+| ---------------------------- | --------------------------------------------- | --------------------------- |
+| `ralph-loop.sh`              | `.specify/scripts/bash/ralph-loop.sh`         | Bash orchestrator for Ralph |
+| `lisa-loop.sh`               | `.specify/scripts/bash/lisa-loop.sh`          | Bash orchestrator for Lisa  |
+| `ralph-prompt.template.md`   | `.specify/templates/ralph-prompt.template.md` | Prompt template for Ralph   |
+| `lisa-prompt.template.md`    | `.specify/templates/lisa-prompt.template.md`  | Prompt template for Lisa    |
+| `speckit.ralph.implement.md` | `.claude/commands/speckit.ralph.implement.md` | Claude Code slash command   |
+| `speckit.lisa.analyze.md`    | `.claude/commands/speckit.lisa.analyze.md`    | Claude Code slash command   |
 
 ## Usage
 
