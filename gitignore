@@ -1,0 +1,11 @@
+# Generate at run time
+*.ralph-prompt.md*
+*.ralph-prev-output*    # Stuck detection state
+*.ralph-state*          # Resumption state
+
+# Lisa loop temp files
+*.lisa-prompt.md*
+*.lisa-prev-output*
+*.lisa-state*
+
+*.specify/logs/*                  # All log files
