@@ -8,4 +8,9 @@
 *.lisa-prev-output*
 *.lisa-state*
 
+# Homer loop temp files
+*.homer-prompt.md*
+*.homer-prev-output*
+*.homer-state*
+
 *.specify/logs/*                  # All log files
