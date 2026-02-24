@@ -17,10 +17,10 @@ Run prerequisite script to identify:
 
 ### Step 3: Extract Quality Gates
 
-Run the following commands from the `mobile/` directory:
+> **PLACEHOLDER** — Replace the command below with your project's quality gates before running Ralph.
 
 ```bash
-cd mobile && npm run lint && npm run typecheck && npm test
+echo "PLACEHOLDER: Update this quality gate in speckit.ralph.implement.md before using Ralph." && exit 1
 ```
 
 ### Step 4: Generate Prompt

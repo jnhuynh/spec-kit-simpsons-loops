@@ -196,7 +196,7 @@ All iterations are logged to `.specify/logs/` with timestamps:
 
 ### Quality gates (Ralph)
 
-The `speckit.ralph.implement.md` command extracts quality gates and substitutes the `{QUALITY_GATES}` placeholder in the prompt template. Edit the command file to match your project's tooling (e.g., replace `npm run lint` with your linter).
+The quality gate in `speckit.ralph.implement.md` ships as a **placeholder** that will intentionally fail. Before running Ralph, open the command file and replace the placeholder command in Step 3 with your project's actual quality gates (e.g., `npm run lint && npm run typecheck && npm test`). The command is substituted into the `{QUALITY_GATES}` slot in the prompt template at runtime.
 
 ### Max iterations
 
