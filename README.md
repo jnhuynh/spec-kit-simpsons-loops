@@ -8,6 +8,16 @@ Automated iteration loops for [Speckit](https://github.com/speckit)-powered proj
 
 Both loops invoke `claude -p` with a fresh context per iteration, which avoids context window limits and keeps each run focused.
 
+## Important: API key vs. Claude subscription
+
+The loops invoke `claude -p`, which will use your `ANTHROPIC_API_KEY` environment variable if one is set. If you want the loops to run against your **Claude subscription** (Pro/Max) instead, unset that variable before running them:
+
+```bash
+unset ANTHROPIC_API_KEY
+```
+
+Otherwise every iteration will consume API credits from the key.
+
 ## Prerequisites
 
 - A project already set up with Speckit (`.specify/` directory exists)
