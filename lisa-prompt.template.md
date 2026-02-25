@@ -1,12 +1,12 @@
 # Lisa Analysis Mode - Spec Kit Integration
 
-Analyze spec artifacts for inconsistencies, gaps, and quality issues. Fix ALL findings at the highest severity level, then exit. Each iteration runs with FRESH CONTEXT.
+Analyze spec artifacts for inconsistencies, gaps, and quality issues. Fix **one finding**, then exit. Each iteration runs with FRESH CONTEXT.
 
-> **Note:** One severity level per iteration. Loop until zero findings remain.
+> **Note:** One finding per iteration. Loop until zero findings remain.
 
 ## Phase 0: Analyze
 
-Run `/speckit.analyze Remediate all findings at the highest severity present without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates all findings at the highest severity level.
+Run `/speckit.analyze Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
 
 ## Phase 1: Assess
 
@@ -15,32 +15,31 @@ Run `/speckit.analyze Remediate all findings at the highest severity present wit
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. Otherwise, confirm remediation was applied to the correct severity level
+3. Otherwise, confirm remediation was applied to exactly one finding
 
 ## Phase 2: Validate
 
 1. Re-read all modified files
-2. Verify each fix resolved its finding
+2. Verify the fix resolved its finding
 3. Check no new same-or-higher severity issues were introduced
-4. If new issues at the same severity were introduced, fix them now
 
 ## Phase 3: Commit & Exit
 
 1. Commit all changes:
    ```bash
-   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] fix [SEVERITY] findings from cross-artifact analysis"
+   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] fix [SEVERITY] finding from cross-artifact analysis"
    git push origin $(git branch --show-current)
    ```
-2. Exit immediately — you will restart with fresh context for the next severity level
+2. Exit immediately — you will restart with fresh context for the next finding
 
 ## Guardrails
 
 | #   | Rule                                                                                             |
 | --- | ------------------------------------------------------------------------------------------------ |
-| 999 | **One severity level per iteration** — Fix all findings at the highest level, then exit          |
+| 999 | **One finding per iteration** — Fix one finding, then exit                                      |
 | 998 | **Constitution is authoritative** — Never modify constitution.md; adjust spec/plan/tasks instead |
 | 997 | **Spec artifacts only** — Only modify files within `{FEATURE_DIR}/`                              |
-| 996 | **Validate after remediation** — Re-read modified files and verify fixes before committing       |
+| 996 | **Validate after remediation** — Re-read modified files and verify fix before committing         |
 | 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW         |
 
 ## File Paths
