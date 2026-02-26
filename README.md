@@ -1,26 +1,26 @@
-# Simpsons Loops for Speckit + Claude Code
+# 🍩 Simpsons Loops for Speckit + Claude Code
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
-- **Homer Loop** — Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves ambiguities and unanswered questions at the highest severity level, commits, and exits. Repeats until zero findings remain.
-- **Lisa Loop** — Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the single highest-severity finding, commits, and exits. Repeats until zero findings remain.
-- **Ralph Loop** — Task-by-task implementation. Picks up the next incomplete task from `tasks.md`, implements it, validates, commits, and exits. Repeats with fresh context until all tasks are done.
-- **Pipeline** — End-to-end orchestrator that runs the full workflow: homer → plan → tasks → lisa → ralph. Auto-detects the feature directory from the current git branch, supports resuming from any step, and manages prompt generation internally.
+- 🍩 **Homer Loop** — Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves ambiguities and unanswered questions at the highest severity level, commits, and exits. Repeats until zero findings remain.
+- 🎷 **Lisa Loop** — Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the single highest-severity finding, commits, and exits. Repeats until zero findings remain.
+- 🖍️ **Ralph Loop** — Task-by-task implementation. Picks up the next incomplete task from `tasks.md`, implements it, validates, commits, and exits. Repeats with fresh context until all tasks are done.
+- 🏭 **Pipeline** — End-to-end orchestrator that runs the full workflow: homer → plan → tasks → lisa → ralph. Auto-detects the feature directory from the current git branch, supports resuming from any step, and manages prompt generation internally.
 
-The loops invoke `claude -p` with a fresh context per iteration, which avoids context window limits and keeps each run focused. The pipeline orchestrates the loops in sequence with smart auto-detection of where to start based on existing artifacts.
+The loops invoke `claude -p --dangerously-skip-permissions` with a fresh context per iteration, which avoids context window limits and keeps each run focused. The pipeline orchestrates the loops in sequence with smart auto-detection of where to start based on existing artifacts.
 
-> **Warning: `--dangerously-skip-permissions`**
+> ⚠️ **Warning: `--dangerously-skip-permissions`**
 > All loop scripts run `claude -p` with the `--dangerously-skip-permissions` flag, which means Claude will execute tool calls (file writes, shell commands, etc.) without asking for confirmation. Review the prompt templates and understand what each loop does before running them. Make sure you are comfortable with the commands Claude will execute in your project.
 
-## Recommended workflow
+## 💡 Recommended workflow
 
 Before kicking off the pipeline or any loop, take the time to refine your specs manually. Run `/speckit.specify` to draft the initial spec, then use `/speckit.clarify` interactively to resolve ambiguities and sharpen requirements. The more precise your spec is before automation takes over, the better the results will be. Automation amplifies whatever it's given — a vague spec produces vague output, while a tight spec produces focused, accurate work.
 
 You can also run each loop individually and review the results between stages instead of running the full pipeline end-to-end. For example, run Homer first, review the clarified spec, then generate the plan and tasks manually, review those, run Lisa, review the analysis fixes, and finally run Ralph. This staged approach lets you course-correct at every step and build confidence in the output before moving on.
 
-## Important: API key vs. Claude subscription
+## 🔑 Important: API key vs. Claude subscription
 
-The loops invoke `claude -p`, which will use your `ANTHROPIC_API_KEY` environment variable if one is set. If you want the loops to run against your **Claude subscription** (Pro/Max) instead, unset that variable before running them:
+The loops invoke `claude -p --dangerously-skip-permissions`, which will use your `ANTHROPIC_API_KEY` environment variable if one is set. If you want the loops to run against your **Claude subscription** (Pro/Max) instead, unset that variable before running them:
 
 ```bash
 unset ANTHROPIC_API_KEY
@@ -28,15 +28,15 @@ unset ANTHROPIC_API_KEY
 
 Otherwise every iteration will consume API credits from the key.
 
-## Prerequisites
+## ✅ Prerequisites
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed
 - Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
 
-## Setup
+## 🛠️ Setup
 
-### Option A: Automated (recommended)
+### 🤖 Option A: Automated (recommended)
 
 From the root of your target project, run the setup script:
 
@@ -46,7 +46,7 @@ bash <path-to-simpsons-loops>/setup.sh
 
 This copies all files (loop scripts, pipeline script, prompt templates, and Claude Code commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
 
-### Option B: Manual
+### 📝 Option B: Manual
 
 <details>
 <summary>Click to expand manual steps</summary>
@@ -126,7 +126,7 @@ Add the loop scripts to your `.claude/settings.local.json` allow list so Claude 
 
 </details>
 
-## File mapping reference
+## 📂 File mapping reference
 
 | Source file                  | Destination                                     | Purpose                        |
 | ---------------------------- | ----------------------------------------------- | ------------------------------ |
@@ -142,9 +142,9 @@ Add the loop scripts to your `.claude/settings.local.json` allow list so Claude 
 | `speckit.lisa.analyze.md`    | `.claude/commands/speckit.lisa.analyze.md`      | Claude Code slash command      |
 | `speckit.homer.clarify.md`   | `.claude/commands/speckit.homer.clarify.md`     | Claude Code slash command      |
 
-## Usage
+## 🚀 Usage
 
-### Homer Loop (clarification)
+### 🍩 Homer Loop (clarification)
 
 After running `/speckit.specify` to create `spec.md`, run the Homer command inside Claude Code:
 
@@ -160,7 +160,7 @@ This prints a bash command:
 
 Copy and run that command in your terminal. Homer will iterate — one finding per cycle (highest severity first) — resolving ambiguities and unclear requirements until zero findings remain.
 
-### Lisa Loop (analysis)
+### 🎷 Lisa Loop (analysis)
 
 Once you have `spec.md`, `plan.md`, and `tasks.md`, run the Lisa command inside Claude Code:
 
@@ -176,7 +176,7 @@ This prints a bash command:
 
 Copy and run that command in your terminal. Lisa will iterate — one finding per cycle (highest severity first) — until zero findings remain.
 
-### Ralph Loop (implementation)
+### 🖍️ Ralph Loop (implementation)
 
 Once you have a `tasks.md` generated by `/speckit.tasks`, run the Ralph command inside Claude Code:
 
@@ -192,7 +192,7 @@ This generates the prompt and prints a bash command to start the loop:
 
 Copy and run that command in your terminal. Ralph will iterate — one task per cycle — until all tasks in `tasks.md` are marked `[x]`.
 
-### Pipeline (end-to-end)
+### 🏭 Pipeline (end-to-end)
 
 After creating a spec with `/speckit.specify`, run the pipeline command inside Claude Code:
 
@@ -219,38 +219,38 @@ Copy and run that command in your terminal. The pipeline will auto-detect the fe
 | `--model <model>`  | Claude model to use                                | opus    |
 | `--dry-run`        | Show what would run without executing              | —       |
 
-**Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts in the spec directory and starts from the right step automatically:
+🧠 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts in the spec directory and starts from the right step automatically:
 
 - `tasks.md` exists with some tasks completed → starts at **ralph**
 - `tasks.md` exists with no tasks started → starts at **lisa**
 - `plan.md` exists → starts at **tasks**
 - `spec.md` exists → starts at **homer**
 
-**Resuming after interruption:** All work is committed after each loop iteration, so you can safely interrupt with Ctrl+C and resume later:
+⏸️ **Resuming after interruption:** All work is committed after each loop iteration, so you can safely interrupt with Ctrl+C and resume later:
 
 ```bash
 .specify/scripts/bash/pipeline.sh --from ralph specs/a1b2-feat-user-auth
 ```
 
-## How the loops work
+## ⚙️ How the loops work
 
-### Fresh context per iteration
+### 🧹 Fresh context per iteration
 
-Each loop calls `claude -p` as a subprocess for each iteration. This means every cycle starts with zero prior context, preventing hallucination drift and context window exhaustion.
+Each loop calls `claude -p --dangerously-skip-permissions` as a subprocess for each iteration. This means every cycle starts with zero prior context, preventing hallucination drift and context window exhaustion.
 
-### Completion detection
+### 🏁 Completion detection
 
 Each loop detects completion via promise tags in the Claude output:
 
-- Homer: `<promise>ALL_FINDINGS_RESOLVED</promise>`
-- Lisa: `<promise>ALL_FINDINGS_RESOLVED</promise>`
-- Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
+- 🍩 Homer: `<promise>ALL_FINDINGS_RESOLVED</promise>`
+- 🎷 Lisa: `<promise>ALL_FINDINGS_RESOLVED</promise>`
+- 🖍️ Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
 
-### Stuck detection
+### 🔄 Stuck detection
 
 If three consecutive iterations produce identical output, the loop aborts automatically to avoid infinite cycling.
 
-### Logging
+### 📋 Logging
 
 All iterations are logged to `.specify/logs/` with timestamps:
 
@@ -261,9 +261,9 @@ All iterations are logged to `.specify/logs/` with timestamps:
 .specify/logs/homer-20260218-231045.log
 ```
 
-## Customization
+## 🎨 Customization
 
-### Quality gates (Ralph)
+### 🚦 Quality gates (Ralph)
 
 The quality gate in `speckit.ralph.implement.md` ships as a **placeholder** that will intentionally fail. Before running Ralph standalone, open the command file and replace the placeholder command in Step 3 with your project's actual quality gates (e.g., `npm run lint && npm run typecheck && npm test`). The command is substituted into the `{QUALITY_GATES}` slot in the prompt template at runtime.
 
@@ -273,7 +273,7 @@ When running Ralph via the pipeline or directly with a spec directory, set the `
 QUALITY_GATES="npm run lint && npm run typecheck && npm test" .specify/scripts/bash/pipeline.sh
 ```
 
-### Max iterations
+### 🔢 Max iterations
 
 - Ralph defaults to `incomplete_tasks + 10` (standalone) or `20` (pipeline)
 - Lisa defaults to `10` (4 severity levels + buffer)
@@ -281,6 +281,6 @@ QUALITY_GATES="npm run lint && npm run typecheck && npm test" .specify/scripts/b
 
 Override by editing the generated bash command (standalone) or passing `--ralph-max`, `--homer-max`, `--lisa-max` flags (pipeline).
 
-## References
+## 📚 References
 
 - [Speckit Ralph Loop: Fresh Context AI Development](https://dominic-boettger.com/blog/speckit-ralph-loop-fresh-context-ai-development/)
