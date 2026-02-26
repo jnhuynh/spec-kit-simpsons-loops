@@ -126,15 +126,17 @@ Add to `.claude/settings.local.json`:
 
 ## 🚀 Usage
 
-Each loop has a corresponding Claude Code slash command. Run the command, then copy and run the printed bash command in your terminal.
+Each loop has a corresponding Claude Code slash command. The slash command does **not** run the script directly — it prints the bash command for you to copy-paste and run in your terminal.
 
 ### 🍩 Homer (clarification)
 
-After running `/speckit.specify` to create `spec.md`:
+After running `/speckit.specify` to create `spec.md`, run the slash command — it prints the bash command to execute:
 
 ```
 /speckit.homer.clarify
 ```
+
+Then copy-paste and run the printed command:
 
 ```bash
 .specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 10
@@ -142,11 +144,13 @@ After running `/speckit.specify` to create `spec.md`:
 
 ### 🎷 Lisa (analysis)
 
-Once you have `spec.md`, `plan.md`, and `tasks.md`:
+Once you have `spec.md`, `plan.md`, and `tasks.md`, run the slash command — it prints the bash command to execute:
 
 ```
 /speckit.lisa.analyze
 ```
+
+Then copy-paste and run the printed command:
 
 ```bash
 .specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10
@@ -154,11 +158,13 @@ Once you have `spec.md`, `plan.md`, and `tasks.md`:
 
 ### 🖍️ Ralph (implementation)
 
-Once you have `tasks.md` from `/speckit.tasks`:
+Once you have `tasks.md` from `/speckit.tasks`, run the slash command — it prints the bash command to execute:
 
 ```
 /speckit.ralph.implement
 ```
+
+Then copy-paste and run the printed command:
 
 ```bash
 .specify/scripts/bash/ralph-loop.sh .specify/.ralph-prompt.md <MAX> <FEATURE_DIR>/tasks.md
@@ -166,11 +172,13 @@ Once you have `tasks.md` from `/speckit.tasks`:
 
 ### 🏭 Pipeline (end-to-end)
 
-After creating a spec with `/speckit.specify`:
+After creating a spec with `/speckit.specify`, run the slash command — it prints the bash command to execute:
 
 ```
 /speckit.pipeline
 ```
+
+Then copy-paste and run the printed command:
 
 ```bash
 .specify/scripts/bash/pipeline.sh specs/a1b2-feat-user-auth

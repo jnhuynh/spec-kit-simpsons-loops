@@ -1,5 +1,5 @@
 ---
-description: Run the full SpecKit pipeline (homer, plan, tasks, lisa, ralph) after spec is complete.
+description: Print the command to run the full SpecKit pipeline (homer, plan, tasks, lisa, ralph) after spec is complete.
 ---
 
 ## User Input
@@ -10,7 +10,9 @@ $ARGUMENTS
 
 ## Overview
 
-Run the automated SpecKit pipeline from spec clarification through implementation. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
+Resolve the spec directory, validate artifacts, and print the shell command for the user to manually run the full SpecKit pipeline from spec clarification through implementation. This command does **not** execute the pipeline — it prints the command so the user can copy-paste it into their terminal.
+
+This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
 
 The pipeline runs these steps in sequence:
 
@@ -44,7 +46,7 @@ The pipeline runs these steps in sequence:
 
 ## Examples
 
-- `/speckit.pipeline` — Auto-detect spec dir from current branch, run full pipeline
-- `/speckit.pipeline specs/a1b2-feat-user-auth` — Run pipeline for specific spec
-- `/speckit.pipeline --from homer` — Start from homer step (auto-detect spec dir)
-- `/speckit.pipeline --from ralph specs/a1b2-feat-user-auth` — Resume ralph for specific spec
+- `/speckit.pipeline` — Auto-detect spec dir from current branch, print full pipeline command
+- `/speckit.pipeline specs/a1b2-feat-user-auth` — Print pipeline command for specific spec
+- `/speckit.pipeline --from homer` — Print command starting from homer step (auto-detect spec dir)
+- `/speckit.pipeline --from ralph specs/a1b2-feat-user-auth` — Print command to resume ralph for specific spec

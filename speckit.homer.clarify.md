@@ -1,5 +1,5 @@
 ---
-description: Run iterative spec clarification and remediation (Homer loop) on spec.md until all findings are resolved.
+description: Print the command to run iterative spec clarification and remediation (Homer loop) on spec.md until all findings are resolved.
 ---
 
 ## User Input

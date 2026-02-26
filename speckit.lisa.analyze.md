@@ -1,5 +1,5 @@
 ---
-description: Run iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
+description: Print the command to run iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
 ---
 
 ## User Input
