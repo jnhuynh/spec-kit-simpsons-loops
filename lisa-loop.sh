@@ -1,11 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Lisa Loop - Iterative spec analysis & remediation with fresh context per iteration
-# Usage: ./lisa-loop.sh <prompt-file> [max-iterations]
+# Usage: ./lisa-loop.sh <prompt-file|spec-dir> [max-iterations]
+#
+# Arg 1 can be either:
+#   - A prompt file path (e.g. .specify/.lisa-prompt.md)
+#   - A spec directory path (e.g. specs/a1b2-feat-foo) — generates prompt from template
+#     with FEATURE_DIR set to the given path
 
 set -uo pipefail
 
-PROMPT_FILE="${1:-.specify/.lisa-prompt.md}"
+ARG1="${1:-}"
 MAX_ITERATIONS="${2:-10}"
+MODEL="${CLAUDE_MODEL:-opus}"
+GENERATED_PROMPT=""
 ITERATION=0
 LOG_DIR=".specify/logs"
 LOG_FILE="$LOG_DIR/lisa-$(date '+%Y%m%d-%H%M%S').log"
@@ -25,6 +32,36 @@ NC='\033[0m'
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
+
+# Resolve PROMPT_FILE from arg: either use directly or generate from template
+resolve_prompt_file() {
+    if [[ -z "$ARG1" ]]; then
+        PROMPT_FILE=".specify/.lisa-prompt.md"
+        return
+    fi
+
+    if [[ -f "$ARG1" ]]; then
+        PROMPT_FILE="$ARG1"
+        return
+    fi
+
+    if [[ -d "$ARG1" ]]; then
+        FEATURE_DIR="$ARG1"
+        GENERATED_PROMPT=".specify/.lisa-prompt.md"
+        local template=".specify/templates/lisa-prompt.template.md"
+        if [[ ! -f "$template" ]]; then
+            echo -e "${RED}Error: Template not found: $template${NC}"
+            exit 1
+        fi
+        sed "s|{FEATURE_DIR}|$FEATURE_DIR|g" "$template" > "$GENERATED_PROMPT"
+        PROMPT_FILE="$GENERATED_PROMPT"
+        return
+    fi
+
+    echo -e "${RED}Error: '$ARG1' is neither an existing file nor directory${NC}"
+    exit 1
+}
+resolve_prompt_file
 
 # Logging functions
 log() {
@@ -61,6 +98,7 @@ cleanup() {
 
     log "INFO" "Interrupted after $ITERATION iterations (duration: ${duration}s)"
     rm -f ".specify/.lisa-prev-output"
+    [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
     exit 130
 }
 trap cleanup SIGINT SIGTERM
@@ -73,7 +111,9 @@ echo -e "${BLUE}╔════════════════════�
 echo -e "${BLUE}║${NC}  ${BOLD}Lisa Loop${NC} - Iterative Spec Analysis & Remediation        ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${BLUE}║${NC}  Prompt: ${DIM}${PROMPT_FILE}${NC}"
+[[ -n "${FEATURE_DIR:-}" ]] && echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
+echo -e "${BLUE}║${NC}  Model: ${DIM}${MODEL}${NC}"
 echo -e "${BLUE}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
@@ -112,7 +152,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     CLAUDE_EXIT=0
     ITER_OUTPUT=$(claude -p \
         --dangerously-skip-permissions \
-        --model opus \
+        --model "$MODEL" \
         < "$PROMPT_FILE" \
         2>&1) || CLAUDE_EXIT=$?
 
@@ -124,6 +164,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
             echo -e "  ${RED}Aborting after $MAX_CONSECUTIVE_FAILURES consecutive failures${NC}"
             log "ERROR" "Aborting: $MAX_CONSECUTIVE_FAILURES consecutive failures"
             rm -f ".specify/.lisa-prev-output"
+            [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
             exit 2
         fi
         echo -e "  ${YELLOW}Retrying... (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
@@ -167,6 +208,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
                 echo -e "  ${YELLOW}   Suggestion: Ctrl+C and review spec artifacts manually${NC}"
                 log "ERROR" "Aborting: stuck after $MAX_CONSECUTIVE_FAILURES consecutive identical outputs"
                 rm -f ".specify/.lisa-prev-output"
+                [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
                 exit 2
             fi
         else
@@ -194,6 +236,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
         log "INFO" "Total duration: ${TOTAL_DURATION}s"
 
         rm -f ".specify/.lisa-prev-output"
+        [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
         exit 0
     fi
 
@@ -217,4 +260,5 @@ log "WARN" "Max iterations ($MAX_ITERATIONS) reached"
 log "INFO" "Total duration: ${total_duration}s"
 
 rm -f ".specify/.lisa-prev-output"
+[[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
 exit 1

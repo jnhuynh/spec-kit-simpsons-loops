@@ -1,4 +1,4 @@
-# Generate at run time
+# Simpsons loops - generated at runtime
 *.ralph-prompt.md*
 *.ralph-prev-output*    # Stuck detection state
 *.ralph-state*          # Resumption state
@@ -13,4 +13,4 @@
 *.homer-prev-output*
 *.homer-state*
 
-*.specify/logs/*                  # All log files
+.specify/logs/                    # All log files

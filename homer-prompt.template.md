@@ -45,6 +45,4 @@ Run `/speckit.clarify Remediate only the single highest-severity finding without
 ## File Paths
 
 - Spec: `{FEATURE_DIR}/spec.md`
-- Plan: `{FEATURE_DIR}/plan.md`
-- Tasks: `{FEATURE_DIR}/tasks.md`
 - Constitution: `.specify/memory/constitution.md`
