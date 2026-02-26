@@ -1,13 +1,13 @@
 #!/bin/bash
 # speckit-pipeline.sh — End-to-end SpecKit pipeline orchestrator
 #
-# Runs the SpecKit workflow from plan to implementation.
+# Runs the SpecKit workflow from spec clarification to implementation.
 # Prerequisite: Run /speckit.specify interactively first to create the spec.
 #
 # Steps:
-#   1. plan     — Generate technical implementation plan
-#   2. tasks    — Generate dependency-ordered task list
-#   3. homer    — Iterative spec clarification & remediation
+#   1. homer    — Iterative spec clarification & remediation
+#   2. plan     — Generate technical implementation plan
+#   3. tasks    — Generate dependency-ordered task list
 #   4. lisa     — Cross-artifact consistency analysis
 #   5. ralph    — Task-by-task implementation with quality gates
 #
@@ -16,7 +16,7 @@
 #   speckit-pipeline [options] [spec-dir]
 #
 # Options:
-#   --from <step>          Start from a specific step: plan, tasks, homer, lisa, ralph
+#   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
 #   --homer-max <n>        Max homer loop iterations (default: 10)
 #   --lisa-max <n>         Max lisa loop iterations (default: 10)
 #   --ralph-max <n>        Max ralph loop iterations (default: 20)
@@ -70,13 +70,13 @@ show_help() {
     cat <<'HELPEOF'
 speckit-pipeline — End-to-end SpecKit pipeline orchestrator
 
-Runs the SpecKit workflow from plan to implementation.
+Runs the SpecKit workflow from spec clarification to implementation.
 Prerequisite: Run /speckit.specify interactively first to create the spec.
 
 Steps:
-  1. plan     — Generate technical implementation plan
-  2. tasks    — Generate dependency-ordered task list
-  3. homer    — Iterative spec clarification & remediation
+  1. homer    — Iterative spec clarification & remediation
+  2. plan     — Generate technical implementation plan
+  3. tasks    — Generate dependency-ordered task list
   4. lisa     — Cross-artifact consistency analysis
   5. ralph    — Task-by-task implementation with quality gates
 
@@ -85,7 +85,7 @@ Usage:
   speckit-pipeline [options] [spec-dir]
 
 Options:
-  --from <step>          Start from a specific step: plan, tasks, homer, lisa, ralph
+  --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
   --homer-max <n>        Max homer loop iterations (default: 10)
   --lisa-max <n>         Max lisa loop iterations (default: 10)
   --ralph-max <n>        Max ralph loop iterations (default: 20)
@@ -111,8 +111,8 @@ while [ $i -le $# ]; do
         --help|-h) show_help ;;
         --from)
             i=$((i + 1)); FROM_STEP="${!i}"
-            if [[ ! "$FROM_STEP" =~ ^(plan|tasks|homer|lisa|ralph)$ ]]; then
-                echo -e "${RED}Error: --from must be one of: plan, tasks, homer, lisa, ralph${NC}" >&2
+            if [[ ! "$FROM_STEP" =~ ^(homer|plan|tasks|lisa|ralph)$ ]]; then
+                echo -e "${RED}Error: --from must be one of: homer, plan, tasks, lisa, ralph${NC}" >&2
                 exit 1
             fi ;;
         --homer-max)
@@ -156,11 +156,11 @@ log_section() {
 
 # ─── Step Tracking ──────────────────────────────────────────────────────────
 
-STEPS=("plan" "tasks" "homer" "lisa" "ralph")
+STEPS=("homer" "plan" "tasks" "lisa" "ralph")
 STEP_LABELS=(
+    "Homer: Spec Clarification"
     "Generate Plan"
     "Generate Tasks"
-    "Homer: Spec Clarification"
     "Lisa: Cross-Artifact Analysis"
     "Ralph: Implementation"
 )
@@ -372,10 +372,13 @@ detect_from_step() {
     local feature_dir="$1"
     local full_dir="$REPO_ROOT/$feature_dir"
 
-    # Walk backwards: if tasks.md exists and has incomplete tasks, start at ralph
-    # If tasks.md exists, start at homer (to re-validate)
-    # If plan.md exists, start at tasks
-    # If spec.md exists, start at plan
+    # Walk backwards through artifacts to find the right starting step:
+    # Pipeline order: homer → plan → tasks → lisa → ralph
+    #
+    # tasks.md with some complete → ralph
+    # tasks.md with none complete → lisa
+    # plan.md exists → tasks
+    # spec.md exists → homer (first step after specify)
 
     if [[ -f "$full_dir/tasks.md" ]]; then
         local incomplete
@@ -387,8 +390,8 @@ detect_from_step() {
             # Some tasks done, some remaining — go straight to ralph
             echo "ralph"
         elif [[ $incomplete -gt 0 ]]; then
-            # Tasks exist but none started — run homer first
-            echo "homer"
+            # Tasks exist but none started — run lisa first
+            echo "lisa"
         else
             # All tasks complete
             echo -e "${GREEN}All tasks already complete!${NC}" >&2
@@ -397,7 +400,7 @@ detect_from_step() {
     elif [[ -f "$full_dir/plan.md" ]]; then
         echo "tasks"
     elif [[ -f "$full_dir/spec.md" ]]; then
-        echo "plan"
+        echo "homer"
     else
         echo -e "${RED}Error: No spec.md found in $feature_dir. Run /speckit.specify interactively first.${NC}" >&2
         return 1
@@ -444,49 +447,11 @@ log_section "PIPELINE STARTED"
 log "INFO" "Feature dir: $FEATURE_DIR, starting from: $FROM_STEP"
 log "INFO" "Model: $MODEL"
 
-# ─── Step 1: Plan ───────────────────────────────────────────────────────────
-
-if ! should_skip_step "plan"; then
-    STEP_START=$(date +%s)
-    print_step_header 1 "Generate Plan (plan)"
-
-    if [[ -f "$REPO_ROOT/$FEATURE_DIR/plan.md" ]]; then
-        print_step_skip "plan" "plan.md already exists"
-    else
-        run_claude "/speckit.plan" "Generate implementation plan" || {
-            echo -e "${RED}Failed to generate plan${NC}"
-            exit 1
-        }
-    fi
-
-    STEP_END=$(date +%s)
-    print_step_complete "Plan" "$((STEP_END - STEP_START))"
-fi
-
-# ─── Step 2: Tasks ──────────────────────────────────────────────────────────
-
-if ! should_skip_step "tasks"; then
-    STEP_START=$(date +%s)
-    print_step_header 2 "Generate Tasks (tasks)"
-
-    if [[ -f "$REPO_ROOT/$FEATURE_DIR/tasks.md" ]]; then
-        print_step_skip "tasks" "tasks.md already exists"
-    else
-        run_claude "/speckit.tasks" "Generate task list" || {
-            echo -e "${RED}Failed to generate tasks${NC}"
-            exit 1
-        }
-    fi
-
-    STEP_END=$(date +%s)
-    print_step_complete "Tasks" "$((STEP_END - STEP_START))"
-fi
-
-# ─── Step 3: Homer Loop ────────────────────────────────────────────────────
+# ─── Step 1: Homer Loop ───────────────────────────────────────────────────
 
 if ! should_skip_step "homer"; then
     STEP_START=$(date +%s)
-    print_step_header 3 "Homer: Spec Clarification"
+    print_step_header 1 "Homer: Spec Clarification"
 
     echo -e "  ${DIM}Generating homer prompt from template...${NC}"
     HOMER_PROMPT=$(generate_homer_prompt "$FEATURE_DIR") || exit 1
@@ -511,6 +476,44 @@ if ! should_skip_step "homer"; then
 
     STEP_END=$(date +%s)
     print_step_complete "Homer" "$((STEP_END - STEP_START))"
+fi
+
+# ─── Step 2: Plan ──────────────────────────────────────────────────────────
+
+if ! should_skip_step "plan"; then
+    STEP_START=$(date +%s)
+    print_step_header 2 "Generate Plan (plan)"
+
+    if [[ -f "$REPO_ROOT/$FEATURE_DIR/plan.md" ]]; then
+        print_step_skip "plan" "plan.md already exists"
+    else
+        run_claude "/speckit.plan" "Generate implementation plan" || {
+            echo -e "${RED}Failed to generate plan${NC}"
+            exit 1
+        }
+    fi
+
+    STEP_END=$(date +%s)
+    print_step_complete "Plan" "$((STEP_END - STEP_START))"
+fi
+
+# ─── Step 3: Tasks ─────────────────────────────────────────────────────────
+
+if ! should_skip_step "tasks"; then
+    STEP_START=$(date +%s)
+    print_step_header 3 "Generate Tasks (tasks)"
+
+    if [[ -f "$REPO_ROOT/$FEATURE_DIR/tasks.md" ]]; then
+        print_step_skip "tasks" "tasks.md already exists"
+    else
+        run_claude "/speckit.tasks" "Generate task list" || {
+            echo -e "${RED}Failed to generate tasks${NC}"
+            exit 1
+        }
+    fi
+
+    STEP_END=$(date +%s)
+    print_step_complete "Tasks" "$((STEP_END - STEP_START))"
 fi
 
 # ─── Step 4: Lisa Loop ─────────────────────────────────────────────────────

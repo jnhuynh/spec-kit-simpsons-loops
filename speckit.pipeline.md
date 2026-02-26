@@ -1,5 +1,5 @@
 ---
-description: Run the full SpecKit pipeline (plan, tasks, homer, lisa, ralph) after spec is complete.
+description: Run the full SpecKit pipeline (homer, plan, tasks, lisa, ralph) after spec is complete.
 ---
 
 ## User Input
@@ -10,13 +10,13 @@ $ARGUMENTS
 
 ## Overview
 
-Run the automated SpecKit pipeline from plan through implementation. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
+Run the automated SpecKit pipeline from spec clarification through implementation. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
 
 The pipeline runs these steps in sequence:
 
-1. **plan** — Generate technical implementation plan
-2. **tasks** — Generate dependency-ordered task list
-3. **homer** — Iterative spec clarification & remediation
+1. **homer** — Iterative spec clarification & remediation
+2. **plan** — Generate technical implementation plan
+3. **tasks** — Generate dependency-ordered task list
 4. **lisa** — Cross-artifact consistency analysis
 5. **ralph** — Task-by-task implementation with quality gates
 

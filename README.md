@@ -2,7 +2,7 @@
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
-- **Pipeline** — End-to-end orchestrator that runs the full workflow: plan → tasks → homer → lisa → ralph. Auto-detects the feature directory from the current git branch, supports resuming from any step, and manages prompt generation internally.
+- **Pipeline** — End-to-end orchestrator that runs the full workflow: homer → plan → tasks → lisa → ralph. Auto-detects the feature directory from the current git branch, supports resuming from any step, and manages prompt generation internally.
 - **Ralph Loop** — Task-by-task implementation. Picks up the next incomplete task from `tasks.md`, implements it, validates, commits, and exits. Repeats with fresh context until all tasks are done.
 - **Lisa Loop** — Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes all findings at the highest severity level, commits, and exits. Repeats until zero findings remain.
 - **Homer Loop** — Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, `plan.md`, and `tasks.md`, resolves ambiguities and unanswered questions at the highest severity level, commits, and exits. Repeats until zero findings remain.
@@ -148,13 +148,13 @@ This prints a bash command to start the full pipeline:
 .specify/scripts/bash/pipeline.sh specs/a1b2-feat-user-auth
 ```
 
-Copy and run that command in your terminal. The pipeline will auto-detect the feature directory from your current git branch and run all five steps in sequence: plan → tasks → homer → lisa → ralph.
+Copy and run that command in your terminal. The pipeline will auto-detect the feature directory from your current git branch and run all five steps in sequence: homer → plan → tasks → lisa → ralph.
 
 **Options:**
 
 | Flag               | Description                                        | Default |
 | ------------------ | -------------------------------------------------- | ------- |
-| `--from <step>`    | Resume from a specific step (plan/tasks/homer/lisa/ralph) | auto-detect |
+| `--from <step>`    | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
 | `--homer-max <n>`  | Max homer loop iterations                          | 10      |
 | `--lisa-max <n>`   | Max lisa loop iterations                            | 10      |
 | `--ralph-max <n>`  | Max ralph loop iterations                           | 20      |
@@ -164,9 +164,9 @@ Copy and run that command in your terminal. The pipeline will auto-detect the fe
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts in the spec directory and starts from the right step automatically:
 
 - `tasks.md` exists with some tasks completed → starts at **ralph**
-- `tasks.md` exists with no tasks started → starts at **homer**
+- `tasks.md` exists with no tasks started → starts at **lisa**
 - `plan.md` exists → starts at **tasks**
-- `spec.md` exists → starts at **plan**
+- `spec.md` exists → starts at **homer**
 
 **Resuming after interruption:** All work is committed after each loop iteration, so you can safely interrupt with Ctrl+C and resume later:
 
@@ -208,7 +208,7 @@ Copy and run that command in your terminal. Lisa will iterate — one severity l
 
 ### Homer Loop (clarification)
 
-Once you have `spec.md`, `plan.md`, and `tasks.md`, run the Homer command inside Claude Code:
+After running `/speckit.specify` to create `spec.md`, run the Homer command inside Claude Code:
 
 ```
 /speckit.homer.clarify
@@ -220,7 +220,7 @@ This generates the prompt and prints a bash command:
 .specify/scripts/bash/homer-loop.sh .specify/.homer-prompt.md 10
 ```
 
-Copy and run that command in your terminal. Homer will iterate — one severity level per cycle (CRITICAL > HIGH > MEDIUM > LOW) — resolving ambiguities and unclear requirements until zero findings remain.
+Copy and run that command in your terminal. Homer will iterate — one finding per cycle (highest severity first) — resolving ambiguities and unclear requirements until zero findings remain.
 
 ## How the loops work
 

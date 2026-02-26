@@ -1,5 +1,5 @@
 ---
-description: Run iterative spec clarification and remediation (Homer loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
+description: Run iterative spec clarification and remediation (Homer loop) on spec.md until all findings are resolved.
 ---
 
 ## User Input
@@ -12,27 +12,19 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Generate the Homer loop prompt and print the bash command to run iterative spec clarification and remediation. Each loop iteration clarifies spec artifacts, fixes all findings at the highest severity level, commits, and exits. The loop continues until zero findings remain.
+Generate the Homer loop prompt and print the bash command to run iterative spec clarification and remediation. Each loop iteration clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain.
 
 ## Execution Steps
 
 ### Step 1: Load Feature Context
 
-Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root. Parse JSON output for `FEATURE_DIR`.
+Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root. Parse JSON output for `FEATURE_DIR`.
 
 ### Step 2: Verify Artifacts
 
-Confirm all three artifacts exist in `FEATURE_DIR`:
+Confirm `spec.md` exists in `FEATURE_DIR`.
 
-- `spec.md`
-- `plan.md`
-- `tasks.md`
-
-If any are missing, abort with guidance:
-
-- Missing `spec.md` → "Run /speckit.specify first"
-- Missing `plan.md` → "Run /speckit.plan first"
-- Missing `tasks.md` → "Run /speckit.tasks first"
+If missing, abort with guidance: "Run /speckit.specify first"
 
 ### Step 3: Generate Prompt
 
