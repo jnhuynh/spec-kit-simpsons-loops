@@ -17,9 +17,6 @@
 #
 # Options:
 #   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
-#   --homer-max <n>        Max homer loop iterations (default: 10)
-#   --lisa-max <n>         Max lisa loop iterations (default: 10)
-#   --ralph-max <n>        Max ralph loop iterations (default: 20)
 #   --model <model>        Claude model to use (default: opus)
 #   --dry-run              Show what would be run without executing
 #   --help                 Show this help message
@@ -31,18 +28,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
-# Quality gates for this project (used in ralph prompt generation)
-QUALITY_GATES='```bash
-yarn run lint
-bundle exec rubocop
-bundle exec rspec
-```'
-
 # Defaults
 FROM_STEP=""
-HOMER_MAX=10
-LISA_MAX=10
-RALPH_MAX=20
 MODEL="opus"
 DRY_RUN=false
 
@@ -86,9 +73,6 @@ Usage:
 
 Options:
   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
-  --homer-max <n>        Max homer loop iterations (default: 10)
-  --lisa-max <n>         Max lisa loop iterations (default: 10)
-  --ralph-max <n>        Max ralph loop iterations (default: 20)
   --model <model>        Claude model to use (default: opus)
   --dry-run              Show what would be run without executing
   --help                 Show this help message
@@ -115,12 +99,6 @@ while [ $i -le $# ]; do
                 echo -e "${RED}Error: --from must be one of: homer, plan, tasks, lisa, ralph${NC}" >&2
                 exit 1
             fi ;;
-        --homer-max)
-            i=$((i + 1)); HOMER_MAX="${!i}" ;;
-        --lisa-max)
-            i=$((i + 1)); LISA_MAX="${!i}" ;;
-        --ralph-max)
-            i=$((i + 1)); RALPH_MAX="${!i}" ;;
         --model)
             i=$((i + 1)); MODEL="${!i}" ;;
         --dry-run)
@@ -157,14 +135,6 @@ log_section() {
 # ─── Step Tracking ──────────────────────────────────────────────────────────
 
 STEPS=("homer" "plan" "tasks" "lisa" "ralph")
-STEP_LABELS=(
-    "Homer: Spec Clarification"
-    "Generate Plan"
-    "Generate Tasks"
-    "Lisa: Cross-Artifact Analysis"
-    "Ralph: Implementation"
-)
-CURRENT_STEP_INDEX=0
 
 should_skip_step() {
     local step="$1"
@@ -175,15 +145,6 @@ should_skip_step() {
         done
     fi
     return 1
-}
-
-step_index() {
-    local step="$1" idx=0
-    for s in "${STEPS[@]}"; do
-        if [[ "$s" == "$step" ]]; then echo $idx; return; fi
-        idx=$((idx + 1))
-    done
-    echo -1
 }
 
 print_step_header() {
@@ -227,62 +188,6 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-# ─── Prompt Generation ──────────────────────────────────────────────────────
-
-generate_homer_prompt() {
-    local feature_dir="$1"
-    local template="$REPO_ROOT/.specify/templates/homer-prompt.template.md"
-    local output="$REPO_ROOT/.specify/.homer-prompt.md"
-
-    if [[ ! -f "$template" ]]; then
-        echo -e "${RED}Error: Homer template not found: $template${NC}" >&2
-        return 1
-    fi
-
-    sed "s|{FEATURE_DIR}|$feature_dir|g" "$template" > "$output"
-    echo "$output"
-}
-
-generate_lisa_prompt() {
-    local feature_dir="$1"
-    local template="$REPO_ROOT/.specify/templates/lisa-prompt.template.md"
-    local output="$REPO_ROOT/.specify/.lisa-prompt.md"
-
-    if [[ ! -f "$template" ]]; then
-        echo -e "${RED}Error: Lisa template not found: $template${NC}" >&2
-        return 1
-    fi
-
-    sed "s|{FEATURE_DIR}|$feature_dir|g" "$template" > "$output"
-    echo "$output"
-}
-
-generate_ralph_prompt() {
-    local feature_dir="$1"
-    local template="$REPO_ROOT/.specify/templates/ralph-prompt.template.md"
-    local output="$REPO_ROOT/.specify/.ralph-prompt.md"
-
-    if [[ ! -f "$template" ]]; then
-        echo -e "${RED}Error: Ralph template not found: $template${NC}" >&2
-        return 1
-    fi
-
-    # Replace {FEATURE_DIR} first, then replace {QUALITY_GATES} with multi-line content
-    sed "s|{FEATURE_DIR}|$feature_dir|g" "$template" | \
-        while IFS= read -r line; do
-            if [[ "$line" == *"{QUALITY_GATES}"* ]]; then
-                printf '%s\n' '```bash'
-                printf '%s\n' 'yarn run lint'
-                printf '%s\n' 'bundle exec rubocop'
-                printf '%s\n' 'bundle exec rspec'
-                printf '%s\n' '```'
-            else
-                printf '%s\n' "$line"
-            fi
-        done > "$output"
-    echo "$output"
-}
-
 # ─── Run claude -p ──────────────────────────────────────────────────────────
 
 run_claude() {
@@ -319,6 +224,61 @@ run_claude() {
     fi
 
     return 0
+}
+
+# ─── Run Command Step ──────────────────────────────────────────────────────
+# Invokes a slash command via claude -p, extracts the <shell-command> tag
+# from the output, and executes the resulting shell command.
+
+run_command_step() {
+    local command="$1"
+    local description="$2"
+
+    log "INFO" "Running command step: $description"
+    echo -e "  ${DIM}Invoking $command via claude -p --model $MODEL ...${NC}"
+
+    if $DRY_RUN; then
+        echo -e "  ${CYAN}[dry-run] Would run: echo '$command' | claude -p --dangerously-skip-permissions --model $MODEL${NC}"
+        echo -e "  ${CYAN}[dry-run] Then extract and execute <shell-command> from output${NC}"
+        return 0
+    fi
+
+    local exit_code=0
+    local output
+    output=$(echo "$command" | claude -p \
+        --dangerously-skip-permissions \
+        --model "$MODEL" \
+        2>&1) || exit_code=$?
+
+    # Log output
+    log "OUTPUT" "--- BEGIN CLAUDE OUTPUT ($description) ---"
+    echo "$output" >> "$LOG_FILE"
+    log "OUTPUT" "--- END CLAUDE OUTPUT ---"
+
+    # Display command output
+    echo "$output"
+
+    if [[ $exit_code -ne 0 ]]; then
+        echo -e "  ${RED}Claude exited with status $exit_code${NC}"
+        log "ERROR" "Claude exited with status $exit_code for: $description"
+        return $exit_code
+    fi
+
+    # Extract shell command from <shell-command> tag
+    local shell_cmd
+    shell_cmd=$(echo "$output" | sed -n 's/.*<shell-command>\(.*\)<\/shell-command>.*/\1/p' | head -1)
+
+    if [[ -z "$shell_cmd" ]]; then
+        echo -e "  ${RED}No <shell-command> tag found in output${NC}"
+        log "ERROR" "No <shell-command> tag in claude output for: $description"
+        return 1
+    fi
+
+    echo -e "  ${DIM}Executing: $shell_cmd${NC}"
+    log "INFO" "Executing extracted command: $shell_cmd"
+
+    eval "$shell_cmd"
+    return $?
 }
 
 # ─── Resolve Feature Directory ──────────────────────────────────────────────
@@ -453,25 +413,17 @@ if ! should_skip_step "homer"; then
     STEP_START=$(date +%s)
     print_step_header 1 "Homer: Spec Clarification"
 
-    echo -e "  ${DIM}Generating homer prompt from template...${NC}"
-    HOMER_PROMPT=$(generate_homer_prompt "$FEATURE_DIR") || exit 1
-    log "INFO" "Generated homer prompt: $HOMER_PROMPT"
+    run_command_step "/speckit.homer.clarify $FEATURE_DIR" "Homer: Spec Clarification"
+    HOMER_EXIT=$?
 
-    if $DRY_RUN; then
-        echo -e "  ${CYAN}[dry-run] Would run: homer-loop.sh $HOMER_PROMPT $HOMER_MAX${NC}"
+    if [[ $HOMER_EXIT -eq 0 ]]; then
+        echo -e "  ${GREEN}Homer: All findings resolved${NC}"
+    elif [[ $HOMER_EXIT -eq 1 ]]; then
+        echo -e "  ${YELLOW}Homer: Max iterations reached — continuing pipeline${NC}"
     else
-        "$SCRIPT_DIR/homer-loop.sh" "$HOMER_PROMPT" "$HOMER_MAX"
-        HOMER_EXIT=$?
-
-        if [[ $HOMER_EXIT -eq 0 ]]; then
-            echo -e "  ${GREEN}Homer: All findings resolved${NC}"
-        elif [[ $HOMER_EXIT -eq 1 ]]; then
-            echo -e "  ${YELLOW}Homer: Max iterations reached — continuing pipeline${NC}"
-        else
-            echo -e "  ${RED}Homer: Failed with exit code $HOMER_EXIT${NC}"
-            log "ERROR" "Homer loop failed: exit $HOMER_EXIT"
-            exit $HOMER_EXIT
-        fi
+        echo -e "  ${RED}Homer: Failed with exit code $HOMER_EXIT${NC}"
+        log "ERROR" "Homer loop failed: exit $HOMER_EXIT"
+        exit $HOMER_EXIT
     fi
 
     STEP_END=$(date +%s)
@@ -522,25 +474,17 @@ if ! should_skip_step "lisa"; then
     STEP_START=$(date +%s)
     print_step_header 4 "Lisa: Cross-Artifact Analysis"
 
-    echo -e "  ${DIM}Generating lisa prompt from template...${NC}"
-    LISA_PROMPT=$(generate_lisa_prompt "$FEATURE_DIR") || exit 1
-    log "INFO" "Generated lisa prompt: $LISA_PROMPT"
+    run_command_step "/speckit.lisa.analyze $FEATURE_DIR" "Lisa: Cross-Artifact Analysis"
+    LISA_EXIT=$?
 
-    if $DRY_RUN; then
-        echo -e "  ${CYAN}[dry-run] Would run: lisa-loop.sh $LISA_PROMPT $LISA_MAX${NC}"
+    if [[ $LISA_EXIT -eq 0 ]]; then
+        echo -e "  ${GREEN}Lisa: All findings resolved${NC}"
+    elif [[ $LISA_EXIT -eq 1 ]]; then
+        echo -e "  ${YELLOW}Lisa: Max iterations reached — continuing pipeline${NC}"
     else
-        "$SCRIPT_DIR/lisa-loop.sh" "$LISA_PROMPT" "$LISA_MAX"
-        LISA_EXIT=$?
-
-        if [[ $LISA_EXIT -eq 0 ]]; then
-            echo -e "  ${GREEN}Lisa: All findings resolved${NC}"
-        elif [[ $LISA_EXIT -eq 1 ]]; then
-            echo -e "  ${YELLOW}Lisa: Max iterations reached — continuing pipeline${NC}"
-        else
-            echo -e "  ${RED}Lisa: Failed with exit code $LISA_EXIT${NC}"
-            log "ERROR" "Lisa loop failed: exit $LISA_EXIT"
-            exit $LISA_EXIT
-        fi
+        echo -e "  ${RED}Lisa: Failed with exit code $LISA_EXIT${NC}"
+        log "ERROR" "Lisa loop failed: exit $LISA_EXIT"
+        exit $LISA_EXIT
     fi
 
     STEP_END=$(date +%s)
@@ -553,27 +497,18 @@ if ! should_skip_step "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
-    echo -e "  ${DIM}Generating ralph prompt from template...${NC}"
-    RALPH_PROMPT=$(generate_ralph_prompt "$FEATURE_DIR") || exit 1
-    TASKS_FILE="$REPO_ROOT/$FEATURE_DIR/tasks.md"
-    log "INFO" "Generated ralph prompt: $RALPH_PROMPT"
+    run_command_step "/speckit.ralph.implement $FEATURE_DIR" "Ralph: Implementation"
+    RALPH_EXIT=$?
 
-    if $DRY_RUN; then
-        echo -e "  ${CYAN}[dry-run] Would run: ralph-loop.sh $RALPH_PROMPT $RALPH_MAX $TASKS_FILE${NC}"
+    if [[ $RALPH_EXIT -eq 0 ]]; then
+        echo -e "  ${GREEN}Ralph: All tasks complete${NC}"
+    elif [[ $RALPH_EXIT -eq 1 ]]; then
+        echo -e "  ${YELLOW}Ralph: Max iterations reached${NC}"
+        echo -e "  ${YELLOW}Resume with: speckit-pipeline --from ralph $FEATURE_DIR${NC}"
     else
-        "$SCRIPT_DIR/ralph-loop.sh" "$RALPH_PROMPT" "$RALPH_MAX" "$TASKS_FILE"
-        RALPH_EXIT=$?
-
-        if [[ $RALPH_EXIT -eq 0 ]]; then
-            echo -e "  ${GREEN}Ralph: All tasks complete${NC}"
-        elif [[ $RALPH_EXIT -eq 1 ]]; then
-            echo -e "  ${YELLOW}Ralph: Max iterations reached${NC}"
-            echo -e "  ${YELLOW}Resume with: speckit-pipeline --from ralph $FEATURE_DIR${NC}"
-        else
-            echo -e "  ${RED}Ralph: Failed with exit code $RALPH_EXIT${NC}"
-            log "ERROR" "Ralph loop failed: exit $RALPH_EXIT"
-            exit $RALPH_EXIT
-        fi
+        echo -e "  ${RED}Ralph: Failed with exit code $RALPH_EXIT${NC}"
+        log "ERROR" "Ralph loop failed: exit $RALPH_EXIT"
+        exit $RALPH_EXIT
     fi
 
     STEP_END=$(date +%s)
