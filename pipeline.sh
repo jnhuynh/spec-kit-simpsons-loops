@@ -1,5 +1,5 @@
-#!/bin/bash
-# speckit-pipeline.sh — End-to-end SpecKit pipeline orchestrator
+#!/usr/bin/env bash
+# pipeline.sh — End-to-end SpecKit pipeline orchestrator
 #
 # Runs the SpecKit workflow from spec clarification to implementation.
 # Prerequisite: Run /speckit.specify interactively first to create the spec.
@@ -12,11 +12,14 @@
 #   5. ralph    — Task-by-task implementation with quality gates
 #
 # Usage:
-#   speckit-pipeline [spec-dir]
-#   speckit-pipeline [options] [spec-dir]
+#   pipeline.sh [spec-dir]
+#   pipeline.sh [options] [spec-dir]
 #
 # Options:
 #   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+#   --homer-max <n>        Max homer loop iterations (default: 10)
+#   --lisa-max <n>         Max lisa loop iterations (default: 10)
+#   --ralph-max <n>        Max ralph loop iterations (default: 20)
 #   --model <model>        Claude model to use (default: opus)
 #   --dry-run              Show what would be run without executing
 #   --help                 Show this help message
@@ -32,6 +35,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 FROM_STEP=""
 MODEL="opus"
 DRY_RUN=false
+HOMER_MAX=10
+LISA_MAX=10
+RALPH_MAX=20
 
 # Colors
 RED='\033[0;31m'
@@ -55,7 +61,7 @@ ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
 show_help() {
     cat <<'HELPEOF'
-speckit-pipeline — End-to-end SpecKit pipeline orchestrator
+pipeline.sh — End-to-end SpecKit pipeline orchestrator
 
 Runs the SpecKit workflow from spec clarification to implementation.
 Prerequisite: Run /speckit.specify interactively first to create the spec.
@@ -68,20 +74,23 @@ Steps:
   5. ralph    — Task-by-task implementation with quality gates
 
 Usage:
-  speckit-pipeline [spec-dir]
-  speckit-pipeline [options] [spec-dir]
+  pipeline.sh [spec-dir]
+  pipeline.sh [options] [spec-dir]
 
 Options:
   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+  --homer-max <n>        Max homer loop iterations (default: 10)
+  --lisa-max <n>         Max lisa loop iterations (default: 10)
+  --ralph-max <n>        Max ralph loop iterations (default: 20)
   --model <model>        Claude model to use (default: opus)
   --dry-run              Show what would be run without executing
   --help                 Show this help message
 
 Examples:
-  speckit-pipeline                                   # Auto-detect from current branch
-  speckit-pipeline specs/a1b2-feat-user-auth         # Explicit spec directory
-  speckit-pipeline --from homer                      # Start from homer step
-  speckit-pipeline --from ralph specs/a1b2-feat-user-auth
+  pipeline.sh                                        # Auto-detect from current branch
+  pipeline.sh specs/a1b2-feat-user-auth              # Explicit spec directory
+  pipeline.sh --from homer                           # Start from homer step
+  pipeline.sh --from ralph specs/a1b2-feat-user-auth
 HELPEOF
     exit 0
 }
@@ -101,17 +110,14 @@ while [ $i -le $# ]; do
             fi ;;
         --model)
             i=$((i + 1)); MODEL="${!i}" ;;
+        --homer-max)
+            i=$((i + 1)); HOMER_MAX="${!i}" ;;
+        --lisa-max)
+            i=$((i + 1)); LISA_MAX="${!i}" ;;
+        --ralph-max)
+            i=$((i + 1)); RALPH_MAX="${!i}" ;;
         --dry-run)
             DRY_RUN=true ;;
-        --resume)
-            # Accept --resume for backwards compatibility, treat next non-flag arg as spec dir
-            _next_idx=$((i + 1))
-            if [ $_next_idx -le $# ]; then
-                _next_val="${!_next_idx}"
-                if [[ "$_next_val" != --* ]]; then
-                    i=$_next_idx; SPEC_DIR_ARG="$_next_val"
-                fi
-            fi ;;
         *)
             SPEC_DIR_ARG="$arg" ;;
     esac
@@ -178,7 +184,7 @@ cleanup() {
     echo -e "${YELLOW}  Pipeline interrupted${NC}"
     echo -e "${YELLOW}  Duration: $((duration / 60))m $((duration % 60))s${NC}"
     if [[ -n "${FEATURE_DIR:-}" ]]; then
-        echo -e "${YELLOW}  Resume with: speckit-pipeline ${FEATURE_DIR}${NC}"
+        echo -e "${YELLOW}  Resume with: pipeline.sh ${FEATURE_DIR}${NC}"
     fi
     echo -e "${YELLOW}  Log: $LOG_FILE${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -224,61 +230,6 @@ run_claude() {
     fi
 
     return 0
-}
-
-# ─── Run Command Step ──────────────────────────────────────────────────────
-# Invokes a slash command via claude -p, extracts the <shell-command> tag
-# from the output, and executes the resulting shell command.
-
-run_command_step() {
-    local command="$1"
-    local description="$2"
-
-    log "INFO" "Running command step: $description"
-    echo -e "  ${DIM}Invoking $command via claude -p --model $MODEL ...${NC}"
-
-    if $DRY_RUN; then
-        echo -e "  ${CYAN}[dry-run] Would run: echo '$command' | claude -p --dangerously-skip-permissions --model $MODEL${NC}"
-        echo -e "  ${CYAN}[dry-run] Then extract and execute <shell-command> from output${NC}"
-        return 0
-    fi
-
-    local exit_code=0
-    local output
-    output=$(echo "$command" | claude -p \
-        --dangerously-skip-permissions \
-        --model "$MODEL" \
-        2>&1) || exit_code=$?
-
-    # Log output
-    log "OUTPUT" "--- BEGIN CLAUDE OUTPUT ($description) ---"
-    echo "$output" >> "$LOG_FILE"
-    log "OUTPUT" "--- END CLAUDE OUTPUT ---"
-
-    # Display command output
-    echo "$output"
-
-    if [[ $exit_code -ne 0 ]]; then
-        echo -e "  ${RED}Claude exited with status $exit_code${NC}"
-        log "ERROR" "Claude exited with status $exit_code for: $description"
-        return $exit_code
-    fi
-
-    # Extract shell command from <shell-command> tag
-    local shell_cmd
-    shell_cmd=$(echo "$output" | sed -n 's/.*<shell-command>\(.*\)<\/shell-command>.*/\1/p' | head -1)
-
-    if [[ -z "$shell_cmd" ]]; then
-        echo -e "  ${RED}No <shell-command> tag found in output${NC}"
-        log "ERROR" "No <shell-command> tag in claude output for: $description"
-        return 1
-    fi
-
-    echo -e "  ${DIM}Executing: $shell_cmd${NC}"
-    log "INFO" "Executing extracted command: $shell_cmd"
-
-    eval "$shell_cmd"
-    return $?
 }
 
 # ─── Resolve Feature Directory ──────────────────────────────────────────────
@@ -399,7 +350,7 @@ echo -e "${MAGENTA}║${NC}  ${BOLD}SpecKit Pipeline${NC} — Plan to Implementa
 echo -e "${MAGENTA}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${MAGENTA}║${NC}  Feature: ${CYAN}${FEATURE_DIR}${NC}"
 echo -e "${MAGENTA}║${NC}  Starting from: ${CYAN}${FROM_STEP}${NC}"
-echo -e "${MAGENTA}║${NC}  Model: ${DIM}${MODEL}${NC}"
+echo -e "${MAGENTA}║${NC}  Model: ${DIM}${MODEL}${NC}  Max: ${DIM}homer=${HOMER_MAX} lisa=${LISA_MAX} ralph=${RALPH_MAX}${NC}"
 echo -e "${MAGENTA}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${MAGENTA}╚════════════════════════════════════════════════════════════╝${NC}"
 
@@ -413,8 +364,17 @@ if ! should_skip_step "homer"; then
     STEP_START=$(date +%s)
     print_step_header 1 "Homer: Spec Clarification"
 
-    run_command_step "/speckit.homer.clarify $FEATURE_DIR" "Homer: Spec Clarification"
-    HOMER_EXIT=$?
+    HOMER_CMD="$REPO_ROOT/.specify/scripts/bash/homer-loop.sh $FEATURE_DIR $HOMER_MAX"
+    log "INFO" "Running: $HOMER_CMD"
+    echo -e "  ${DIM}Running: $HOMER_CMD${NC}"
+
+    if $DRY_RUN; then
+        echo -e "  ${CYAN}[dry-run] Would run: $HOMER_CMD${NC}"
+        HOMER_EXIT=0
+    else
+        CLAUDE_MODEL="$MODEL" $HOMER_CMD
+        HOMER_EXIT=$?
+    fi
 
     if [[ $HOMER_EXIT -eq 0 ]]; then
         echo -e "  ${GREEN}Homer: All findings resolved${NC}"
@@ -474,8 +434,17 @@ if ! should_skip_step "lisa"; then
     STEP_START=$(date +%s)
     print_step_header 4 "Lisa: Cross-Artifact Analysis"
 
-    run_command_step "/speckit.lisa.analyze $FEATURE_DIR" "Lisa: Cross-Artifact Analysis"
-    LISA_EXIT=$?
+    LISA_CMD="$REPO_ROOT/.specify/scripts/bash/lisa-loop.sh $FEATURE_DIR $LISA_MAX"
+    log "INFO" "Running: $LISA_CMD"
+    echo -e "  ${DIM}Running: $LISA_CMD${NC}"
+
+    if $DRY_RUN; then
+        echo -e "  ${CYAN}[dry-run] Would run: $LISA_CMD${NC}"
+        LISA_EXIT=0
+    else
+        CLAUDE_MODEL="$MODEL" $LISA_CMD
+        LISA_EXIT=$?
+    fi
 
     if [[ $LISA_EXIT -eq 0 ]]; then
         echo -e "  ${GREEN}Lisa: All findings resolved${NC}"
@@ -497,14 +466,23 @@ if ! should_skip_step "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
-    run_command_step "/speckit.ralph.implement $FEATURE_DIR" "Ralph: Implementation"
-    RALPH_EXIT=$?
+    RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX $REPO_ROOT/$FEATURE_DIR/tasks.md"
+    log "INFO" "Running: $RALPH_CMD"
+    echo -e "  ${DIM}Running: $RALPH_CMD${NC}"
+
+    if $DRY_RUN; then
+        echo -e "  ${CYAN}[dry-run] Would run: $RALPH_CMD${NC}"
+        RALPH_EXIT=0
+    else
+        CLAUDE_MODEL="$MODEL" $RALPH_CMD
+        RALPH_EXIT=$?
+    fi
 
     if [[ $RALPH_EXIT -eq 0 ]]; then
         echo -e "  ${GREEN}Ralph: All tasks complete${NC}"
     elif [[ $RALPH_EXIT -eq 1 ]]; then
         echo -e "  ${YELLOW}Ralph: Max iterations reached${NC}"
-        echo -e "  ${YELLOW}Resume with: speckit-pipeline --from ralph $FEATURE_DIR${NC}"
+        echo -e "  ${YELLOW}Resume with: pipeline.sh --from ralph $FEATURE_DIR${NC}"
     else
         echo -e "  ${RED}Ralph: Failed with exit code $RALPH_EXIT${NC}"
         log "ERROR" "Ralph loop failed: exit $RALPH_EXIT"

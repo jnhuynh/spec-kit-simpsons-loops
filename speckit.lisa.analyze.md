@@ -12,7 +12,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Resolve the feature directory, verify artifacts, and print the bash command to run the Lisa loop for iterative cross-artifact analysis and remediation. Each loop iteration analyzes spec artifacts, fixes all findings at the highest severity level, commits, and exits. The loop continues until zero findings remain.
+Resolve the feature directory, verify artifacts, and print the bash command to run the Lisa loop for iterative cross-artifact analysis and remediation. Each loop iteration analyzes spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain.
 
 ## Execution Steps
 

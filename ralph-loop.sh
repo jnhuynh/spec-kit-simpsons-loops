@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Ralph Loop - True fresh context per iteration
 # Usage: ./ralph-loop.sh <prompt-file|spec-dir> [max-iterations] [tasks-file]
 #
@@ -12,6 +12,7 @@ set -uo pipefail
 ARG1="${1:-}"
 MAX_ITERATIONS="${2:-5}"
 TASKS_FILE="${3:-}"
+MODEL="${CLAUDE_MODEL:-opus}"
 GENERATED_PROMPT=""
 ITERATION=0
 LOG_DIR=".specify/logs"
@@ -55,7 +56,10 @@ resolve_prompt_file() {
             echo -e "${RED}Error: Template not found: $template${NC}"
             exit 1
         fi
-        sed "s|{FEATURE_DIR}|$FEATURE_DIR|g" "$template" > "$GENERATED_PROMPT"
+        local quality_gates="${QUALITY_GATES:-echo \"PLACEHOLDER: Set QUALITY_GATES env var or update speckit.ralph.implement.md\" && exit 1}"
+        sed -e "s|{FEATURE_DIR}|$FEATURE_DIR|g" \
+            -e "s|{QUALITY_GATES}|$quality_gates|g" \
+            "$template" > "$GENERATED_PROMPT"
         PROMPT_FILE="$GENERATED_PROMPT"
         return
     fi
@@ -136,6 +140,7 @@ echo -e "${BLUE}╠════════════════════�
 echo -e "${BLUE}║${NC}  Prompt: ${DIM}${PROMPT_FILE}${NC}"
 [[ -n "${FEATURE_DIR:-}" ]] && echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
+echo -e "${BLUE}║${NC}  Model: ${DIM}${MODEL}${NC}"
 if [[ -n "$TASKS_FILE" ]]; then
     echo -e "${BLUE}║${NC}  Tasks: ${DIM}${TASKS_FILE}${NC}"
 fi
@@ -212,7 +217,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     CLAUDE_EXIT=0
     ITER_OUTPUT=$(claude -p \
         --dangerously-skip-permissions \
-        --model opus \
+        --model "$MODEL" \
         < "$PROMPT_FILE" \
         2>&1) || CLAUDE_EXIT=$?
 
@@ -260,11 +265,11 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
         if diff -q ".specify/.ralph-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
             STUCK=true
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
-            echo -e "  ${YELLOW}⚠️  Output identical to previous iteration (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
+            echo -e "  ${YELLOW}  Output identical to previous iteration (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
             log "WARN" "Stuck detection: output identical to previous (consecutive: $CONSECUTIVE_FAILURES)"
 
             if [[ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]]; then
-                echo -e "  ${RED}❌ Stuck after $MAX_CONSECUTIVE_FAILURES identical outputs${NC}"
+                echo -e "  ${RED}  Stuck after $MAX_CONSECUTIVE_FAILURES identical outputs${NC}"
                 echo -e "  ${YELLOW}   Suggestion: Ctrl+C and run /speckit.tasks to regenerate${NC}"
                 log "ERROR" "Aborting: stuck after $MAX_CONSECUTIVE_FAILURES consecutive identical outputs"
                 rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
@@ -284,7 +289,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
 
         echo ""
         echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║  ✅ ALL TASKS COMPLETE                                     ║${NC}"
+        echo -e "${GREEN}║  ALL TASKS COMPLETE                                        ║${NC}"
         echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
         echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
         echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
@@ -311,7 +316,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
 
             echo ""
             echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-            echo -e "${GREEN}║  ✅ ALL TASKS COMPLETE (verified in tasks.md)             ║${NC}"
+            echo -e "${GREEN}║  ALL TASKS COMPLETE (verified in tasks.md)                ║${NC}"
             echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
             echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
             echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
@@ -336,7 +341,7 @@ total_duration=$((end_time - START_TIME))
 
 echo ""
 echo -e "${YELLOW}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${YELLOW}║  ⚠️  Max iterations ($MAX_ITERATIONS) reached              ║${NC}"
+echo -e "${YELLOW}║  Max iterations ($MAX_ITERATIONS) reached                            ║${NC}"
 echo -e "${YELLOW}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${YELLOW}║${NC}  Duration: $((total_duration / 60))m $((total_duration % 60))s"
 echo -e "${YELLOW}║${NC}  Run /speckit.ralph.implement to continue"

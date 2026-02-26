@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Homer Loop - Iterative spec clarification & remediation with fresh context per iteration
 # Usage: ./homer-loop.sh <prompt-file|spec-dir> [max-iterations]
 #
@@ -11,6 +11,7 @@ set -uo pipefail
 
 ARG1="${1:-}"
 MAX_ITERATIONS="${2:-10}"
+MODEL="${CLAUDE_MODEL:-opus}"
 GENERATED_PROMPT=""
 ITERATION=0
 LOG_DIR=".specify/logs"
@@ -112,6 +113,7 @@ echo -e "${BLUE}╠════════════════════�
 echo -e "${BLUE}║${NC}  Prompt: ${DIM}${PROMPT_FILE}${NC}"
 [[ -n "${FEATURE_DIR:-}" ]] && echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
+echo -e "${BLUE}║${NC}  Model: ${DIM}${MODEL}${NC}"
 echo -e "${BLUE}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
@@ -150,7 +152,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     CLAUDE_EXIT=0
     ITER_OUTPUT=$(claude -p \
         --dangerously-skip-permissions \
-        --model opus \
+        --model "$MODEL" \
         < "$PROMPT_FILE" \
         2>&1) || CLAUDE_EXIT=$?
 
