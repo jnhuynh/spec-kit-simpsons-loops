@@ -9,11 +9,11 @@
 **Context**: The spec (FR-004, FR-008, FR-009) mandates that the canonical term is "Agent tool" (not "Task tool"). The current codebase uses "Task tool" in multiple locations.
 
 **Current State (observed inconsistencies)**:
-- `speckit.homer.clarify.md` lines 15, 40: uses "Task tool"
-- `speckit.lisa.analyze.md` lines 15, 48: uses "Task tool"
-- `speckit.ralph.implement.md` lines 15, 48: uses "Task tool"
-- `speckit.pipeline.md` lines 13, 56, 58: uses "Task tool" and "Task tool call"
-- `README.md` lines 5, 131: uses "Task tool"
+- ~~`speckit.homer.clarify.md` lines 15, 40: uses "Task tool"~~ — REMEDIATED (now uses "Agent tool" throughout)
+- ~~`speckit.lisa.analyze.md` lines 15, 48: uses "Task tool"~~ — REMEDIATED (now uses "Agent tool" throughout)
+- ~~`speckit.ralph.implement.md` lines 15, 48: uses "Task tool"~~ — REMEDIATED (now uses "Agent tool" throughout)
+- ~~`speckit.pipeline.md` lines 13, 56, 58: uses "Task tool" and "Task tool call"~~ — REMEDIATED (now uses "Agent tool" throughout)
+- `README.md` lines 5, 131: uses "Task tool" — STILL OPEN (tracked by T034)
 
 **Decision**: Replace all "Task tool" occurrences with "Agent tool" in loop command files and README.
 **Rationale**: The spec explicitly deprecates "Task tool" in favor of "Agent tool" as the canonical term.
@@ -135,7 +135,7 @@
 
 | # | Finding | Status | Action Required |
 |---|---------|--------|-----------------|
-| R1 | "Task tool" used instead of "Agent tool" in 5 files | Inconsistency | Replace in all loop commands + README |
+| R1 | "Task tool" used instead of "Agent tool" in 5 files | Partially Remediated | Loop command files fixed (T012-T015 complete); README.md still open (T034) |
 | R2 | Loop commands have retry logic, spec says no retry | Inconsistency | Update loop commands to abort on first failure |
 | R3 | Ralph's dynamic iteration limit | Compliant | Keep as-is, ensure clear abort messages |
 | R4 | Setup script idempotency | Compliant | Minor wording improvements |
