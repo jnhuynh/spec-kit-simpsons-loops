@@ -44,7 +44,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This copies all files (loop scripts, pipeline, agent definitions, and Claude Code commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
+This copies all files (bash loop scripts, pipeline, agent definitions, and loop commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
 
 ### 📝 Option B: Manual
 
@@ -56,7 +56,7 @@ This copies all files (loop scripts, pipeline, agent definitions, and Claude Cod
 From the root of your project:
 
 ```bash
-# Shell scripts (manual fallback) → .specify/scripts/bash/
+# Bash loop scripts (manual fallback) → .specify/scripts/bash/
 cp <path-to-simpsons-loops>/ralph-loop.sh   .specify/scripts/bash/ralph-loop.sh
 cp <path-to-simpsons-loops>/lisa-loop.sh     .specify/scripts/bash/lisa-loop.sh
 cp <path-to-simpsons-loops>/homer-loop.sh    .specify/scripts/bash/homer-loop.sh
@@ -69,7 +69,7 @@ cp <path-to-simpsons-loops>/agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/agents/tasks.md  .claude/agents/tasks.md
 
-# Claude Code commands → .claude/commands/
+# Loop commands → .claude/commands/
 cp <path-to-simpsons-loops>/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
 cp <path-to-simpsons-loops>/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
 cp <path-to-simpsons-loops>/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
@@ -107,7 +107,7 @@ chmod +x .specify/scripts/bash/pipeline.sh
 .specify/logs/          # All log files
 ```
 
-#### 4. Allow loop scripts in Claude Code permissions
+#### 4. Allow bash loop scripts in Claude Code permissions
 
 Add to `.claude/settings.local.json`:
 
