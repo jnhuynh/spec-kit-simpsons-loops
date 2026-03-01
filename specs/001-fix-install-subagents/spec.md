@@ -78,6 +78,12 @@ A developer reads the README and gets an accurate picture of how the project wor
 - What happens if stuck detection triggers during autonomous execution? The loop aborts after 3 identical outputs and suggests manual review.
 - What happens if `setup.sh` is run from inside the simpsons-loops repo itself? It fails with a clear error explaining to run it from the target project instead.
 
+## Clarifications
+
+### Session 2026-03-01
+
+- Q: What are the canonical terms for the sub agent spawning mechanism, and what deprecated synonyms should be avoided for consistency across all project files? → A: The canonical term is "Agent tool" (not "Task tool"). All references to spawning sub agents must use "Agent tool" or "sub agents via the Agent tool". The term "Task tool" is deprecated and must be replaced wherever it appears in loop command files and the README.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -100,6 +106,21 @@ A developer reads the README and gets an accurate picture of how the project wor
 - **Agent definitions**: The `.claude/agents/*.md` files that define behavior for each sub agent type (homer, lisa, ralph, plan, tasks)
 - **Bash loop scripts**: The standalone shell scripts (`homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`) that provide a fallback outside of Claude Code
 - **README**: The primary documentation file describing setup, usage, and behavior
+
+### Terminology & Consistency
+
+The following canonical terms MUST be used consistently across all project files (loop command files, agent definitions, README, and spec):
+
+| Canonical Term | Definition | Deprecated Synonyms |
+|---------------|------------|---------------------|
+| **Agent tool** | The Claude Code mechanism for spawning sub agents with `subagent_type` parameter | "Task tool" |
+| **sub agent** | A fresh-context agent instance spawned by the Agent tool within a loop iteration | "task", "child agent" |
+| **loop command** | A Claude Code slash command (`.claude/commands/speckit.*.md`) that orchestrates iterative sub agent execution | "loop script" (reserved for bash fallback) |
+| **bash loop script** | A standalone shell script (`*-loop.sh`, `pipeline.sh`) that provides fallback execution outside Claude Code | — |
+| **promise tag** | The XML-style completion signal (e.g., `<promise>ALL_FINDINGS_RESOLVED</promise>`) returned by sub agents | "completion signal" (acceptable but less precise) |
+| **stuck detection** | The mechanism that aborts a loop after 3 consecutive identical outputs | — |
+
+**Enforcement**: FR-008 and FR-009 require that all files use the canonical terms above. Any occurrence of a deprecated synonym MUST be replaced with the canonical term.
 
 ## Assumptions
 
