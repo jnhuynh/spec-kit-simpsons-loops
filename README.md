@@ -205,14 +205,15 @@ The bash scripts provide a standalone alternative that runs outside of Claude Co
 
 ### Pipeline options (bash)
 
-| Flag               | Description                                              | Default      |
-| ------------------ | -------------------------------------------------------- | ------------ |
-| `--from <step>`    | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
-| `--homer-max <n>`  | Max homer loop iterations                                | 10           |
-| `--lisa-max <n>`   | Max lisa loop iterations                                 | 10           |
-| `--ralph-max <n>`  | Max ralph loop iterations                                | 20           |
-| `--model <model>`  | Claude model to use                                      | opus         |
-| `--dry-run`        | Show what would run without executing                    | —            |
+| Flag                    | Description                                              | Default      |
+| ----------------------- | -------------------------------------------------------- | ------------ |
+| `--from <step>`         | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
+| `--homer-max <n>`       | Max homer loop iterations                                | 10           |
+| `--lisa-max <n>`        | Max lisa loop iterations                                 | 10           |
+| `--ralph-max <n>`       | Max ralph loop iterations                                | 20           |
+| `--quality-gates <cmd>` | Quality gates command for Ralph                          | placeholder  |
+| `--model <model>`       | Claude model to use                                      | opus         |
+| `--dry-run`             | Show what would run without executing                    | —            |
 
 ## ⚙️ How the loops work
 
