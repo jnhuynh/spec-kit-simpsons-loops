@@ -34,6 +34,8 @@ The constitution file (`.specify/memory/constitution.md`) contains only placehol
 
 ```text
 specs/001-fix-install-subagents/
+├── spec.md              # Feature specification (/speckit.specify command)
+├── checklists/          # Specification quality checklists
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
