@@ -2,7 +2,7 @@
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
-Each loop spawns fresh sub agents (via the Task tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
+Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
 | Loop | What it does |
 | --- | --- |
@@ -128,7 +128,7 @@ Add to `.claude/settings.local.json`:
 
 ## 🚀 Usage (Recommended: Slash Commands)
 
-Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Task tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
+Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
 
 ### 🍩 Homer (clarification)
 
