@@ -78,7 +78,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - What happens if a loop command cannot find the spec directory? It reports the error clearly and suggests running `/speckit.specify`.
 - What happens if stuck detection triggers during autonomous execution? The loop aborts after 3 identical outputs and suggests manual review.
 - What happens if `setup.sh` is run from inside the simpsons-loops repo itself? It fails with a clear error explaining to run it from the target project instead.
-- What happens if a sub agent crashes or times out mid-iteration (as opposed to stuck detection for identical outputs)? The loop command catches the error, logs the failure context (iteration number, agent type, error message), and aborts the loop with a clear error message suggesting manual review. The loop does NOT retry automatically to avoid cascading failures.
+- What happens if a sub agent crashes or times out mid-iteration (as opposed to stuck detection for identical outputs)? **Loop commands** (slash commands) catch the error, log the failure context (iteration number, agent type, error message), and abort the loop with a clear error message suggesting manual review. Loop commands do NOT retry automatically to avoid cascading failures. **Bash loop scripts** implement limited retry (up to 3 consecutive failures before aborting) as a resilience measure, since CLI process failures are more common and often transient.
 - What happens if a loop reaches 10 iterations without the sub agent returning the promise tag and without stuck detection triggering? The loop aborts with a clear message reporting the iteration count (10) and suggesting manual review. This prevents runaway execution when outputs vary enough to bypass stuck detection but never converge on the completion signal.
 
 ## Clarifications
@@ -89,6 +89,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - Q: What should happen if a sub agent crashes or times out mid-iteration, distinct from stuck detection? → A: The loop command catches the error, logs failure context (iteration number, agent type, error message), and aborts with a clear error suggesting manual review. No automatic retry to avoid cascading failures.
 - Q: What is the maximum iteration limit for loop commands to prevent runaway execution when stuck detection does not trigger? → A: All loop commands MUST enforce a maximum of 10 iterations per loop invocation. When the limit is reached, the loop aborts with a clear message reporting the iteration count and suggesting manual review. This safeguards against non-converging outputs that vary enough to bypass stuck detection but never reach the promise tag.
 - Q: What are the exact 13 distribution files referenced in FR-001, and what are their source-to-destination mappings? → A: The 13 files are enumerated in the Distribution File Manifest under Key Entities. They comprise 4 bash loop scripts, 5 agent definitions, and 4 loop command files, each with an explicit source path and destination path in the target project.
+- Q: Does the no-retry policy for sub agent failures (FR-011) apply to both loop commands and bash loop scripts, or only to loop commands? → A: FR-011's no-retry policy applies to loop commands (slash commands) only. Bash loop scripts implement limited retry (up to 3 consecutive failures) as a resilience measure for transient CLI process failures. This distinction is intentional: loop commands run inside Claude Code where failures are typically deterministic, while bash scripts invoke external CLI processes where transient failures are common.
 
 ## Requirements *(mandatory)*
 
@@ -104,7 +105,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - **FR-008**: The README MUST use consistent terminology that matches the loop command files and agent definitions
 - **FR-009**: All loop command files and the README MUST be internally consistent — the same behavior described the same way across all files
 - **FR-010**: The bash script fallback (`homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`) MUST use `--dangerously-skip-permissions` when invoking `claude --agent`
-- **FR-011**: All loop commands MUST handle sub agent crash or timeout by catching the error, logging failure context (iteration number, agent type, error message), and aborting the loop with a clear error message — no automatic retry
+- **FR-011**: All loop commands (slash commands) MUST handle sub agent crash or timeout by catching the error, logging failure context (iteration number, agent type, error message), and aborting the loop with a clear error message — no automatic retry. Bash loop scripts MAY implement limited retry (up to 3 consecutive failures) for transient CLI process failures before aborting.
 - **FR-012**: All loop commands MUST enforce a maximum iteration limit of 10 iterations per loop invocation — when the limit is reached, the loop aborts with a clear message reporting the iteration count and suggesting manual review
 
 ### Key Entities
