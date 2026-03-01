@@ -10,23 +10,23 @@ This feature is a consistency and correctness pass across the simpsons-loops pro
 
 ### 1. Terminology Fix: "Task tool" -> "Agent tool"
 
-**Files to change** (5 files):
-- `speckit.homer.clarify.md` -- 2 occurrences
-- `speckit.lisa.analyze.md` -- 2 occurrences
-- `speckit.ralph.implement.md` -- 2 occurrences
-- `speckit.pipeline.md` -- 3 occurrences (including "Task tool call" -> "Agent tool call")
+**Files already remediated** (4 files -- T012-T015 VERIFIED COMPLETE):
+- ~~`speckit.homer.clarify.md` -- 2 occurrences~~ DONE
+- ~~`speckit.lisa.analyze.md` -- 2 occurrences~~ DONE
+- ~~`speckit.ralph.implement.md` -- 2 occurrences~~ DONE
+- ~~`speckit.pipeline.md` -- 3 occurrences (including "Task tool call" -> "Agent tool call")~~ DONE
+
+**Files remaining** (1 file -- tracked by T034):
 - `README.md` -- 2 occurrences
 
-**What to do**: Find-and-replace "Task tool" with "Agent tool" in each file.
+**What to do**: Find-and-replace "Task tool" with "Agent tool" in `README.md`.
 
 ### 2. Failure Handling: No Retry in Loop Commands
 
-**Files to change** (3 files):
-- `speckit.homer.clarify.md`
-- `speckit.lisa.analyze.md`
-- `speckit.ralph.implement.md`
-
-**What to do**: Replace the "Abort after 3 consecutive failures" failure handling with immediate abort on first failure. Log failure context (iteration number, agent type, error message).
+**Files already remediated** (3 files -- T016-T018 VERIFIED COMPLETE):
+- ~~`speckit.homer.clarify.md`~~ DONE -- already uses immediate abort with error context logging
+- ~~`speckit.lisa.analyze.md`~~ DONE -- already uses immediate abort with error context logging
+- ~~`speckit.ralph.implement.md`~~ DONE -- already uses immediate abort with error context logging
 
 **Do NOT change** (4 files):
 - `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh` -- bash scripts keep their retry behavior.
