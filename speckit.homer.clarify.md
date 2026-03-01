@@ -51,7 +51,7 @@ For each iteration (up to max):
 
 3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest manual review.
 
-4. **Failure handling**: If the sub agent fails, increment failure counter. Abort after 3 consecutive failures.
+4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
 ### Step 5: Report Results
 
