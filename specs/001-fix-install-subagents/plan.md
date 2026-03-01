@@ -5,7 +5,7 @@
 
 ## Summary
 
-Fix the install script (`setup.sh`) to work reliably with test directories, update all four loop command files to use the canonical "Agent tool" terminology instead of deprecated "Task tool", enforce consistent behavior (sequential execution, autonomous operation, 10-iteration limit, error handling), and rewrite the README to accurately reflect current behavior. This is primarily a consistency and correctness pass across shell scripts, Markdown command files, and documentation.
+Fix the install script (`setup.sh`) to work reliably with test directories, update all four loop command files to use the canonical "Agent tool" terminology instead of deprecated "Task tool", enforce consistent behavior (sequential execution, autonomous operation, iteration limits per FR-012 — homer/lisa: 10, ralph: `incomplete_tasks + 10`, error handling), and rewrite the README to accurately reflect current behavior. This is primarily a consistency and correctness pass across shell scripts, Markdown command files, and documentation.
 
 ## Technical Context
 
