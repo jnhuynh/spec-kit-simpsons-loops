@@ -77,12 +77,14 @@ A developer reads the README and gets an accurate picture of how the project wor
 - What happens if a loop command cannot find the spec directory? It reports the error clearly and suggests running `/speckit.specify`.
 - What happens if stuck detection triggers during autonomous execution? The loop aborts after 3 identical outputs and suggests manual review.
 - What happens if `setup.sh` is run from inside the simpsons-loops repo itself? It fails with a clear error explaining to run it from the target project instead.
+- What happens if a sub agent crashes or times out mid-iteration (as opposed to stuck detection for identical outputs)? The loop command catches the error, logs the failure context (iteration number, agent type, error message), and aborts the loop with a clear error message suggesting manual review. The loop does NOT retry automatically to avoid cascading failures.
 
 ## Clarifications
 
 ### Session 2026-03-01
 
 - Q: What are the canonical terms for the sub agent spawning mechanism, and what deprecated synonyms should be avoided for consistency across all project files? → A: The canonical term is "Agent tool" (not "Task tool"). All references to spawning sub agents must use "Agent tool" or "sub agents via the Agent tool". The term "Task tool" is deprecated and must be replaced wherever it appears in loop command files and the README.
+- Q: What should happen if a sub agent crashes or times out mid-iteration, distinct from stuck detection? → A: The loop command catches the error, logs failure context (iteration number, agent type, error message), and aborts with a clear error suggesting manual review. No automatic retry to avoid cascading failures.
 
 ## Requirements *(mandatory)*
 
@@ -98,6 +100,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - **FR-008**: The README MUST use consistent terminology that matches the loop command files and agent definitions
 - **FR-009**: All loop command files and the README MUST be internally consistent — the same behavior described the same way across all files
 - **FR-010**: The bash script fallback (`homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`) MUST use `--dangerously-skip-permissions` when invoking `claude --agent`
+- **FR-011**: All loop commands MUST handle sub agent crash or timeout by catching the error, logging failure context (iteration number, agent type, error message), and aborting the loop with a clear error message — no automatic retry
 
 ### Key Entities
 
