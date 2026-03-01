@@ -12,7 +12,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Orchestrate the Lisa loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Task tool) that analyzes cross-artifact consistency, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
+Orchestrate the Lisa loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that analyzes cross-artifact consistency, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
 
@@ -45,7 +45,7 @@ If any are missing, abort with guidance:
 
 For each iteration (up to max):
 
-1. Spawn a fresh-context sub agent using the **Task tool**:
+1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `.claude/agents/lisa.md`

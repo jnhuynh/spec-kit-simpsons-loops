@@ -10,7 +10,7 @@ $ARGUMENTS
 
 ## Overview
 
-Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Task tool) with isolated context windows. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
+Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
 
 **AUTONOMOUS EXECUTION**: This pipeline runs unattended. Do NOT ask the user for confirmation between iterations or steps. Do NOT pause for permission requests. Execute all steps and iterations back-to-back until the pipeline completes or a failure condition is met.
 
@@ -53,9 +53,9 @@ Check which artifacts exist to determine where to start:
 
 ### Step 5: Execute Pipeline Steps
 
-**CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Task tool call MUST return before the next one is spawned. Never use parallel Task calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
+**CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Agent tool call MUST return before the next one is spawned. Never use parallel Agent calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
 
-For each step (starting from the detected/specified step), spawn fresh sub agents using the **Task tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
+For each step (starting from the detected/specified step), spawn fresh sub agents using the **Agent tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
 
 When composing the prompt for each sub agent, always include:
 - Instruct the agent to read and follow the corresponding agent file from `.claude/agents/`

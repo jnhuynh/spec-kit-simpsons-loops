@@ -12,7 +12,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Orchestrate the Ralph loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Task tool) that implements one task from tasks.md, runs quality gates, commits, and exits. The loop continues until all tasks are complete or max iterations is reached.
+Orchestrate the Ralph loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that implements one task from tasks.md, runs quality gates, commits, and exits. The loop continues until all tasks are complete or max iterations is reached.
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all tasks complete, max iterations reached, or stuck detection triggers).
 
@@ -45,7 +45,7 @@ echo "PLACEHOLDER: Update this quality gate in speckit.ralph.implement.md before
 
 For each iteration (up to max):
 
-1. Spawn a fresh-context sub agent using the **Task tool**:
+1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `.claude/agents/ralph.md`
