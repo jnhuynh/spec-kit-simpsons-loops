@@ -67,5 +67,5 @@ For each iteration (up to max):
 
 After the loop completes, report:
 - Total iterations run
-- Whether all findings were resolved or max iterations reached
-- Suggestion to rerun if max iterations reached
+- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Suggestion to rerun if not fully resolved

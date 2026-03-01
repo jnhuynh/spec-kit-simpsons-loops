@@ -117,8 +117,8 @@ Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md d
 After all steps complete, report:
 - Steps executed
 - Total iterations per loop step
-- Overall success or where the pipeline stopped
-- Suggestion to resume with `--from <step>` if needed
+- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 3 consecutive identical outputs detected in a loop step; **failure** — a sub agent crashed or errored)
+- Suggestion to resume with `--from <step>` if not fully resolved
 
 ## Examples
 
