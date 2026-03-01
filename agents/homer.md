@@ -4,6 +4,10 @@ Clarify spec artifacts by resolving ambiguities, unanswered questions, and uncle
 
 > **Note:** One finding per iteration. Loop until zero findings remain.
 
+## Feature Directory
+
+The feature directory is provided via the `-p` prompt when this agent is invoked. Extract the path from the prompt (e.g., "Feature directory: specs/a1b2-feat-foo").
+
 ## Phase 0: Clarify
 
 Run `/speckit.clarify Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Clarification Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
@@ -38,11 +42,11 @@ Run `/speckit.clarify Remediate only the single highest-severity finding without
 | --- | ------------------------------------------------------------------------------------------------ |
 | 999 | **One finding per iteration** — Fix one finding, then exit                                      |
 | 998 | **Constitution is authoritative** — Never modify constitution.md; adjust spec/plan/tasks instead |
-| 997 | **Spec artifacts only** — Only modify files within `{FEATURE_DIR}/`                              |
+| 997 | **Spec artifacts only** — Only modify files within the feature directory                         |
 | 996 | **Validate after remediation** — Re-read modified files and verify fix before committing         |
 | 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW         |
 
 ## File Paths
 
-- Spec: `{FEATURE_DIR}/spec.md`
+- Spec: `<FEATURE_DIR>/spec.md`
 - Constitution: `.specify/memory/constitution.md`

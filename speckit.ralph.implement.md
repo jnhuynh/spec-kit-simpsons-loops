@@ -1,5 +1,5 @@
 ---
-description: Generate Ralph loop prompt and print the bash command to run task-by-task implementation.
+description: Orchestrate task-by-task implementation (Ralph loop) until all tasks are complete.
 ---
 
 ## User Input
@@ -12,7 +12,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Resolve the feature directory, generate the Ralph loop prompt (with quality gates), and print the bash command to run task-by-task implementation. Each loop iteration implements one task, runs quality gates, commits, and exits. The loop continues until all tasks are complete.
+Orchestrate the Ralph loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Task tool) that implements one task from tasks.md, runs quality gates, commits, and exits. The loop continues until all tasks are complete or max iterations is reached.
+
+**AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all tasks complete, max iterations reached, or stuck detection triggers).
 
 ## Execution Steps
 
@@ -35,22 +37,34 @@ Resolve the feature directory, generate the Ralph loop prompt (with quality gate
 echo "PLACEHOLDER: Update this quality gate in speckit.ralph.implement.md before using Ralph." && exit 1
 ```
 
-### Step 4: Generate Prompt
+### Step 4: Configuration
 
-1. Read `.specify/templates/ralph-prompt.template.md`
-2. Substitute `{FEATURE_DIR}` and `{QUALITY_GATES}`
-3. Write or overwrite to `.specify/.ralph-prompt.md`
+- Calculate max iterations: `incomplete_tasks + 10`
 
-### Step 5: Print Command
+### Step 5: Run Ralph Loop
 
-Calculate max iterations: `incomplete_tasks + 10`
+For each iteration (up to max):
 
-Print the bash command for the user to execute in a code block, and also emit the structured tag for pipeline extraction:
+1. Spawn a fresh-context sub agent using the **Task tool**:
+   - **subagent_type**: `general-purpose`
+   - **prompt**: Compose a prompt containing:
+     - Instruct the agent to read and follow `.claude/agents/ralph.md`
+     - When those instructions reference a slash command (e.g., `/speckit.implement`), read the corresponding file from `.claude/commands/` and follow its instructions directly
+     - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: <QUALITY_GATES>`
+   - Each sub agent gets a fresh context window, preventing hallucination drift
 
-```
-.specify/scripts/bash/ralph-loop.sh .specify/.ralph-prompt.md <MAX> <FEATURE_DIR>/tasks.md
-```
+2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`
+   - If found: report success and stop looping
+   - If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete
 
-`<shell-command>.specify/scripts/bash/ralph-loop.sh .specify/.ralph-prompt.md <MAX> <FEATURE_DIR>/tasks.md</shell-command>`
+3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest reviewing tasks.md.
 
-Replace `<MAX>` and `<FEATURE_DIR>` with the actual values in both the code block and the tag.
+4. **Failure handling**: If the sub agent fails, increment failure counter. Abort after 3 consecutive failures.
+
+### Step 6: Report Results
+
+After the loop completes, report:
+- Total iterations run
+- Tasks completed vs remaining
+- Whether all tasks were completed or max iterations reached
+- Suggestion to rerun if max iterations reached

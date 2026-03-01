@@ -2,7 +2,7 @@
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
-Each loop invokes `claude -p --dangerously-skip-permissions` with a fresh context per iteration, preventing hallucination drift and context window exhaustion.
+Each loop spawns fresh sub agents (via the Task tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
 | Loop | What it does |
 | --- | --- |
@@ -11,8 +11,8 @@ Each loop invokes `claude -p --dangerously-skip-permissions` with a fresh contex
 | 🖍️ **Ralph** | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates, commits, and repeats until all tasks are done. |
 | 🏭 **Pipeline** | End-to-end orchestrator: homer → plan → tasks → lisa → ralph. Auto-detects where to start based on existing artifacts. |
 
-> **Warning: `--dangerously-skip-permissions`**
-> Claude will execute tool calls (file writes, shell commands, etc.) without asking for confirmation. Review the prompt templates and understand what each loop does before running them.
+> **Note on permissions**
+> When using the recommended workflow (slash commands with sub agents), Claude Code will prompt for permission as normal. When using the bash script fallback, `--dangerously-skip-permissions` is used — review the agent files and understand what each loop does before running them.
 
 ## 💡 Recommended workflow
 
@@ -44,7 +44,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This copies all files (loop scripts, pipeline, prompt templates, and Claude Code commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
+This copies all files (loop scripts, pipeline, agent definitions, and Claude Code commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
 
 ### 📝 Option B: Manual
 
@@ -56,16 +56,18 @@ This copies all files (loop scripts, pipeline, prompt templates, and Claude Code
 From the root of your project:
 
 ```bash
-# Shell scripts → .specify/scripts/bash/
+# Shell scripts (manual fallback) → .specify/scripts/bash/
 cp <path-to-simpsons-loops>/ralph-loop.sh   .specify/scripts/bash/ralph-loop.sh
 cp <path-to-simpsons-loops>/lisa-loop.sh     .specify/scripts/bash/lisa-loop.sh
 cp <path-to-simpsons-loops>/homer-loop.sh    .specify/scripts/bash/homer-loop.sh
 cp <path-to-simpsons-loops>/pipeline.sh      .specify/scripts/bash/pipeline.sh
 
-# Prompt templates → .specify/templates/
-cp <path-to-simpsons-loops>/ralph-prompt.template.md   .specify/templates/ralph-prompt.template.md
-cp <path-to-simpsons-loops>/lisa-prompt.template.md    .specify/templates/lisa-prompt.template.md
-cp <path-to-simpsons-loops>/homer-prompt.template.md   .specify/templates/homer-prompt.template.md
+# Agent definitions → .claude/agents/
+cp <path-to-simpsons-loops>/agents/homer.md  .claude/agents/homer.md
+cp <path-to-simpsons-loops>/agents/lisa.md   .claude/agents/lisa.md
+cp <path-to-simpsons-loops>/agents/ralph.md  .claude/agents/ralph.md
+cp <path-to-simpsons-loops>/agents/plan.md   .claude/agents/plan.md
+cp <path-to-simpsons-loops>/agents/tasks.md  .claude/agents/tasks.md
 
 # Claude Code commands → .claude/commands/
 cp <path-to-simpsons-loops>/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
@@ -124,67 +126,84 @@ Add to `.claude/settings.local.json`:
 
 </details>
 
-## 🚀 Usage
+## 🚀 Usage (Recommended: Slash Commands)
 
-Each loop has a corresponding Claude Code slash command. The slash command does **not** run the script directly — it prints the bash command for you to copy-paste and run in your terminal.
+Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Task tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
 
 ### 🍩 Homer (clarification)
 
-After running `/speckit.specify` to create `spec.md`, run the slash command — it prints the bash command to execute:
+After running `/speckit.specify` to create `spec.md`:
 
 ```
 /speckit.homer.clarify
 ```
 
-Then copy-paste and run the printed command:
-
-```bash
-.specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 10
-```
-
 ### 🎷 Lisa (analysis)
 
-Once you have `spec.md`, `plan.md`, and `tasks.md`, run the slash command — it prints the bash command to execute:
+Once you have `spec.md`, `plan.md`, and `tasks.md`:
 
 ```
 /speckit.lisa.analyze
 ```
 
-Then copy-paste and run the printed command:
-
-```bash
-.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10
-```
-
 ### 🖍️ Ralph (implementation)
 
-Once you have `tasks.md` from `/speckit.tasks`, run the slash command — it prints the bash command to execute:
+Once you have `tasks.md` from `/speckit.tasks`:
 
 ```
 /speckit.ralph.implement
 ```
 
-Then copy-paste and run the printed command:
-
-```bash
-.specify/scripts/bash/ralph-loop.sh .specify/.ralph-prompt.md <MAX> <FEATURE_DIR>/tasks.md
-```
-
 ### 🏭 Pipeline (end-to-end)
 
-After creating a spec with `/speckit.specify`, run the slash command — it prints the bash command to execute:
+After creating a spec with `/speckit.specify`, run the full pipeline:
 
 ```
 /speckit.pipeline
 ```
 
-Then copy-paste and run the printed command:
+Or target a specific spec directory:
+
+```
+/speckit.pipeline specs/a1b2-feat-user-auth
+```
+
+Or resume from a specific step:
+
+```
+/speckit.pipeline --from ralph specs/a1b2-feat-user-auth
+```
+
+**Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
+
+- `tasks.md` with some tasks completed → **ralph**
+- `tasks.md` with no tasks started → **lisa**
+- `plan.md` exists → **tasks**
+- `spec.md` exists → **homer**
+
+**Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
+
+## 🔧 Manual Fallback: Bash Scripts
+
+The bash scripts provide a standalone alternative that runs outside of Claude Code. They spawn `claude --agent` CLI processes and can be used with any coding agent that supports the same interface.
+
+### Running individual loops
 
 ```bash
+# Homer
+.specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 10
+
+# Lisa
+.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10
+
+# Ralph
+.specify/scripts/bash/ralph-loop.sh <FEATURE_DIR> 20
+
+# Pipeline (end-to-end)
 .specify/scripts/bash/pipeline.sh specs/a1b2-feat-user-auth
 ```
 
-**Options:**
+### Pipeline options (bash)
 
 | Flag               | Description                                              | Default      |
 | ------------------ | -------------------------------------------------------- | ------------ |
@@ -194,19 +213,6 @@ Then copy-paste and run the printed command:
 | `--ralph-max <n>`  | Max ralph loop iterations                                | 20           |
 | `--model <model>`  | Claude model to use                                      | opus         |
 | `--dry-run`        | Show what would run without executing                    | —            |
-
-**Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
-
-- `tasks.md` with some tasks completed → **ralph**
-- `tasks.md` with no tasks started → **lisa**
-- `plan.md` exists → **tasks**
-- `spec.md` exists → **homer**
-
-**Resuming after interruption:** All work is committed after each iteration, so you can safely Ctrl+C and resume:
-
-```bash
-.specify/scripts/bash/pipeline.sh --from ralph specs/a1b2-feat-user-auth
-```
 
 ## ⚙️ How the loops work
 

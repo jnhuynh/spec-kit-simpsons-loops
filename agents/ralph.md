@@ -4,6 +4,12 @@ Execute **one task** from tasks.md per iteration. Each iteration runs with FRESH
 
 > **Note:** Batching happens at planning time via composite tasks in tasks.md, not at runtime.
 
+## Feature Directory & Quality Gates
+
+The feature directory and quality gates are provided via the `-p` prompt when this agent is invoked. Extract:
+- **Feature directory**: the path (e.g., "Feature directory: specs/a1b2-feat-foo")
+- **Quality gates**: the commands to run for validation (e.g., "Quality gates: npm test && npm run lint")
+
 ## Phase 0: Orient
 
 0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`)
@@ -23,9 +29,7 @@ Run `/speckit.implement Only implement the next incomplete task` to implement th
 Verify the task was implemented correctly:
 
 1. Re-read the modified files
-2. Run quality gates — **MUST pass before proceeding:**
-
-{QUALITY_GATES}
+2. Run the quality gates provided in the `-p` prompt — **MUST pass before proceeding**
 
 If validation fails:
 
@@ -57,7 +61,7 @@ If validation fails:
 
 ## File Paths
 
-- Tasks: `{FEATURE_DIR}/tasks.md`
-- Spec: `{FEATURE_DIR}/spec.md`
-- Plan: `{FEATURE_DIR}/plan.md`
+- Tasks: `<FEATURE_DIR>/tasks.md`
+- Spec: `<FEATURE_DIR>/spec.md`
+- Plan: `<FEATURE_DIR>/plan.md`
 - Constitution: `.specify/memory/constitution.md`
