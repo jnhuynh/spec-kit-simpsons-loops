@@ -16,6 +16,8 @@ Orchestrate the Homer loop directly within this Claude Code session. Each iterat
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
 
+**STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Wait for one iteration to finish before starting the next.
+
 ## Execution Steps
 
 ### Step 1: Resolve Feature Directory
