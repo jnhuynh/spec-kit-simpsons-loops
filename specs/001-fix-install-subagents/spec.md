@@ -36,6 +36,7 @@ A developer runs `/speckit.pipeline`, `/speckit.homer.clarify`, `/speckit.lisa.a
 1. **Given** a spec directory with `spec.md`, **When** `/speckit.homer.clarify` is run, **Then** each iteration spawns one `general-purpose` sub agent via the Agent tool, waits for it to return, then checks the output before spawning the next
 2. **Given** a spec directory with `spec.md`, `plan.md`, and `tasks.md`, **When** `/speckit.pipeline` is run, **Then** the pipeline executes steps in order (homer, plan, tasks, lisa, ralph), each step completes fully before the next step begins, and within loop steps each iteration completes before the next iteration starts
 3. **Given** any loop command is running, **When** the sub agent returns output containing the promise tag, **Then** the loop stops and reports success without spawning additional sub agents
+4. **Given** any loop command is running, **When** 10 iterations complete without the promise tag being returned and without stuck detection triggering, **Then** the loop aborts with a clear message reporting the iteration count and suggesting manual review
 
 ---
 
@@ -78,6 +79,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - What happens if stuck detection triggers during autonomous execution? The loop aborts after 3 identical outputs and suggests manual review.
 - What happens if `setup.sh` is run from inside the simpsons-loops repo itself? It fails with a clear error explaining to run it from the target project instead.
 - What happens if a sub agent crashes or times out mid-iteration (as opposed to stuck detection for identical outputs)? The loop command catches the error, logs the failure context (iteration number, agent type, error message), and aborts the loop with a clear error message suggesting manual review. The loop does NOT retry automatically to avoid cascading failures.
+- What happens if a loop reaches 10 iterations without the sub agent returning the promise tag and without stuck detection triggering? The loop aborts with a clear message reporting the iteration count (10) and suggesting manual review. This prevents runaway execution when outputs vary enough to bypass stuck detection but never converge on the completion signal.
 
 ## Clarifications
 
@@ -85,6 +87,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 
 - Q: What are the canonical terms for the sub agent spawning mechanism, and what deprecated synonyms should be avoided for consistency across all project files? → A: The canonical term is "Agent tool" (not "Task tool"). All references to spawning sub agents must use "Agent tool" or "sub agents via the Agent tool". The term "Task tool" is deprecated and must be replaced wherever it appears in loop command files and the README.
 - Q: What should happen if a sub agent crashes or times out mid-iteration, distinct from stuck detection? → A: The loop command catches the error, logs failure context (iteration number, agent type, error message), and aborts with a clear error suggesting manual review. No automatic retry to avoid cascading failures.
+- Q: What is the maximum iteration limit for loop commands to prevent runaway execution when stuck detection does not trigger? → A: All loop commands MUST enforce a maximum of 10 iterations per loop invocation. When the limit is reached, the loop aborts with a clear message reporting the iteration count and suggesting manual review. This safeguards against non-converging outputs that vary enough to bypass stuck detection but never reach the promise tag.
 
 ## Requirements *(mandatory)*
 
@@ -101,6 +104,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - **FR-009**: All loop command files and the README MUST be internally consistent — the same behavior described the same way across all files
 - **FR-010**: The bash script fallback (`homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`) MUST use `--dangerously-skip-permissions` when invoking `claude --agent`
 - **FR-011**: All loop commands MUST handle sub agent crash or timeout by catching the error, logging failure context (iteration number, agent type, error message), and aborting the loop with a clear error message — no automatic retry
+- **FR-012**: All loop commands MUST enforce a maximum iteration limit of 10 iterations per loop invocation — when the limit is reached, the loop aborts with a clear message reporting the iteration count and suggesting manual review
 
 ### Key Entities
 
@@ -142,3 +146,4 @@ The following canonical terms MUST be used consistently across all project files
 - **SC-004**: All 4 loop command files contain explicit instructions for sequential execution and autonomous operation without permission prompts
 - **SC-005**: 100% of file paths and commands referenced in the README correspond to actual files and working commands in the repository
 - **SC-006**: Terminology across the README, loop command files, and agent definitions is consistent — no conflicting names for the same concept
+- **SC-007**: All 4 loop command files enforce a maximum iteration limit of 10, aborting with a clear message when the limit is reached
