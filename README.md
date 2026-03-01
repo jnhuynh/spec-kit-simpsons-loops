@@ -12,7 +12,7 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | 🏭 **Pipeline** | End-to-end orchestrator: homer → plan → tasks → lisa → ralph. Auto-detects where to start based on existing artifacts. |
 
 > **Note on permissions**
-> When using the recommended workflow (slash commands with sub agents), Claude Code will prompt for permission as normal. When using the bash script fallback, `--dangerously-skip-permissions` is used — review the agent files and understand what each loop does before running them.
+> When using the recommended workflow (slash commands with sub agents), the loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. When using the bash script fallback, `--dangerously-skip-permissions` is passed to `claude --agent`. In both cases, review the agent files and understand what each loop does before running them.
 
 ## 💡 Recommended workflow
 

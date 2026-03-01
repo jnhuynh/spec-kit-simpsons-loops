@@ -115,7 +115,7 @@ This is a flat distribution repository. All source files live at the root level.
 ### Implementation for User Story 4
 
 - [x] T034 [P] [US4] Replace all occurrences of "Task tool" with "Agent tool" in `README.md` (2 occurrences per research.md R1 and R5) — COMPLETED: replaced "Task tool" with "Agent tool" on lines 5 and 131 of README.md; zero occurrences of "Task tool" remain
-- [ ] T035 [US4] Update the permission note in `README.md` to clarify that loop commands instruct sub agents to execute autonomously -- remove or correct the note that says "Claude Code will prompt for permission as normal" per research.md R5 and FR-006
+- [x] T035 [US4] Update the permission note in `README.md` to clarify that loop commands instruct sub agents to execute autonomously -- remove or correct the note that says "Claude Code will prompt for permission as normal" per research.md R5 and FR-006 — COMPLETED: replaced "Claude Code will prompt for permission as normal" with "the loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses" and clarified that bash scripts pass `--dangerously-skip-permissions` to `claude --agent`; both paths now advise reviewing agent files before running
 - [ ] T036 [US4] Verify all file paths referenced in `README.md` correspond to actual files in the repository per FR-007 and SC-005
 - [ ] T037 [US4] Verify `README.md` describes the recommended workflow (slash commands with sub agents) and the bash script fallback accurately per FR-007
 - [ ] T038 [US4] Verify terminology in `README.md` is consistent with loop command files and agent definitions -- use the Terminology Map from data-model.md Entity 4 as the reference per FR-008 and FR-009
