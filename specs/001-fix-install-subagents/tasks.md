@@ -25,7 +25,7 @@ This is a flat distribution repository. All source files live at the root level.
 
 - [x] T001 Verify all 13 distribution source files exist at repository root per the Distribution File Manifest in spec.md (4 bash scripts: `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`; 5 agent definitions in `agents/`: `homer.md`, `lisa.md`, `ralph.md`, `plan.md`, `tasks.md`; 4 loop commands: `speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md`, `speckit.pipeline.md`)
 - [x] T002 Verify `setup.sh` exists at repository root and review its current structure against the contract in `specs/001-fix-install-subagents/contracts/setup-sh.md` — VERIFIED COMPLETE: setup.sh exists, all preconditions match contract (exit 1 for missing .claude/, missing .specify/, self-install), copies all 13 files, chmod +x on 4 scripts, .gitignore marker check, jq-based settings.local.json with unique, graceful jq-missing fallback, output format matches contract
-- [ ] T003 Verify `README.md` exists at repository root
+- [x] T003 Verify `README.md` exists at repository root — VERIFIED COMPLETE: README.md exists at repository root (9.5K)
 
 ---
 
