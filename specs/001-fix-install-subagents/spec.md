@@ -88,6 +88,7 @@ A developer reads the README and gets an accurate picture of how the project wor
 - Q: What are the canonical terms for the sub agent spawning mechanism, and what deprecated synonyms should be avoided for consistency across all project files? → A: The canonical term is "Agent tool" (not "Task tool"). All references to spawning sub agents must use "Agent tool" or "sub agents via the Agent tool". The term "Task tool" is deprecated and must be replaced wherever it appears in loop command files and the README.
 - Q: What should happen if a sub agent crashes or times out mid-iteration, distinct from stuck detection? → A: The loop command catches the error, logs failure context (iteration number, agent type, error message), and aborts with a clear error suggesting manual review. No automatic retry to avoid cascading failures.
 - Q: What is the maximum iteration limit for loop commands to prevent runaway execution when stuck detection does not trigger? → A: All loop commands MUST enforce a maximum of 10 iterations per loop invocation. When the limit is reached, the loop aborts with a clear message reporting the iteration count and suggesting manual review. This safeguards against non-converging outputs that vary enough to bypass stuck detection but never reach the promise tag.
+- Q: What are the exact 13 distribution files referenced in FR-001, and what are their source-to-destination mappings? → A: The 13 files are enumerated in the Distribution File Manifest under Key Entities. They comprise 4 bash loop scripts, 5 agent definitions, and 4 loop command files, each with an explicit source path and destination path in the target project.
 
 ## Requirements *(mandatory)*
 
@@ -113,6 +114,38 @@ A developer reads the README and gets an accurate picture of how the project wor
 - **Agent definitions**: The `.claude/agents/*.md` files that define behavior for each sub agent type (homer, lisa, ralph, plan, tasks)
 - **Bash loop scripts**: The standalone shell scripts (`homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh`) that provide a fallback outside of Claude Code
 - **README**: The primary documentation file describing setup, usage, and behavior
+
+### Distribution File Manifest
+
+The 13 files distributed by `setup.sh` (referenced in FR-001 and SC-001) are:
+
+**Bash loop scripts (4 files — copied to `.specify/scripts/bash/` and made executable):**
+
+| # | Source | Destination |
+|---|--------|-------------|
+| 1 | `homer-loop.sh` | `.specify/scripts/bash/homer-loop.sh` |
+| 2 | `lisa-loop.sh` | `.specify/scripts/bash/lisa-loop.sh` |
+| 3 | `ralph-loop.sh` | `.specify/scripts/bash/ralph-loop.sh` |
+| 4 | `pipeline.sh` | `.specify/scripts/bash/pipeline.sh` |
+
+**Agent definitions (5 files — copied to `.claude/agents/`):**
+
+| # | Source | Destination |
+|---|--------|-------------|
+| 5 | `agents/homer.md` | `.claude/agents/homer.md` |
+| 6 | `agents/lisa.md` | `.claude/agents/lisa.md` |
+| 7 | `agents/ralph.md` | `.claude/agents/ralph.md` |
+| 8 | `agents/plan.md` | `.claude/agents/plan.md` |
+| 9 | `agents/tasks.md` | `.claude/agents/tasks.md` |
+
+**Loop command files (4 files — copied to `.claude/commands/`):**
+
+| # | Source | Destination |
+|---|--------|-------------|
+| 10 | `speckit.homer.clarify.md` | `.claude/commands/speckit.homer.clarify.md` |
+| 11 | `speckit.lisa.analyze.md` | `.claude/commands/speckit.lisa.analyze.md` |
+| 12 | `speckit.ralph.implement.md` | `.claude/commands/speckit.ralph.implement.md` |
+| 13 | `speckit.pipeline.md` | `.claude/commands/speckit.pipeline.md` |
 
 ### Terminology & Consistency
 
