@@ -66,10 +66,10 @@ This is a flat distribution repository. All source files live at the root level.
 
 ### Implementation for User Story 2
 
-- [ ] T012 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.homer.clarify.md` (2 occurrences per research.md R1)
-- [ ] T013 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.lisa.analyze.md` (2 occurrences per research.md R1)
-- [ ] T014 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.ralph.implement.md` (2 occurrences per research.md R1)
-- [ ] T015 [P] [US2] Replace all occurrences of "Task tool" and "Task tool call" with "Agent tool" and "Agent tool call" in `speckit.pipeline.md` (3 occurrences per research.md R1)
+- [x] T012 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.homer.clarify.md` (2 occurrences per research.md R1) — VERIFIED COMPLETE: source file already uses "Agent tool" throughout
+- [x] T013 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.lisa.analyze.md` (2 occurrences per research.md R1) — VERIFIED COMPLETE: source file already uses "Agent tool" throughout
+- [x] T014 [P] [US2] Replace all occurrences of "Task tool" with "Agent tool" in `speckit.ralph.implement.md` (2 occurrences per research.md R1) — VERIFIED COMPLETE: source file already uses "Agent tool" throughout
+- [x] T015 [P] [US2] Replace all occurrences of "Task tool" and "Task tool call" with "Agent tool" and "Agent tool call" in `speckit.pipeline.md` (3 occurrences per research.md R1) — VERIFIED COMPLETE: source file already uses "Agent tool" throughout
 - [ ] T016 [P] [US2] Update failure handling in `speckit.homer.clarify.md` to abort immediately on sub agent failure with no retry -- replace "Abort after 3 consecutive failures" with immediate abort and error context logging (iteration number, agent type, error message) per FR-011 and contract `specs/001-fix-install-subagents/contracts/loop-commands.md`
 - [ ] T017 [P] [US2] Update failure handling in `speckit.lisa.analyze.md` to abort immediately on sub agent failure with no retry -- replace "Abort after 3 consecutive failures" with immediate abort and error context logging (iteration number, agent type, error message) per FR-011 and contract `specs/001-fix-install-subagents/contracts/loop-commands.md`
 - [ ] T018 [P] [US2] Update failure handling in `speckit.ralph.implement.md` to abort immediately on sub agent failure with no retry -- replace "Abort after 3 consecutive failures" with immediate abort and error context logging (iteration number, agent type, error message) per FR-011 and contract `specs/001-fix-install-subagents/contracts/loop-commands.md`
