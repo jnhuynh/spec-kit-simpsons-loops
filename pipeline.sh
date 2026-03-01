@@ -20,6 +20,7 @@
 #   --homer-max <n>        Max homer loop iterations (default: 10)
 #   --lisa-max <n>         Max lisa loop iterations (default: 10)
 #   --ralph-max <n>        Max ralph loop iterations (default: 20)
+#   --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
 #   --model <model>        Claude model to use (default: opus)
 #   --dry-run              Show what would be run without executing
 #   --help                 Show this help message
@@ -38,6 +39,7 @@ DRY_RUN=false
 HOMER_MAX=10
 LISA_MAX=10
 RALPH_MAX=20
+QUALITY_GATES="${QUALITY_GATES:-echo \"PLACEHOLDER: Set quality gates via --quality-gates or QUALITY_GATES env var\" && exit 1}"
 
 # Colors
 RED='\033[0;31m'
@@ -82,6 +84,7 @@ Options:
   --homer-max <n>        Max homer loop iterations (default: 10)
   --lisa-max <n>         Max lisa loop iterations (default: 10)
   --ralph-max <n>        Max ralph loop iterations (default: 20)
+  --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
   --model <model>        Claude model to use (default: opus)
   --dry-run              Show what would be run without executing
   --help                 Show this help message
@@ -116,6 +119,8 @@ while [ $i -le $# ]; do
             i=$((i + 1)); LISA_MAX="${!i}" ;;
         --ralph-max)
             i=$((i + 1)); RALPH_MAX="${!i}" ;;
+        --quality-gates)
+            i=$((i + 1)); QUALITY_GATES="${!i}" ;;
         --dry-run)
             DRY_RUN=true ;;
         *)
@@ -194,23 +199,25 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
-# ─── Run claude -p ──────────────────────────────────────────────────────────
+# ─── Run claude --agent ─────────────────────────────────────────────────────
 
-run_claude() {
-    local prompt="$1"
-    local description="$2"
+run_agent() {
+    local agent="$1"
+    local prompt="$2"
+    local description="$3"
 
-    log "INFO" "Running claude -p: $description"
-    echo -e "  ${DIM}Running claude -p --model $MODEL ...${NC}"
+    log "INFO" "Running claude --agent $agent: $description"
+    echo -e "  ${DIM}Running claude --agent $agent --model $MODEL ...${NC}"
 
     if $DRY_RUN; then
-        echo -e "  ${CYAN}[dry-run] Would run: echo '...' | claude -p --dangerously-skip-permissions --model $MODEL${NC}"
+        echo -e "  ${CYAN}[dry-run] Would run: claude --agent $agent -p \"$prompt\" --dangerously-skip-permissions --model $MODEL${NC}"
         return 0
     fi
 
     local exit_code=0
     local output
-    output=$(echo "$prompt" | claude -p \
+    output=$(claude --agent "$agent" \
+        -p "$prompt" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
         2>&1) || exit_code=$?
@@ -399,7 +406,7 @@ if ! should_skip_step "plan"; then
     if [[ -f "$REPO_ROOT/$FEATURE_DIR/plan.md" ]]; then
         print_step_skip "plan" "plan.md already exists"
     else
-        run_claude "/speckit.plan" "Generate implementation plan" || {
+        run_agent "plan" "Feature directory: $FEATURE_DIR" "Generate implementation plan" || {
             echo -e "${RED}Failed to generate plan${NC}"
             exit 1
         }
@@ -418,7 +425,7 @@ if ! should_skip_step "tasks"; then
     if [[ -f "$REPO_ROOT/$FEATURE_DIR/tasks.md" ]]; then
         print_step_skip "tasks" "tasks.md already exists"
     else
-        run_claude "/speckit.tasks" "Generate task list" || {
+        run_agent "tasks" "Feature directory: $FEATURE_DIR" "Generate task list" || {
             echo -e "${RED}Failed to generate tasks${NC}"
             exit 1
         }
@@ -466,7 +473,7 @@ if ! should_skip_step "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
-    RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX $REPO_ROOT/$FEATURE_DIR/tasks.md"
+    RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX \"$QUALITY_GATES\""
     log "INFO" "Running: $RALPH_CMD"
     echo -e "  ${DIM}Running: $RALPH_CMD${NC}"
 
@@ -474,7 +481,7 @@ if ! should_skip_step "ralph"; then
         echo -e "  ${CYAN}[dry-run] Would run: $RALPH_CMD${NC}"
         RALPH_EXIT=0
     else
-        CLAUDE_MODEL="$MODEL" $RALPH_CMD
+        CLAUDE_MODEL="$MODEL" eval $RALPH_CMD
         RALPH_EXIT=$?
     fi
 

@@ -1,0 +1,15 @@
+# Spec-kit (installed via `specify init`)
+.specify/
+.claude/commands/
+.claude/agents/
+
+# Simpsons loops - generated at runtime
+*.ralph-prompt.md*
+*.ralph-prev-output*
+*.ralph-state*
+*.lisa-prompt.md*
+*.lisa-prev-output*
+*.lisa-state*
+*.homer-prompt.md*
+*.homer-prev-output*
+*.homer-state*

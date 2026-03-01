@@ -1,19 +1,18 @@
 #!/usr/bin/env bash
-# Ralph Loop - True fresh context per iteration
-# Usage: ./ralph-loop.sh <prompt-file|spec-dir> [max-iterations] [tasks-file]
+# Ralph Loop - Task-by-task implementation with fresh context per iteration
+# Usage: ./ralph-loop.sh <spec-dir> [max-iterations] [quality-gates]
 #
-# Arg 1 can be either:
-#   - A prompt file path (e.g. .specify/.ralph-prompt.md)
-#   - A spec directory path (e.g. specs/a1b2-feat-foo) — generates prompt from template
-#     with FEATURE_DIR set to the given path
+# Arg 1: A spec directory path (e.g. specs/a1b2-feat-foo)
+# Arg 2: Max iterations (default: 5)
+# Arg 3: Quality gates command (default: placeholder)
 
 set -uo pipefail
 
-ARG1="${1:-}"
+FEATURE_DIR="${1:-}"
 MAX_ITERATIONS="${2:-5}"
-TASKS_FILE="${3:-}"
+QUALITY_GATES="${3:-echo \"PLACEHOLDER: Set quality gates via arg 3 or QUALITY_GATES env var\" && exit 1}"
+QUALITY_GATES="${QUALITY_GATES:-$QUALITY_GATES}"
 MODEL="${CLAUDE_MODEL:-opus}"
-GENERATED_PROMPT=""
 ITERATION=0
 LOG_DIR=".specify/logs"
 LOG_FILE="$LOG_DIR/ralph-$(date '+%Y%m%d-%H%M%S').log"
@@ -36,38 +35,25 @@ NC='\033[0m'
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# Resolve PROMPT_FILE from arg: either use directly or generate from template
-resolve_prompt_file() {
-    if [[ -z "$ARG1" ]]; then
-        PROMPT_FILE=".specify/.ralph-prompt.md"
-        return
-    fi
-
-    if [[ -f "$ARG1" ]]; then
-        PROMPT_FILE="$ARG1"
-        return
-    fi
-
-    if [[ -d "$ARG1" ]]; then
-        FEATURE_DIR="$ARG1"
-        GENERATED_PROMPT=".specify/.ralph-prompt.md"
-        local template=".specify/templates/ralph-prompt.template.md"
-        if [[ ! -f "$template" ]]; then
-            echo -e "${RED}Error: Template not found: $template${NC}"
-            exit 1
-        fi
-        local quality_gates="${QUALITY_GATES:-echo \"PLACEHOLDER: Set QUALITY_GATES env var or update speckit.ralph.implement.md\" && exit 1}"
-        sed -e "s|{FEATURE_DIR}|$FEATURE_DIR|g" \
-            -e "s|{QUALITY_GATES}|$quality_gates|g" \
-            "$template" > "$GENERATED_PROMPT"
-        PROMPT_FILE="$GENERATED_PROMPT"
-        return
-    fi
-
-    echo -e "${RED}Error: '$ARG1' is neither an existing file nor directory${NC}"
+# Validate feature directory
+if [[ -z "$FEATURE_DIR" ]]; then
+    echo -e "${RED}Error: Feature directory required${NC}"
+    echo "Usage: ./ralph-loop.sh <spec-dir> [max-iterations] [quality-gates]"
     exit 1
-}
-resolve_prompt_file
+fi
+
+if [[ ! -d "$FEATURE_DIR" ]]; then
+    echo -e "${RED}Error: Directory not found: $FEATURE_DIR${NC}"
+    exit 1
+fi
+
+TASKS_FILE="$FEATURE_DIR/tasks.md"
+
+if [[ ! -f "$TASKS_FILE" ]]; then
+    echo -e "${RED}Error: tasks.md not found in $FEATURE_DIR${NC}"
+    echo "Run /speckit.tasks first"
+    exit 1
+fi
 
 # Logging functions
 log() {
@@ -86,7 +72,7 @@ log_section() {
 
 # Get current task from tasks.md
 get_current_task() {
-    if [[ -n "$TASKS_FILE" ]] && [[ -f "$TASKS_FILE" ]]; then
+    if [[ -f "$TASKS_FILE" ]]; then
         grep -m1 '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null | sed 's/^\s*- \[ \] //' | head -c 60
     fi
 }
@@ -119,13 +105,12 @@ cleanup() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}  Loop interrupted after $ITERATION iterations${NC}"
     echo -e "${YELLOW}  Duration: $((duration / 60))m $((duration % 60))s${NC}"
-    echo -e "${YELLOW}  Work is safely committed - resume with /speckit.ralph.implement${NC}"
+    echo -e "${YELLOW}  Work is safely committed - rerun to continue${NC}"
     echo -e "${YELLOW}  Log: $LOG_FILE${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     log "INFO" "Interrupted after $ITERATION iterations (duration: ${duration}s)"
     rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-    [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
     exit 130
 }
 trap cleanup SIGINT SIGTERM
@@ -137,39 +122,27 @@ START_TIME=$(date +%s)
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║${NC}  ${BOLD}Ralph Loop${NC} - Fresh Context Per Iteration                  ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BLUE}║${NC}  Prompt: ${DIM}${PROMPT_FILE}${NC}"
-[[ -n "${FEATURE_DIR:-}" ]] && echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
+echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
 echo -e "${BLUE}║${NC}  Model: ${DIM}${MODEL}${NC}"
-if [[ -n "$TASKS_FILE" ]]; then
-    echo -e "${BLUE}║${NC}  Tasks: ${DIM}${TASKS_FILE}${NC}"
-fi
+echo -e "${BLUE}║${NC}  Tasks: ${DIM}${TASKS_FILE}${NC}"
 echo -e "${BLUE}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
-# Verify prompt file exists
-if [[ ! -f "$PROMPT_FILE" ]]; then
-    echo -e "${RED}Error: Prompt file not found: $PROMPT_FILE${NC}"
-    log "ERROR" "Prompt file not found: $PROMPT_FILE"
-    exit 1
-fi
-
 # Initialize log
 log_section "RALPH LOOP STARTED"
-log "INFO" "Prompt: $PROMPT_FILE"
+log "INFO" "Feature dir: $FEATURE_DIR"
 log "INFO" "Max iterations: $MAX_ITERATIONS"
-log "INFO" "Tasks file: ${TASKS_FILE:-none}"
+log "INFO" "Tasks file: $TASKS_FILE"
 
 # Create symlink to latest log
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
 # Initial task count
-if [[ -n "$TASKS_FILE" ]] && [[ -f "$TASKS_FILE" ]]; then
-    INITIAL_INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INITIAL_INCOMPLETE=0
-    INITIAL_COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || INITIAL_COMPLETE=0
-    TOTAL_TASKS=$((INITIAL_INCOMPLETE + INITIAL_COMPLETE))
-    log "INFO" "Initial state: $INITIAL_COMPLETE/$TOTAL_TASKS complete"
-fi
+INITIAL_INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INITIAL_INCOMPLETE=0
+INITIAL_COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || INITIAL_COMPLETE=0
+TOTAL_TASKS=$((INITIAL_INCOMPLETE + INITIAL_COMPLETE))
+log "INFO" "Initial state: $INITIAL_COMPLETE/$TOTAL_TASKS complete"
 
 while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     ITERATION=$((ITERATION + 1))
@@ -177,11 +150,9 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
 
     # Get current state
     CURRENT_TASK=$(get_current_task)
-    if [[ -n "$TASKS_FILE" ]] && [[ -f "$TASKS_FILE" ]]; then
-        INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
-        COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
-        TOTAL=$((INCOMPLETE + COMPLETE))
-    fi
+    INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
+    COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
+    TOTAL=$((INCOMPLETE + COMPLETE))
 
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -189,10 +160,8 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     # Show progress
-    if [[ -n "$TASKS_FILE" ]] && [[ -f "$TASKS_FILE" ]]; then
-        PROGRESS_BAR=$(progress_bar "$COMPLETE" "$TOTAL")
-        echo -e "  ${BLUE}Progress:${NC} $PROGRESS_BAR ${GREEN}$COMPLETE${NC}/${TOTAL} tasks"
-    fi
+    PROGRESS_BAR=$(progress_bar "$COMPLETE" "$TOTAL")
+    echo -e "  ${BLUE}Progress:${NC} $PROGRESS_BAR ${GREEN}$COMPLETE${NC}/${TOTAL} tasks"
 
     # Show current task
     if [[ -n "$CURRENT_TASK" ]]; then
@@ -212,13 +181,13 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     echo "TASK=$CURRENT_TASK" >> "$STATE_FILE"
 
     # Run Claude with fresh context (new process each time)
-    echo -e "  ${DIM}Running claude -p ...${NC}"
+    echo -e "  ${DIM}Running claude --agent ralph ...${NC}"
 
     CLAUDE_EXIT=0
-    ITER_OUTPUT=$(claude -p \
+    ITER_OUTPUT=$(claude --agent ralph \
+        -p "Feature directory: $FEATURE_DIR. Quality gates: $QUALITY_GATES" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
-        < "$PROMPT_FILE" \
         2>&1) || CLAUDE_EXIT=$?
 
     if [[ $CLAUDE_EXIT -ne 0 ]]; then
@@ -229,7 +198,6 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
             echo -e "  ${RED}Aborting after $MAX_CONSECUTIVE_FAILURES consecutive failures${NC}"
             log "ERROR" "Aborting: $MAX_CONSECUTIVE_FAILURES consecutive failures"
             rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-            [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
             exit 2
         fi
         echo -e "  ${YELLOW}Retrying... (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
@@ -273,7 +241,6 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
                 echo -e "  ${YELLOW}   Suggestion: Ctrl+C and run /speckit.tasks to regenerate${NC}"
                 log "ERROR" "Aborting: stuck after $MAX_CONSECUTIVE_FAILURES consecutive identical outputs"
                 rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-                [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
                 exit 2
             fi
         else
@@ -301,36 +268,32 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
         log "INFO" "Total duration: ${TOTAL_DURATION}s"
 
         rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-        [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
         exit 0
     fi
 
-    # Also check tasks.md directly if provided
-    if [[ -n "$TASKS_FILE" ]] && [[ -f "$TASKS_FILE" ]]; then
-        INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
-        COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
+    # Also check tasks.md directly
+    INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
+    COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
 
-        if [[ "$INCOMPLETE" -eq 0 ]] && [[ "$COMPLETE" -gt 0 ]]; then
-            END_TIME=$(date +%s)
-            TOTAL_DURATION=$((END_TIME - START_TIME))
+    if [[ "$INCOMPLETE" -eq 0 ]] && [[ "$COMPLETE" -gt 0 ]]; then
+        END_TIME=$(date +%s)
+        TOTAL_DURATION=$((END_TIME - START_TIME))
 
-            echo ""
-            echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-            echo -e "${GREEN}║  ALL TASKS COMPLETE (verified in tasks.md)                ║${NC}"
-            echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
-            echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
-            echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
-            echo -e "${GREEN}║${NC}  Log: ${DIM}$LOG_FILE${NC}"
-            echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║  ALL TASKS COMPLETE (verified in tasks.md)                ║${NC}"
+        echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
+        echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
+        echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
+        echo -e "${GREEN}║${NC}  Log: ${DIM}$LOG_FILE${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 
-            log_section "COMPLETE"
-            log "INFO" "All tasks complete (verified via tasks.md) after $ITERATION iterations"
-            log "INFO" "Total duration: ${TOTAL_DURATION}s"
+        log_section "COMPLETE"
+        log "INFO" "All tasks complete (verified via tasks.md) after $ITERATION iterations"
+        log "INFO" "Total duration: ${TOTAL_DURATION}s"
 
-            rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-            [[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
-            exit 0
-        fi
+        rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
+        exit 0
     fi
 
     log "INFO" "Iteration $ITERATION completed in ${ITER_DURATION}s"
@@ -344,7 +307,7 @@ echo -e "${YELLOW}╔═══════════════════�
 echo -e "${YELLOW}║  Max iterations ($MAX_ITERATIONS) reached                            ║${NC}"
 echo -e "${YELLOW}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${YELLOW}║${NC}  Duration: $((total_duration / 60))m $((total_duration % 60))s"
-echo -e "${YELLOW}║${NC}  Run /speckit.ralph.implement to continue"
+echo -e "${YELLOW}║${NC}  Rerun to continue"
 echo -e "${YELLOW}║${NC}  Log: ${DIM}$LOG_FILE${NC}"
 echo -e "${YELLOW}╚════════════════════════════════════════════════════════════╝${NC}"
 
@@ -353,5 +316,4 @@ log "WARN" "Max iterations ($MAX_ITERATIONS) reached"
 log "INFO" "Total duration: ${total_duration}s"
 
 rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
-[[ -n "$GENERATED_PROMPT" ]] && rm -f "$GENERATED_PROMPT"
 exit 1

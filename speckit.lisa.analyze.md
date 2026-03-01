@@ -1,5 +1,5 @@
 ---
-description: Print the command to run iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
+description: Orchestrate iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
 ---
 
 ## User Input
@@ -12,7 +12,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Resolve the feature directory, verify artifacts, and print the bash command to run the Lisa loop for iterative cross-artifact analysis and remediation. Each loop iteration analyzes spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain.
+Orchestrate the Lisa loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Task tool) that analyzes cross-artifact consistency, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
+
+**AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
 
 ## Execution Steps
 
@@ -35,16 +37,33 @@ If any are missing, abort with guidance:
 - Missing `plan.md` → "Run /speckit.plan first"
 - Missing `tasks.md` → "Run /speckit.tasks first"
 
-### Step 3: Print Command
+### Step 3: Configuration
 
-Default max iterations: **10** (4 severity levels + buffer).
+- Default max iterations: **10** (4 severity levels + buffer)
 
-Print the bash command for the user to execute in a code block, and also emit the structured tag for pipeline extraction:
+### Step 4: Run Lisa Loop
 
-```
-.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10
-```
+For each iteration (up to max):
 
-`<shell-command>.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10</shell-command>`
+1. Spawn a fresh-context sub agent using the **Task tool**:
+   - **subagent_type**: `general-purpose`
+   - **prompt**: Compose a prompt containing:
+     - Instruct the agent to read and follow `.claude/agents/lisa.md`
+     - When those instructions reference a slash command (e.g., `/speckit.analyze`), read the corresponding file from `.claude/commands/` and follow its instructions directly
+     - Provide: `Feature directory: <FEATURE_DIR>`
+   - Each sub agent gets a fresh context window, preventing hallucination drift
 
-Replace `<FEATURE_DIR>` with the actual resolved path in both the code block and the tag.
+2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`
+   - If found: report success and stop looping
+   - If not found: continue to next iteration
+
+3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest manual review.
+
+4. **Failure handling**: If the sub agent fails, increment failure counter. Abort after 3 consecutive failures.
+
+### Step 5: Report Results
+
+After the loop completes, report:
+- Total iterations run
+- Whether all findings were resolved or max iterations reached
+- Suggestion to rerun if max iterations reached
