@@ -12,9 +12,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Orchestrate the Homer loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Task tool) that clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
+Orchestrate the Homer loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
+
+**STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Wait for one iteration to finish before starting the next.
 
 ## Execution Steps
 
@@ -37,7 +39,7 @@ If missing, abort with guidance: "Run /speckit.specify first"
 
 For each iteration (up to max):
 
-1. Spawn a fresh-context sub agent using the **Task tool**:
+1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `.claude/agents/homer.md`
@@ -51,11 +53,11 @@ For each iteration (up to max):
 
 3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest manual review.
 
-4. **Failure handling**: If the sub agent fails, increment failure counter. Abort after 3 consecutive failures.
+4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
 ### Step 5: Report Results
 
 After the loop completes, report:
 - Total iterations run
-- Whether all findings were resolved or max iterations reached
-- Suggestion to rerun if max iterations reached
+- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Suggestion to rerun if not fully resolved

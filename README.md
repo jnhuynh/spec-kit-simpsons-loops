@@ -2,7 +2,7 @@
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
-Each loop spawns fresh sub agents (via the Task tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
+Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
 | Loop | What it does |
 | --- | --- |
@@ -12,7 +12,7 @@ Each loop spawns fresh sub agents (via the Task tool) with isolated context wind
 | 🏭 **Pipeline** | End-to-end orchestrator: homer → plan → tasks → lisa → ralph. Auto-detects where to start based on existing artifacts. |
 
 > **Note on permissions**
-> When using the recommended workflow (slash commands with sub agents), Claude Code will prompt for permission as normal. When using the bash script fallback, `--dangerously-skip-permissions` is used — review the agent files and understand what each loop does before running them.
+> When using the recommended workflow (slash commands with sub agents), the loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. When using the bash script fallback, `--dangerously-skip-permissions` is passed to `claude --agent`. In both cases, review the agent files and understand what each loop does before running them.
 
 ## 💡 Recommended workflow
 
@@ -44,7 +44,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This copies all files (loop scripts, pipeline, agent definitions, and Claude Code commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
+This copies all files (bash loop scripts, pipeline, agent definitions, and loop commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
 
 ### 📝 Option B: Manual
 
@@ -56,7 +56,7 @@ This copies all files (loop scripts, pipeline, agent definitions, and Claude Cod
 From the root of your project:
 
 ```bash
-# Shell scripts (manual fallback) → .specify/scripts/bash/
+# Bash loop scripts (manual fallback) → .specify/scripts/bash/
 cp <path-to-simpsons-loops>/ralph-loop.sh   .specify/scripts/bash/ralph-loop.sh
 cp <path-to-simpsons-loops>/lisa-loop.sh     .specify/scripts/bash/lisa-loop.sh
 cp <path-to-simpsons-loops>/homer-loop.sh    .specify/scripts/bash/homer-loop.sh
@@ -69,7 +69,7 @@ cp <path-to-simpsons-loops>/agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/agents/tasks.md  .claude/agents/tasks.md
 
-# Claude Code commands → .claude/commands/
+# Loop commands → .claude/commands/
 cp <path-to-simpsons-loops>/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
 cp <path-to-simpsons-loops>/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
 cp <path-to-simpsons-loops>/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
@@ -107,7 +107,7 @@ chmod +x .specify/scripts/bash/pipeline.sh
 .specify/logs/          # All log files
 ```
 
-#### 4. Allow loop scripts in Claude Code permissions
+#### 4. Allow bash loop scripts in Claude Code permissions
 
 Add to `.claude/settings.local.json`:
 
@@ -128,7 +128,7 @@ Add to `.claude/settings.local.json`:
 
 ## 🚀 Usage (Recommended: Slash Commands)
 
-Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Task tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
+Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
 
 ### 🍩 Homer (clarification)
 
@@ -205,14 +205,15 @@ The bash scripts provide a standalone alternative that runs outside of Claude Co
 
 ### Pipeline options (bash)
 
-| Flag               | Description                                              | Default      |
-| ------------------ | -------------------------------------------------------- | ------------ |
-| `--from <step>`    | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
-| `--homer-max <n>`  | Max homer loop iterations                                | 10           |
-| `--lisa-max <n>`   | Max lisa loop iterations                                 | 10           |
-| `--ralph-max <n>`  | Max ralph loop iterations                                | 20           |
-| `--model <model>`  | Claude model to use                                      | opus         |
-| `--dry-run`        | Show what would run without executing                    | —            |
+| Flag                    | Description                                              | Default      |
+| ----------------------- | -------------------------------------------------------- | ------------ |
+| `--from <step>`         | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
+| `--homer-max <n>`       | Max homer loop iterations                                | 10           |
+| `--lisa-max <n>`        | Max lisa loop iterations                                 | 10           |
+| `--ralph-max <n>`       | Max ralph loop iterations                                | 20           |
+| `--quality-gates <cmd>` | Quality gates command for Ralph                          | placeholder  |
+| `--model <model>`       | Claude model to use                                      | opus         |
+| `--dry-run`             | Show what would run without executing                    | —            |
 
 ## ⚙️ How the loops work
 

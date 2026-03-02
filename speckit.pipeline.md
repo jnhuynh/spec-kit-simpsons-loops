@@ -10,7 +10,7 @@ $ARGUMENTS
 
 ## Overview
 
-Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Task tool) with isolated context windows. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
+Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
 
 **AUTONOMOUS EXECUTION**: This pipeline runs unattended. Do NOT ask the user for confirmation between iterations or steps. Do NOT pause for permission requests. Execute all steps and iterations back-to-back until the pipeline completes or a failure condition is met.
 
@@ -53,9 +53,9 @@ Check which artifacts exist to determine where to start:
 
 ### Step 5: Execute Pipeline Steps
 
-**CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Task tool call MUST return before the next one is spawned. Never use parallel Task calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
+**CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Agent tool call MUST return before the next one is spawned. Never use parallel Agent calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
 
-For each step (starting from the detected/specified step), spawn fresh sub agents using the **Task tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
+For each step (starting from the detected/specified step), spawn fresh sub agents using the **Agent tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
 
 When composing the prompt for each sub agent, always include:
 - Instruct the agent to read and follow the corresponding agent file from `.claude/agents/`
@@ -69,22 +69,30 @@ For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it
 
 Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
 
+**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from homer`.
+
 #### Plan (single-shot step)
 Skip if `plan.md` already exists. Otherwise, spawn a sub agent:
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/plan.md`
+
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (plan) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from plan`.
 
 #### Tasks (single-shot step)
 Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/tasks.md`
 
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (tasks) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from tasks`.
+
 #### Lisa (loop step)
 For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/lisa.md`
 
-Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection.
+Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
+
+**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from lisa`.
 
 #### Ralph (loop step)
 
@@ -100,15 +108,17 @@ For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it
 - **agent file**: `.claude/agents/ralph.md`
 - **prompt** (additional): Include quality gates: `Quality gates: <QUALITY_GATES>`
 
-Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly. Apply stuck detection.
+Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly. Apply stuck detection (3 identical outputs = abort).
+
+**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
 
 ### Step 6: Report Results
 
 After all steps complete, report:
 - Steps executed
 - Total iterations per loop step
-- Overall success or where the pipeline stopped
-- Suggestion to resume with `--from <step>` if needed
+- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 3 consecutive identical outputs detected in a loop step; **failure** — a sub agent crashed or errored)
+- Suggestion to resume with `--from <step>` if not fully resolved
 
 ## Examples
 
