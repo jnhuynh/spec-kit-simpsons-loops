@@ -1,29 +1,53 @@
-# speckit-simpsons-loops Development Guidelines
+# Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-01
+## Code Principles
 
-## Active Technologies
+- **Readability first** — clean, human-readable code with meaningful variable names. Clarity over brevity.
+- **Functional design** — services take inputs, yield deterministic outputs. No hidden side effects.
+- **Maintainability over cleverness** — no premature optimizations. Code must be maintainable by developers who didn't write it.
+- **Simplicity (KISS & YAGNI)** — build only what's needed. Prefer simpler solutions that can be validated before investing in sophisticated alternatives.
+- **Follow best practices** — established conventions for the languages, frameworks, and packages in use. Community standards over novel approaches.
 
-- Bash (POSIX-compatible, tested with bash 4+); Markdown for Claude Code commands and agent definitions + Claude Code CLI (`claude --agent`), `jq` (optional, for JSON manipulation in setup.sh), `git` (001-fix-install-subagents)
+## Test-First Development
 
-## Project Structure
+Unit tests for new logic MUST be written before the implementation code:
 
-```text
-src/
-tests/
-```
+1. Write the test
+2. Run it — verify it **fails**
+3. Write the minimum implementation to make it pass
 
-## Commands
+Applies to: new service functions, business logic, hooks, utilities, and bug fixes (reproduce the bug in a test first). Never proceed with failing tests.
 
-# Add commands for Bash (POSIX-compatible, tested with bash 4+); Markdown for Claude Code commands and agent definitions
+## Quality Gates
 
-## Code Style
+All changes must pass before committing:
 
-Bash (POSIX-compatible, tested with bash 4+); Markdown for Claude Code commands and agent definitions: Follow standard conventions
+- All tests pass
+- Linting passes with zero errors
+- Type checking passes with zero errors (typed languages)
 
-## Recent Changes
+## Git Discipline
 
-- 001-fix-install-subagents: Added Bash (POSIX-compatible, tested with bash 4+); Markdown for Claude Code commands and agent definitions + Claude Code CLI (`claude --agent`), `jq` (optional, for JSON manipulation in setup.sh), `git`
+- **Never push without explicit permission** — commits are fine, pushing is gated
+- Commit format: `type(scope): [ticket] description`
+- One logical change per commit
+- Branch naming follows spec directory: `XXXX-type-description` where type is `feat`, `fix`, or `chore`
 
-<!-- MANUAL ADDITIONS START -->
-<!-- MANUAL ADDITIONS END -->
+## Process Hygiene
+
+- Before starting a dev server: check if one is already running. Reuse it — do NOT start a duplicate.
+- Verify UI and integration work against the running application. Unit tests alone are insufficient.
+- Stop any dev servers, watchers, or child processes when implementation is complete. No straggling processes.
+
+## Speckit
+
+- Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation
+- Adjust spec, plan, or tasks instead
+- **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
+- **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
+- **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
+- Exit after each iteration — restart with fresh context
+
+<!-- ====== PROJECT SPECIFIC ====== -->
+
+<!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
