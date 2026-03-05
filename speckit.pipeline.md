@@ -47,8 +47,8 @@ Check which artifacts exist to determine where to start:
 
 ### Step 4: Configuration
 
-- Homer max iterations: **10**
-- Lisa max iterations: **10**
+- Homer max iterations: **20**
+- Lisa max iterations: **20**
 - Ralph max iterations: **incomplete_tasks + 10** (calculated at ralph step)
 
 ### Step 5: Execute Pipeline Steps

@@ -7,7 +7,7 @@
 set -uo pipefail
 
 FEATURE_DIR="${1:-}"
-MAX_ITERATIONS="${2:-10}"
+MAX_ITERATIONS="${2:-20}"
 MODEL="${CLAUDE_MODEL:-opus}"
 ITERATION=0
 LOG_DIR=".specify/logs"

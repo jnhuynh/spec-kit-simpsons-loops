@@ -174,6 +174,20 @@ Or resume from a specific step:
 /speckit.pipeline --from ralph specs/a1b2-feat-user-auth
 ```
 
+**Stop-after menu:** When running interactively, the pipeline presents a menu asking how far to run:
+
+```
+How far should the pipeline run?
+  a) All the way through (homer -> plan -> tasks -> lisa -> ralph)
+  b) Stop after homer loop
+  c) Stop after plan
+  d) Stop after tasks
+  e) Stop after lisa loop
+  (default: a)
+```
+
+Pick a letter and press Enter (or just Enter for the full pipeline). This works alongside `--from` — you can start from any step and stop at any later step.
+
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
 - `tasks.md` with some tasks completed → **ralph**
@@ -191,10 +205,10 @@ The bash scripts provide a standalone alternative that runs outside of Claude Co
 
 ```bash
 # Homer
-.specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 10
+.specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 20
 
 # Lisa
-.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 10
+.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 20
 
 # Ralph
 .specify/scripts/bash/ralph-loop.sh <FEATURE_DIR> 20
@@ -208,8 +222,8 @@ The bash scripts provide a standalone alternative that runs outside of Claude Co
 | Flag                    | Description                                              | Default      |
 | ----------------------- | -------------------------------------------------------- | ------------ |
 | `--from <step>`         | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
-| `--homer-max <n>`       | Max homer loop iterations                                | 10           |
-| `--lisa-max <n>`        | Max lisa loop iterations                                 | 10           |
+| `--homer-max <n>`       | Max homer loop iterations                                | 20           |
+| `--lisa-max <n>`        | Max lisa loop iterations                                 | 20           |
 | `--ralph-max <n>`       | Max ralph loop iterations                                | 20           |
 | `--quality-gates <cmd>` | Quality gates command for Ralph                          | placeholder  |
 | `--model <model>`       | Claude model to use                                      | opus         |
@@ -242,8 +256,8 @@ QUALITY_GATES="npm run lint && npm run typecheck && npm test" .specify/scripts/b
 
 | Loop  | Standalone default          | Pipeline default |
 | ----- | --------------------------- | ---------------- |
-| Homer | 10                          | 10               |
-| Lisa  | 10                          | 10               |
+| Homer | 20                          | 20               |
+| Lisa  | 20                          | 20               |
 | Ralph | incomplete tasks + 10       | 20               |
 
 Override with `--homer-max`, `--lisa-max`, `--ralph-max` flags (pipeline) or by editing the generated bash command (standalone).

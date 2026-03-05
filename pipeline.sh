@@ -17,8 +17,8 @@
 #
 # Options:
 #   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
-#   --homer-max <n>        Max homer loop iterations (default: 10)
-#   --lisa-max <n>         Max lisa loop iterations (default: 10)
+#   --homer-max <n>        Max homer loop iterations (default: 20)
+#   --lisa-max <n>         Max lisa loop iterations (default: 20)
 #   --ralph-max <n>        Max ralph loop iterations (default: 20)
 #   --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
 #   --model <model>        Claude model to use (default: opus)
@@ -36,8 +36,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 FROM_STEP=""
 MODEL="opus"
 DRY_RUN=false
-HOMER_MAX=10
-LISA_MAX=10
+HOMER_MAX=20
+LISA_MAX=20
 RALPH_MAX=20
 QUALITY_GATES="${QUALITY_GATES:-echo \"PLACEHOLDER: Set quality gates via --quality-gates or QUALITY_GATES env var\" && exit 1}"
 
@@ -81,8 +81,8 @@ Usage:
 
 Options:
   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
-  --homer-max <n>        Max homer loop iterations (default: 10)
-  --lisa-max <n>         Max lisa loop iterations (default: 10)
+  --homer-max <n>        Max homer loop iterations (default: 20)
+  --lisa-max <n>         Max lisa loop iterations (default: 20)
   --ralph-max <n>        Max ralph loop iterations (default: 20)
   --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
   --model <model>        Claude model to use (default: opus)
@@ -350,6 +350,47 @@ if [[ -z "$FROM_STEP" ]]; then
     FROM_STEP=$(detect_from_step "$FEATURE_DIR") || exit 0
 fi
 
+# ─── Stop-After Menu ──────────────────────────────────────────────────────────
+
+STOP_AFTER="ralph"  # default: run all the way through
+
+if [[ "$DRY_RUN" == false ]] && [[ -t 0 ]]; then
+    echo ""
+    echo -e "${CYAN}How far should the pipeline run?${NC}"
+    echo -e "  ${BOLD}a)${NC} All the way through (homer -> plan -> tasks -> lisa -> ralph)"
+    echo -e "  ${BOLD}b)${NC} Stop after homer loop"
+    echo -e "  ${BOLD}c)${NC} Stop after plan"
+    echo -e "  ${BOLD}d)${NC} Stop after tasks"
+    echo -e "  ${BOLD}e)${NC} Stop after lisa loop"
+    echo -e "  ${DIM}(default: a)${NC}"
+    echo ""
+    read -r -p "  Choose [a-e]: " MENU_CHOICE
+
+    case "${MENU_CHOICE:-a}" in
+        a|A) STOP_AFTER="ralph" ;;
+        b|B) STOP_AFTER="homer" ;;
+        c|C) STOP_AFTER="plan" ;;
+        d|D) STOP_AFTER="tasks" ;;
+        e|E) STOP_AFTER="lisa" ;;
+        *)
+            echo -e "${YELLOW}Invalid choice '${MENU_CHOICE}', defaulting to full pipeline.${NC}"
+            STOP_AFTER="ralph" ;;
+    esac
+fi
+
+# Helper: check if a step is past the stop-after point
+past_stop_after() {
+    local step="$1"
+    local found_stop=false
+    for s in "${STEPS[@]}"; do
+        if [[ "$found_stop" == true ]]; then
+            if [[ "$s" == "$step" ]]; then return 0; fi  # step is past the stop point
+        fi
+        if [[ "$s" == "$STOP_AFTER" ]]; then found_stop=true; fi
+    done
+    return 1
+}
+
 # ─── Header ─────────────────────────────────────────────────────────────────
 
 echo -e "${MAGENTA}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -357,17 +398,18 @@ echo -e "${MAGENTA}║${NC}  ${BOLD}SpecKit Pipeline${NC} — Plan to Implementa
 echo -e "${MAGENTA}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${MAGENTA}║${NC}  Feature: ${CYAN}${FEATURE_DIR}${NC}"
 echo -e "${MAGENTA}║${NC}  Starting from: ${CYAN}${FROM_STEP}${NC}"
+echo -e "${MAGENTA}║${NC}  Stop after: ${CYAN}${STOP_AFTER}${NC}"
 echo -e "${MAGENTA}║${NC}  Model: ${DIM}${MODEL}${NC}  Max: ${DIM}homer=${HOMER_MAX} lisa=${LISA_MAX} ralph=${RALPH_MAX}${NC}"
 echo -e "${MAGENTA}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${MAGENTA}╚════════════════════════════════════════════════════════════╝${NC}"
 
 log_section "PIPELINE STARTED"
-log "INFO" "Feature dir: $FEATURE_DIR, starting from: $FROM_STEP"
+log "INFO" "Feature dir: $FEATURE_DIR, starting from: $FROM_STEP, stop after: $STOP_AFTER"
 log "INFO" "Model: $MODEL"
 
 # ─── Step 1: Homer Loop ───────────────────────────────────────────────────
 
-if ! should_skip_step "homer"; then
+if ! should_skip_step "homer" && ! past_stop_after "homer"; then
     STEP_START=$(date +%s)
     print_step_header 1 "Homer: Spec Clarification"
 
@@ -399,7 +441,7 @@ fi
 
 # ─── Step 2: Plan ──────────────────────────────────────────────────────────
 
-if ! should_skip_step "plan"; then
+if ! should_skip_step "plan" && ! past_stop_after "plan"; then
     STEP_START=$(date +%s)
     print_step_header 2 "Generate Plan (plan)"
 
@@ -418,7 +460,7 @@ fi
 
 # ─── Step 3: Tasks ─────────────────────────────────────────────────────────
 
-if ! should_skip_step "tasks"; then
+if ! should_skip_step "tasks" && ! past_stop_after "tasks"; then
     STEP_START=$(date +%s)
     print_step_header 3 "Generate Tasks (tasks)"
 
@@ -437,7 +479,7 @@ fi
 
 # ─── Step 4: Lisa Loop ─────────────────────────────────────────────────────
 
-if ! should_skip_step "lisa"; then
+if ! should_skip_step "lisa" && ! past_stop_after "lisa"; then
     STEP_START=$(date +%s)
     print_step_header 4 "Lisa: Cross-Artifact Analysis"
 
@@ -469,7 +511,7 @@ fi
 
 # ─── Step 5: Ralph Loop ────────────────────────────────────────────────────
 
-if ! should_skip_step "ralph"; then
+if ! should_skip_step "ralph" && ! past_stop_after "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
