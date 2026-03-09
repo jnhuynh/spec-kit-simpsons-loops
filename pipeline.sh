@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # pipeline.sh — End-to-end SpecKit pipeline orchestrator
 #
-# Runs the SpecKit workflow from spec clarification to implementation.
-# Prerequisite: Run /speckit.specify interactively first to create the spec.
+# Runs the SpecKit workflow from feature description to implementation.
 #
 # Steps:
+#   0. specify  — Create feature spec from description (optional, auto-detected)
 #   1. homer    — Iterative spec clarification & remediation
 #   2. plan     — Generate technical implementation plan
 #   3. tasks    — Generate dependency-ordered task list
@@ -16,11 +16,12 @@
 #   pipeline.sh [options] [spec-dir]
 #
 # Options:
-#   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+#   --from <step>          Start from a specific step: specify, homer, plan, tasks, lisa, ralph
+#   --description <text>   Feature description for the specify step
 #   --homer-max <n>        Max homer loop iterations (default: 20)
 #   --lisa-max <n>         Max lisa loop iterations (default: 20)
 #   --ralph-max <n>        Max ralph loop iterations (default: 20)
-#   --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
+#   --quality-gates <cmd>  Quality gates command for Ralph (default: .specify/quality-gates.sh)
 #   --model <model>        Claude model to use (default: opus)
 #   --dry-run              Show what would be run without executing
 #   --help                 Show this help message
@@ -68,10 +69,10 @@ show_help() {
     cat <<'HELPEOF'
 pipeline.sh — End-to-end SpecKit pipeline orchestrator
 
-Runs the SpecKit workflow from spec clarification to implementation.
-Prerequisite: Run /speckit.specify interactively first to create the spec.
+Runs the SpecKit workflow from feature description to implementation.
 
 Steps:
+  0. specify  — Create feature spec from description (optional, auto-detected)
   1. homer    — Iterative spec clarification & remediation
   2. plan     — Generate technical implementation plan
   3. tasks    — Generate dependency-ordered task list
@@ -83,11 +84,12 @@ Usage:
   pipeline.sh [options] [spec-dir]
 
 Options:
-  --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+  --from <step>          Start from a specific step: specify, homer, plan, tasks, lisa, ralph
+  --description <text>   Feature description for the specify step
   --homer-max <n>        Max homer loop iterations (default: 20)
   --lisa-max <n>         Max lisa loop iterations (default: 20)
   --ralph-max <n>        Max ralph loop iterations (default: 20)
-  --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
+  --quality-gates <cmd>  Quality gates command for Ralph (default: .specify/quality-gates.sh)
   --model <model>        Claude model to use (default: opus)
   --dry-run              Show what would be run without executing
   --help                 Show this help message
@@ -97,6 +99,8 @@ Examples:
   pipeline.sh specs/a1b2-feat-user-auth              # Explicit spec directory
   pipeline.sh --from homer                           # Start from homer step
   pipeline.sh --from ralph specs/a1b2-feat-user-auth
+  pipeline.sh --description "Add user auth" specs/a1b2-feat-user-auth  # End-to-end from description
+  pipeline.sh --from specify --description "Add user auth"             # Explicit specify step
 HELPEOF
     exit 0
 }
@@ -428,21 +432,23 @@ STOP_AFTER="ralph"  # default: run all the way through
 if [[ "$DRY_RUN" == false ]] && [[ -t 0 ]]; then
     echo ""
     echo -e "${CYAN}How far should the pipeline run?${NC}"
-    echo -e "  ${BOLD}a)${NC} All the way through (homer -> plan -> tasks -> lisa -> ralph)"
-    echo -e "  ${BOLD}b)${NC} Stop after homer loop"
-    echo -e "  ${BOLD}c)${NC} Stop after plan"
-    echo -e "  ${BOLD}d)${NC} Stop after tasks"
-    echo -e "  ${BOLD}e)${NC} Stop after lisa loop"
+    echo -e "  ${BOLD}a)${NC} All the way through (specify -> homer -> plan -> tasks -> lisa -> ralph)"
+    echo -e "  ${BOLD}b)${NC} Stop after specify"
+    echo -e "  ${BOLD}c)${NC} Stop after homer loop"
+    echo -e "  ${BOLD}d)${NC} Stop after plan"
+    echo -e "  ${BOLD}e)${NC} Stop after tasks"
+    echo -e "  ${BOLD}f)${NC} Stop after lisa loop"
     echo -e "  ${DIM}(default: a)${NC}"
     echo ""
-    read -r -p "  Choose [a-e]: " MENU_CHOICE
+    read -r -p "  Choose [a-f]: " MENU_CHOICE
 
     case "${MENU_CHOICE:-a}" in
         a|A) STOP_AFTER="ralph" ;;
-        b|B) STOP_AFTER="homer" ;;
-        c|C) STOP_AFTER="plan" ;;
-        d|D) STOP_AFTER="tasks" ;;
-        e|E) STOP_AFTER="lisa" ;;
+        b|B) STOP_AFTER="specify" ;;
+        c|C) STOP_AFTER="homer" ;;
+        d|D) STOP_AFTER="plan" ;;
+        e|E) STOP_AFTER="tasks" ;;
+        f|F) STOP_AFTER="lisa" ;;
         *)
             echo -e "${YELLOW}Invalid choice '${MENU_CHOICE}', defaulting to full pipeline.${NC}"
             STOP_AFTER="ralph" ;;
