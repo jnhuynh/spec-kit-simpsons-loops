@@ -81,7 +81,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017 [US3] Create `agents/specify.md` (source template at repo root, following the same pattern as `agents/homer.md`, `agents/plan.md`, etc.) agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
+- [ ] T017 [US3] Create `agents/specify.md` (source template at repo root, following the same pattern as `agents/homer.md`, `agents/plan.md`, etc.) agent wrapper that invokes `/speckit.specify` non-interactively; the agent file MUST include an explicit instruction in its prompt/body directing the sub-agent to auto-resolve all clarifications with best guesses rather than presenting questions to the user (e.g., "Do not ask the user for clarification — make your best judgment and proceed; the Homer loop will refine gaps afterward"). The agent receives the feature directory and description via the `-p` prompt, following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents
 - [ ] T018 [US3] Update `setup.sh` to copy `agents/specify.md` to the target project's `.claude/agents/specify.md` directory (alongside the existing agent copies like `agents/homer.md` → `.claude/agents/homer.md`)
 - [ ] T019 [US3] Add `specify` to the `STEPS` array in `pipeline.sh` as step 0 (before `homer`)
 - [ ] T020 [US3] Add `--description` CLI option parsing to `pipeline.sh` for accepting a feature description string
