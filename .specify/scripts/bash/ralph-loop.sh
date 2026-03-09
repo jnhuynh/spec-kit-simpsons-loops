@@ -10,8 +10,7 @@ set -uo pipefail
 
 FEATURE_DIR="${1:-}"
 MAX_ITERATIONS="${2:-5}"
-QUALITY_GATES="${3:-echo \"PLACEHOLDER: Set quality gates via arg 3 or QUALITY_GATES env var\" && exit 1}"
-QUALITY_GATES="${QUALITY_GATES:-$QUALITY_GATES}"
+QUALITY_GATES_CLI_ARG="${3:-}"
 MODEL="${CLAUDE_MODEL:-opus}"
 ITERATION=0
 LOG_DIR=".specify/logs"
@@ -31,6 +30,49 @@ MAGENTA='\033[0;35m'
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# Resolve quality gates using precedence: CLI arg > env var > file > error
+# Sets QUALITY_GATES (value) and QUALITY_GATES_SOURCE ("cli", "env", or "file")
+resolve_quality_gates() {
+    local cli_arg="${1:-}"
+    local qg_file=".specify/quality-gates.sh"
+
+    # Priority 1: CLI argument
+    if [[ -n "$cli_arg" ]]; then
+        QUALITY_GATES="$cli_arg"
+        QUALITY_GATES_SOURCE="cli"
+        return 0
+    fi
+
+    # Priority 2: Environment variable (QUALITY_GATES may already be set)
+    if [[ -n "${QUALITY_GATES:-}" ]]; then
+        QUALITY_GATES_SOURCE="env"
+        return 0
+    fi
+
+    # Priority 3: Quality gate file
+    if [[ -f "$qg_file" ]]; then
+        # Validate file is non-empty after stripping comments and whitespace
+        local effective_content
+        effective_content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
+        if [[ -z "$effective_content" ]]; then
+            echo -e "${RED}Error: Quality gate file exists but contains no executable commands.${NC}" >&2
+            echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
+            exit 1
+        fi
+        QUALITY_GATES="$qg_file"
+        QUALITY_GATES_SOURCE="file"
+        return 0
+    fi
+
+    # Priority 4: Error — nothing configured
+    echo -e "${RED}Error: No quality gates configured.${NC}" >&2
+    echo "Create .specify/quality-gates.sh or pass quality gates as argument 3 or set QUALITY_GATES env var." >&2
+    exit 1
+}
+
+# Resolve quality gates
+resolve_quality_gates "$QUALITY_GATES_CLI_ARG"
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -149,7 +191,7 @@ INITIAL_COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || INITIA
 TOTAL_TASKS=$((INITIAL_INCOMPLETE + INITIAL_COMPLETE))
 log "INFO" "Initial state: $INITIAL_COMPLETE/$TOTAL_TASKS complete"
 
-while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
+while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
 
@@ -188,9 +230,18 @@ while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
     # Run Claude with fresh context (new process each time)
     echo -e "  ${DIM}Running claude --agent ralph ...${NC}"
 
+    # Build the quality gates prompt based on source type:
+    # - File source: tell the agent to execute the file directly
+    # - CLI/env source: pass the command string for shell evaluation
+    if [[ "$QUALITY_GATES_SOURCE" == "file" ]]; then
+        QG_PROMPT="Quality gates: $QUALITY_GATES (execute this file directly)"
+    else
+        QG_PROMPT="Quality gates: $QUALITY_GATES"
+    fi
+
     CLAUDE_EXIT=0
     ITER_OUTPUT=$(claude --agent ralph \
-        -p "Feature directory: $FEATURE_DIR. Quality gates: $QUALITY_GATES" \
+        -p "Feature directory: $FEATURE_DIR. $QG_PROMPT" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
         2>&1) || CLAUDE_EXIT=$?

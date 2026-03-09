@@ -124,7 +124,7 @@ log "INFO" "Max iterations: $MAX_ITERATIONS"
 # Create symlink to latest log
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
-while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
+while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
 

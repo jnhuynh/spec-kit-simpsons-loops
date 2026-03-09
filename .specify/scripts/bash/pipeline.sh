@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # pipeline.sh — End-to-end SpecKit pipeline orchestrator
 #
-# Runs the SpecKit workflow from spec clarification to implementation.
-# Prerequisite: Run /speckit.specify interactively first to create the spec.
+# Runs the SpecKit workflow from feature description to implementation.
 #
 # Steps:
+#   0. specify  — Create feature spec from description (optional, auto-detected)
 #   1. homer    — Iterative spec clarification & remediation
 #   2. plan     — Generate technical implementation plan
 #   3. tasks    — Generate dependency-ordered task list
@@ -16,11 +16,12 @@
 #   pipeline.sh [options] [spec-dir]
 #
 # Options:
-#   --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+#   --from <step>          Start from a specific step: specify, homer, plan, tasks, lisa, ralph
+#   --description <text>   Feature description for the specify step
 #   --homer-max <n>        Max homer loop iterations (default: 20)
 #   --lisa-max <n>         Max lisa loop iterations (default: 20)
 #   --ralph-max <n>        Max ralph loop iterations (default: 20)
-#   --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
+#   --quality-gates <cmd>  Quality gates command for Ralph (default: .specify/quality-gates.sh)
 #   --model <model>        Claude model to use (default: opus)
 #   --dry-run              Show what would be run without executing
 #   --help                 Show this help message
@@ -39,7 +40,10 @@ DRY_RUN=false
 HOMER_MAX=20
 LISA_MAX=20
 RALPH_MAX=20
-QUALITY_GATES="${QUALITY_GATES:-echo \"PLACEHOLDER: Set quality gates via --quality-gates or QUALITY_GATES env var\" && exit 1}"
+DESCRIPTION=""
+QUALITY_GATES_CLI_ARG=""
+QUALITY_GATES_ENV="${QUALITY_GATES:-}"
+QUALITY_GATES_SOURCE=""
 
 # Colors
 RED='\033[0;31m'
@@ -65,10 +69,10 @@ show_help() {
     cat <<'HELPEOF'
 pipeline.sh — End-to-end SpecKit pipeline orchestrator
 
-Runs the SpecKit workflow from spec clarification to implementation.
-Prerequisite: Run /speckit.specify interactively first to create the spec.
+Runs the SpecKit workflow from feature description to implementation.
 
 Steps:
+  0. specify  — Create feature spec from description (optional, auto-detected)
   1. homer    — Iterative spec clarification & remediation
   2. plan     — Generate technical implementation plan
   3. tasks    — Generate dependency-ordered task list
@@ -80,11 +84,12 @@ Usage:
   pipeline.sh [options] [spec-dir]
 
 Options:
-  --from <step>          Start from a specific step: homer, plan, tasks, lisa, ralph
+  --from <step>          Start from a specific step: specify, homer, plan, tasks, lisa, ralph
+  --description <text>   Feature description for the specify step
   --homer-max <n>        Max homer loop iterations (default: 20)
   --lisa-max <n>         Max lisa loop iterations (default: 20)
   --ralph-max <n>        Max ralph loop iterations (default: 20)
-  --quality-gates <cmd>  Quality gates command for Ralph (default: placeholder)
+  --quality-gates <cmd>  Quality gates command for Ralph (default: .specify/quality-gates.sh)
   --model <model>        Claude model to use (default: opus)
   --dry-run              Show what would be run without executing
   --help                 Show this help message
@@ -94,6 +99,8 @@ Examples:
   pipeline.sh specs/a1b2-feat-user-auth              # Explicit spec directory
   pipeline.sh --from homer                           # Start from homer step
   pipeline.sh --from ralph specs/a1b2-feat-user-auth
+  pipeline.sh --description "Add user auth" specs/a1b2-feat-user-auth  # End-to-end from description
+  pipeline.sh --from specify --description "Add user auth"             # Explicit specify step
 HELPEOF
     exit 0
 }
@@ -103,12 +110,13 @@ SPEC_DIR_ARG=""
 i=1
 while [ $i -le $# ]; do
     arg="${!i}"
+    # shellcheck disable=SC2034  # DESCRIPTION used by specify step (T022)
     case "$arg" in
         --help|-h) show_help ;;
         --from)
             i=$((i + 1)); FROM_STEP="${!i}"
-            if [[ ! "$FROM_STEP" =~ ^(homer|plan|tasks|lisa|ralph)$ ]]; then
-                echo -e "${RED}Error: --from must be one of: homer, plan, tasks, lisa, ralph${NC}" >&2
+            if [[ ! "$FROM_STEP" =~ ^(specify|homer|plan|tasks|lisa|ralph)$ ]]; then
+                echo -e "${RED}Error: --from must be one of: specify, homer, plan, tasks, lisa, ralph${NC}" >&2
                 exit 1
             fi ;;
         --model)
@@ -120,7 +128,9 @@ while [ $i -le $# ]; do
         --ralph-max)
             i=$((i + 1)); RALPH_MAX="${!i}" ;;
         --quality-gates)
-            i=$((i + 1)); QUALITY_GATES="${!i}" ;;
+            i=$((i + 1)); QUALITY_GATES_CLI_ARG="${!i}" ;;
+        --description)
+            i=$((i + 1)); DESCRIPTION="${!i}" ;;
         --dry-run)
             DRY_RUN=true ;;
         *)
@@ -147,7 +157,7 @@ log_section() {
 
 # ─── Step Tracking ──────────────────────────────────────────────────────────
 
-STEPS=("homer" "plan" "tasks" "lisa" "ralph")
+STEPS=("specify" "homer" "plan" "tasks" "lisa" "ralph")
 
 should_skip_step() {
     local step="$1"
@@ -243,6 +253,50 @@ run_agent() {
     return 0
 }
 
+# ─── Resolve Quality Gates ─────────────────────────────────────────────────
+
+# Resolve quality gates using precedence: CLI arg > env var > file > error
+# Sets QUALITY_GATES (value) and QUALITY_GATES_SOURCE ("cli", "env", or "file")
+resolve_quality_gates() {
+    local cli_arg="${1:-}"
+    local env_val="${2:-}"
+    local qg_file="$REPO_ROOT/.specify/quality-gates.sh"
+
+    # Priority 1: CLI argument
+    if [[ -n "$cli_arg" ]]; then
+        QUALITY_GATES="$cli_arg"
+        QUALITY_GATES_SOURCE="cli"
+        return 0
+    fi
+
+    # Priority 2: Environment variable
+    if [[ -n "$env_val" ]]; then
+        QUALITY_GATES="$env_val"
+        QUALITY_GATES_SOURCE="env"
+        return 0
+    fi
+
+    # Priority 3: Quality gate file
+    if [[ -f "$qg_file" ]]; then
+        # Validate file is non-empty after stripping comments and whitespace
+        local effective_content
+        effective_content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
+        if [[ -z "$effective_content" ]]; then
+            echo -e "${RED}Error: Quality gate file exists but contains no executable commands.${NC}" >&2
+            echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
+            exit 1
+        fi
+        QUALITY_GATES="$qg_file"
+        QUALITY_GATES_SOURCE="file"
+        return 0
+    fi
+
+    # Priority 4: Error — nothing configured
+    echo -e "${RED}Error: No quality gates configured.${NC}" >&2
+    echo "Create .specify/quality-gates.sh or pass --quality-gates <cmd> or set QUALITY_GATES env var." >&2
+    exit 1
+}
+
 # ─── Resolve Feature Directory ──────────────────────────────────────────────
 
 resolve_feature_dir() {
@@ -333,7 +387,7 @@ detect_from_step() {
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
-cd "$REPO_ROOT" || exit 1
+cd "$REPO_ROOT" || exit
 
 PIPELINE_START=$(date +%s)
 FEATURE_DIR=""
@@ -342,16 +396,33 @@ FEATURE_DIR=""
 
 FEATURE_DIR=$(resolve_feature_dir) || exit 1
 
-# Validate that spec.md exists (must be created interactively first)
+# Resolve quality gates (CLI arg > env var > file > error)
+resolve_quality_gates "$QUALITY_GATES_CLI_ARG" "$QUALITY_GATES_ENV"
+
+# Validate that spec.md exists or can be created via the specify step
 if [[ ! -f "$REPO_ROOT/$FEATURE_DIR/spec.md" ]]; then
-    echo -e "${RED}Error: No spec.md found in $FEATURE_DIR${NC}" >&2
-    echo -e "${RED}Run /speckit.specify interactively first to create the spec.${NC}" >&2
-    exit 1
+    if [[ "$FROM_STEP" == "specify" ]] || [[ -n "$DESCRIPTION" ]]; then
+        # Allow pipeline to continue — the specify step will create spec.md
+        if [[ -z "$FROM_STEP" ]]; then
+            FROM_STEP="specify"
+        fi
+    else
+        echo -e "${RED}Error: No spec.md found in $FEATURE_DIR${NC}" >&2
+        echo -e "${RED}Run /speckit.specify interactively first, or pass --description to auto-create the spec.${NC}" >&2
+        exit 1
+    fi
 fi
 
 # Auto-detect starting step if not specified
 if [[ -z "$FROM_STEP" ]]; then
     FROM_STEP=$(detect_from_step "$FEATURE_DIR") || exit 0
+fi
+
+# Validate that --description is provided when the specify step will run
+if [[ "$FROM_STEP" == "specify" ]] && [[ -z "$DESCRIPTION" ]]; then
+    echo -e "${RED}Error: Feature description required for specify step.${NC}" >&2
+    echo "Pass --description \"your feature description\" to use the specify step." >&2
+    exit 1
 fi
 
 # ─── Stop-After Menu ──────────────────────────────────────────────────────────
@@ -361,21 +432,23 @@ STOP_AFTER="ralph"  # default: run all the way through
 if [[ "$DRY_RUN" == false ]] && [[ -t 0 ]]; then
     echo ""
     echo -e "${CYAN}How far should the pipeline run?${NC}"
-    echo -e "  ${BOLD}a)${NC} All the way through (homer -> plan -> tasks -> lisa -> ralph)"
-    echo -e "  ${BOLD}b)${NC} Stop after homer loop"
-    echo -e "  ${BOLD}c)${NC} Stop after plan"
-    echo -e "  ${BOLD}d)${NC} Stop after tasks"
-    echo -e "  ${BOLD}e)${NC} Stop after lisa loop"
+    echo -e "  ${BOLD}a)${NC} All the way through (specify -> homer -> plan -> tasks -> lisa -> ralph)"
+    echo -e "  ${BOLD}b)${NC} Stop after specify"
+    echo -e "  ${BOLD}c)${NC} Stop after homer loop"
+    echo -e "  ${BOLD}d)${NC} Stop after plan"
+    echo -e "  ${BOLD}e)${NC} Stop after tasks"
+    echo -e "  ${BOLD}f)${NC} Stop after lisa loop"
     echo -e "  ${DIM}(default: a)${NC}"
     echo ""
-    read -r -p "  Choose [a-e]: " MENU_CHOICE
+    read -r -p "  Choose [a-f]: " MENU_CHOICE
 
     case "${MENU_CHOICE:-a}" in
         a|A) STOP_AFTER="ralph" ;;
-        b|B) STOP_AFTER="homer" ;;
-        c|C) STOP_AFTER="plan" ;;
-        d|D) STOP_AFTER="tasks" ;;
-        e|E) STOP_AFTER="lisa" ;;
+        b|B) STOP_AFTER="specify" ;;
+        c|C) STOP_AFTER="homer" ;;
+        d|D) STOP_AFTER="plan" ;;
+        e|E) STOP_AFTER="tasks" ;;
+        f|F) STOP_AFTER="lisa" ;;
         *)
             echo -e "${YELLOW}Invalid choice '${MENU_CHOICE}', defaulting to full pipeline.${NC}"
             STOP_AFTER="ralph" ;;
@@ -410,6 +483,28 @@ echo -e "${MAGENTA}╚═══════════════════�
 log_section "PIPELINE STARTED"
 log "INFO" "Feature dir: $FEATURE_DIR, starting from: $FROM_STEP, stop after: $STOP_AFTER"
 log "INFO" "Model: $MODEL"
+
+# ─── Step 0: Specify ─────────────────────────────────────────────────────
+
+if ! should_skip_step "specify" && ! past_stop_after "specify"; then
+    STEP_START=$(date +%s)
+    print_step_header 0 "Specify: Create Feature Spec"
+
+    if [[ -f "$REPO_ROOT/$FEATURE_DIR/spec.md" ]]; then
+        print_step_skip "specify" "spec.md already exists"
+    else
+        run_agent "specify" \
+            "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." \
+            "Create feature spec from description" || {
+            echo -e "${RED}Specify step failed. Fix the issue and re-invoke with --from specify${NC}" >&2
+            log "ERROR" "Specify step failed for feature dir: $FEATURE_DIR"
+            exit 1
+        }
+    fi
+
+    STEP_END=$(date +%s)
+    print_step_complete "Specify" "$((STEP_END - STEP_START))"
+fi
 
 # ─── Step 1: Homer Loop ───────────────────────────────────────────────────
 
@@ -519,8 +614,16 @@ if ! should_skip_step "ralph" && ! past_stop_after "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
-    RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX \"$QUALITY_GATES\""
-    log "INFO" "Running: $RALPH_CMD"
+    # Build the ralph-loop.sh command based on quality gates source:
+    # - File source: omit CLI arg so ralph-loop.sh discovers the file itself
+    #   (preserves file-source semantics for prompt differentiation)
+    # - CLI/env source: pass the command string as CLI arg for ralph-loop.sh
+    if [[ "$QUALITY_GATES_SOURCE" == "file" ]]; then
+        RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX"
+    else
+        RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX \"$QUALITY_GATES\""
+    fi
+    log "INFO" "Running: $RALPH_CMD (quality gates source: $QUALITY_GATES_SOURCE)"
     echo -e "  ${DIM}Running: $RALPH_CMD${NC}"
 
     if $DRY_RUN; then
