@@ -66,7 +66,7 @@
 - [x] T012 [US2] Update `ralph-loop.sh` to use the resolved quality gates when invoking the Ralph agent, handling both file execution and command string evaluation
 - [x] T013 [US2] Update `pipeline.sh` to use the resolved quality gates when invoking the Ralph step, handling both file execution and command string evaluation
 - [x] T014 [US2] Add clear error message and non-zero exit when no quality gates are configured (no file, no env var, no CLI arg) in both `ralph-loop.sh` and `pipeline.sh`
-- [ ] T015 [P] [US2] Run `shellcheck ralph-loop.sh` and fix any linting errors
+- [x] T015 [P] [US2] Run `shellcheck ralph-loop.sh` and fix any linting errors
 - [ ] T016 [P] [US2] Run `shellcheck pipeline.sh` and fix any linting errors
 
 **Checkpoint**: Loop scripts read quality gates from file by default. CLI and env var overrides work. Missing configuration produces clear error. All four acceptance scenarios from US2 pass.
