@@ -395,11 +395,18 @@ FEATURE_DIR=$(resolve_feature_dir) || exit 1
 # Resolve quality gates (CLI arg > env var > file > error)
 resolve_quality_gates "$QUALITY_GATES_CLI_ARG" "$QUALITY_GATES_ENV"
 
-# Validate that spec.md exists (must be created interactively first)
+# Validate that spec.md exists or can be created via the specify step
 if [[ ! -f "$REPO_ROOT/$FEATURE_DIR/spec.md" ]]; then
-    echo -e "${RED}Error: No spec.md found in $FEATURE_DIR${NC}" >&2
-    echo -e "${RED}Run /speckit.specify interactively first to create the spec.${NC}" >&2
-    exit 1
+    if [[ "$FROM_STEP" == "specify" ]] || [[ -n "$DESCRIPTION" ]]; then
+        # Allow pipeline to continue — the specify step will create spec.md
+        if [[ -z "$FROM_STEP" ]]; then
+            FROM_STEP="specify"
+        fi
+    else
+        echo -e "${RED}Error: No spec.md found in $FEATURE_DIR${NC}" >&2
+        echo -e "${RED}Run /speckit.specify interactively first, or pass --description to auto-create the spec.${NC}" >&2
+        exit 1
+    fi
 fi
 
 # Auto-detect starting step if not specified
