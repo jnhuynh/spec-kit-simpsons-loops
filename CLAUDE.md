@@ -51,3 +51,10 @@ All changes must pass before committing:
 <!-- ====== PROJECT SPECIFIC ====== -->
 
 <!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
+
+## Active Technologies
+- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`) (002-rerun-setup-pipeline)
+- Filesystem only — shell scripts, markdown files, and configuration files (002-rerun-setup-pipeline)
+
+## Recent Changes
+- 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)

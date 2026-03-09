@@ -33,6 +33,70 @@ fi
 echo "Installing Simpsons Loops into: $PROJECT_DIR"
 echo ""
 
+# ── 0. Quality gate file (never overwrite) ──────────────────────────
+# MUST run before file copies so we can inspect the target's existing
+# Ralph command file for custom quality gates before it gets overwritten.
+
+QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
+RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
+SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
+
+if [[ -f "$QUALITY_GATE_FILE" ]]; then
+  echo "  Quality gate file already exists — skipped"
+else
+  # Determine content: placeholder or extracted custom gates
+  qg_content=""
+
+  if [[ -f "$RALPH_CMD_FILE" ]] && ! grep -qF "$SENTINEL" "$RALPH_CMD_FILE"; then
+    # Sentinel is absent → custom quality gates → extract code block from
+    # the "### Step 3: Extract Quality Gates" section
+    extracted=$(awk '
+      /^### Step 3: Extract Quality Gates/ { found_section=1; next }
+      found_section && /^```bash/ { in_block=1; next }
+      in_block && /^```/ { exit }
+      in_block { print }
+    ' "$RALPH_CMD_FILE")
+
+    if [[ -n "$extracted" ]]; then
+      qg_content="$(printf '#!/usr/bin/env bash\n%s\n' "$extracted")"
+      echo "  Extracted custom quality gates from Ralph command file"
+    fi
+  fi
+
+  # If nothing was extracted (no file, sentinel present, or empty block),
+  # create the placeholder
+  if [[ -z "$qg_content" ]]; then
+    qg_content='#!/usr/bin/env bash
+# SPECKIT_DEFAULT_QUALITY_GATE
+#
+# Quality Gates Configuration
+# ──────────────────────────────────────────────────────────────
+# Add your project'\''s quality gate commands below.
+# These commands run after each implementation step to verify code quality.
+#
+# Examples:
+#   npm test && npm run lint
+#   pytest && ruff check .
+#   cargo test && cargo clippy
+#   shellcheck *.sh
+#
+# This file is sourced by the pipeline and Ralph loop scripts.
+# It must exit 0 for quality gates to pass.
+# ──────────────────────────────────────────────────────────────
+
+echo "ERROR: Quality gates not configured."
+echo "Edit .specify/quality-gates.sh with your project'\''s quality gate commands."
+exit 1'
+    echo "  Created placeholder quality gate file"
+  fi
+
+  # Atomic write: temp file → mv
+  tmp=$(mktemp)
+  printf '%s\n' "$qg_content" > "$tmp"
+  chmod +x "$tmp"
+  mv "$tmp" "$QUALITY_GATE_FILE"
+fi
+
 # ── 1. Copy files ───────────────────────────────────────────────────
 
 mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
@@ -48,6 +112,7 @@ cp "$SCRIPT_DIR/agents/lisa.md"             "$PROJECT_DIR/.claude/agents/lisa.md
 cp "$SCRIPT_DIR/agents/ralph.md"            "$PROJECT_DIR/.claude/agents/ralph.md"
 cp "$SCRIPT_DIR/agents/plan.md"             "$PROJECT_DIR/.claude/agents/plan.md"
 cp "$SCRIPT_DIR/agents/tasks.md"            "$PROJECT_DIR/.claude/agents/tasks.md"
+cp "$SCRIPT_DIR/agents/specify.md"          "$PROJECT_DIR/.claude/agents/specify.md"
 cp "$SCRIPT_DIR/speckit.ralph.implement.md" "$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
 cp "$SCRIPT_DIR/speckit.lisa.analyze.md"    "$PROJECT_DIR/.claude/commands/speckit.lisa.analyze.md"
 cp "$SCRIPT_DIR/speckit.homer.clarify.md"   "$PROJECT_DIR/.claude/commands/speckit.homer.clarify.md"
@@ -63,6 +128,7 @@ echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/ralph.md"
 echo "    .claude/agents/plan.md"
 echo "    .claude/agents/tasks.md"
+echo "    .claude/agents/specify.md"
 echo "    .claude/commands/speckit.ralph.implement.md"
 echo "    .claude/commands/speckit.lisa.analyze.md"
 echo "    .claude/commands/speckit.homer.clarify.md"
