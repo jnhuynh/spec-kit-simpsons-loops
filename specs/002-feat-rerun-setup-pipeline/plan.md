@@ -30,7 +30,7 @@ Make `setup.sh` safely rerunnable by extracting quality gate configuration into 
 | III. Maintainability Over Cleverness | PASS | No clever tricks; sentinel-based detection is straightforward grep; atomic writes use standard mktemp+mv pattern |
 | IV. Best Practices | PASS | Follows established bash conventions: `set -euo pipefail`, shellcheck-clean, atomic file operations, trap-based cleanup |
 | V. Simplicity (KISS & YAGNI) | PASS | Quality gate file is a plain shell script (no custom format); pipeline step addition is minimal; no new dependencies introduced |
-| Test-First Development | PASS | Shell scripts will be validated via shellcheck + functional test runs before committing |
+| Test-First Development | PASS (adapted) | Shell scripts lack practical pre-implementation unit test frameworks. Adapted approach: `shellcheck` static analysis before committing any script change, plus functional validation against a test project per the quickstart checklist. This satisfies the constitution's intent (verify behavior before merge) while acknowledging that bash tooling does not support the write-test-first → run-red → implement → run-green cycle used for application code. |
 | Process Cleanup | N/A | No dev servers or long-running processes involved |
 
 **Post-Design Re-check**: PASS. The design adds no new abstractions, no new dependencies, and no complexity beyond what the requirements mandate. All changes follow existing codebase patterns.
