@@ -63,7 +63,7 @@ speckit.ralph.implement.md                  # Replace inline quality gates with 
 speckit.pipeline.md                         # Add specify step, quality gate file reading
 
 # Files CREATED (new)
-specify.md                                  # Agent wrapper for /speckit.specify (non-interactive mode for pipeline use)
+agents/specify.md                           # Agent wrapper for /speckit.specify (non-interactive mode for pipeline use)
 # Note: .specify/quality-gates.sh is created per-project by setup.sh, not in this repo
 ```
 
