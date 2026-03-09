@@ -39,7 +39,8 @@ DRY_RUN=false
 HOMER_MAX=20
 LISA_MAX=20
 RALPH_MAX=20
-QUALITY_GATES="${QUALITY_GATES:-echo \"PLACEHOLDER: Set quality gates via --quality-gates or QUALITY_GATES env var\" && exit 1}"
+QUALITY_GATES_CLI_ARG=""
+QUALITY_GATES_ENV="${QUALITY_GATES:-}"
 
 # Colors
 RED='\033[0;31m'
@@ -120,7 +121,7 @@ while [ $i -le $# ]; do
         --ralph-max)
             i=$((i + 1)); RALPH_MAX="${!i}" ;;
         --quality-gates)
-            i=$((i + 1)); QUALITY_GATES="${!i}" ;;
+            i=$((i + 1)); QUALITY_GATES_CLI_ARG="${!i}" ;;
         --dry-run)
             DRY_RUN=true ;;
         *)
@@ -243,6 +244,46 @@ run_agent() {
     return 0
 }
 
+# ─── Resolve Quality Gates ─────────────────────────────────────────────────
+
+# Resolve quality gates using precedence: CLI arg > env var > file > error
+resolve_quality_gates() {
+    local cli_arg="${1:-}"
+    local env_val="${2:-}"
+    local qg_file="$REPO_ROOT/.specify/quality-gates.sh"
+
+    # Priority 1: CLI argument
+    if [[ -n "$cli_arg" ]]; then
+        QUALITY_GATES="$cli_arg"
+        return 0
+    fi
+
+    # Priority 2: Environment variable
+    if [[ -n "$env_val" ]]; then
+        QUALITY_GATES="$env_val"
+        return 0
+    fi
+
+    # Priority 3: Quality gate file
+    if [[ -f "$qg_file" ]]; then
+        # Validate file is non-empty after stripping comments and whitespace
+        local effective_content
+        effective_content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
+        if [[ -z "$effective_content" ]]; then
+            echo -e "${RED}Error: Quality gate file exists but contains no executable commands.${NC}" >&2
+            echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
+            exit 1
+        fi
+        QUALITY_GATES="$qg_file"
+        return 0
+    fi
+
+    # Priority 4: Error — nothing configured
+    echo -e "${RED}Error: No quality gates configured.${NC}" >&2
+    echo "Create .specify/quality-gates.sh or pass --quality-gates <cmd> or set QUALITY_GATES env var." >&2
+    exit 1
+}
+
 # ─── Resolve Feature Directory ──────────────────────────────────────────────
 
 resolve_feature_dir() {
@@ -341,6 +382,9 @@ FEATURE_DIR=""
 # ─── Resolve Feature Directory ────────────────────────────────────────────
 
 FEATURE_DIR=$(resolve_feature_dir) || exit 1
+
+# Resolve quality gates (CLI arg > env var > file > error)
+resolve_quality_gates "$QUALITY_GATES_CLI_ARG" "$QUALITY_GATES_ENV"
 
 # Validate that spec.md exists (must be created interactively first)
 if [[ ! -f "$REPO_ROOT/$FEATURE_DIR/spec.md" ]]; then
