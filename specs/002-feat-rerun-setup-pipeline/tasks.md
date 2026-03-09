@@ -1,6 +1,6 @@
 # Tasks: Rerunnable Setup & End-to-End Pipeline
 
-**Input**: Design documents from `/specs/002-rerun-setup-pipeline/`
+**Input**: Design documents from `/specs/002-feat-rerun-setup-pipeline/`
 **Prerequisites**: plan.md (required), spec.md (required), research.md, data-model.md, contracts/
 
 **Tests**: This feature consists entirely of shell scripts and markdown command files. Per the constitution's test-first mandate, the test-first approach for shell scripts is: (1) `shellcheck` static analysis before committing any script change, and (2) functional validation against a test project per the quickstart checklist. Each phase includes shellcheck tasks that MUST pass before proceeding. Functional acceptance scenarios are validated at phase checkpoints.

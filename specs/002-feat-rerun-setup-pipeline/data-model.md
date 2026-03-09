@@ -1,7 +1,7 @@
 # Data Model: Rerunnable Setup & End-to-End Pipeline
 
 **Date**: 2026-03-09
-**Feature**: `002-rerun-setup-pipeline`
+**Feature**: `002-feat-rerun-setup-pipeline`
 
 ## Entities
 

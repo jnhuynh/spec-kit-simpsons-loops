@@ -1,7 +1,7 @@
 # Implementation Plan: Rerunnable Setup & End-to-End Pipeline
 
-**Branch**: `002-rerun-setup-pipeline` | **Date**: 2026-03-09 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `/specs/002-rerun-setup-pipeline/spec.md`
+**Branch**: `002-feat-rerun-setup-pipeline` | **Date**: 2026-03-09 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/specs/002-feat-rerun-setup-pipeline/spec.md`
 
 ## Summary
 
@@ -40,7 +40,7 @@ Make `setup.sh` safely rerunnable by extracting quality gate configuration into 
 ### Documentation (this feature)
 
 ```text
-specs/002-rerun-setup-pipeline/
+specs/002-feat-rerun-setup-pipeline/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output — research decisions
 ├── data-model.md        # Phase 1 output — entity model

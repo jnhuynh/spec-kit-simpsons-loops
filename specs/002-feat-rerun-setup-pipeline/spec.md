@@ -1,6 +1,6 @@
 # Feature Specification: Rerunnable Setup & End-to-End Pipeline
 
-**Feature Branch**: `002-rerun-setup-pipeline`
+**Feature Branch**: `002-feat-rerun-setup-pipeline`
 **Created**: 2026-03-09
 **Status**: Draft
 **Input**: User description: "Let's update this project to support rerunning setup.sh to update a project's spec kit simpsons loops. The key thing is not wiping out the existing quality gate if it exists. Should it exist in a separate file that we never rewrite and have the various loops read the quality gate from the file? Also, let's update speckit.pipeline to support /speckit.specify so that it's a true end to end pipeline from initial spec user input to implementation."
