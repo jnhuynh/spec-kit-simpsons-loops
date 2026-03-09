@@ -56,14 +56,15 @@ specs/002-feat-rerun-setup-pipeline/
 
 ```text
 # Files MODIFIED (existing)
-setup.sh                                    # Add quality gate file creation/extraction logic
+setup.sh                                    # Add quality gate file creation/extraction logic + copy specify agent
 pipeline.sh                                 # Add specify step, quality gate file reading
 ralph-loop.sh                               # Add quality gate file reading as fallback
 speckit.ralph.implement.md                  # Replace inline quality gates with file reference
 speckit.pipeline.md                         # Add specify step, quality gate file reading
 
 # Files CREATED (new)
-# (No new source files — the quality gate file is created per-project by setup.sh)
+specify.md                                  # Agent wrapper for /speckit.specify (non-interactive mode for pipeline use)
+# Note: .specify/quality-gates.sh is created per-project by setup.sh, not in this repo
 ```
 
 **Structure Decision**: This is a modification-heavy feature within an existing flat project structure. No new directories are created in the source repo. The quality gate file (`.specify/quality-gates.sh`) is created in target projects by `setup.sh`, not in this repo itself.

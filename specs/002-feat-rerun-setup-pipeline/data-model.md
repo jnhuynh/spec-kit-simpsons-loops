@@ -89,7 +89,7 @@ exit 1
 
 | Category | Overwrite on Rerun | Files |
 |----------|-------------------|-------|
-| Always overwrite | Yes | Loop scripts (`ralph-loop.sh`, `lisa-loop.sh`, `homer-loop.sh`, `pipeline.sh`), agent files (`homer.md`, `lisa.md`, `ralph.md`, `plan.md`, `tasks.md`), command files (`speckit.*.md`) |
+| Always overwrite | Yes | Loop scripts (`ralph-loop.sh`, `lisa-loop.sh`, `homer-loop.sh`, `pipeline.sh`), agent files (`homer.md`, `lisa.md`, `ralph.md`, `plan.md`, `tasks.md`, `specify.md`), command files (`speckit.*.md`) |
 | Never overwrite | No | Quality gate file (`.specify/quality-gates.sh`) |
 | Append-only | Conditional | `.gitignore` (only if marker not present) |
 | Merge | Conditional | `.claude/settings.local.json` (add permissions, preserve existing) |

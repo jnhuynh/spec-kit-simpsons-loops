@@ -32,6 +32,7 @@ These files are unconditionally overwritten on every run:
 .claude/agents/ralph.md
 .claude/agents/plan.md
 .claude/agents/tasks.md
+.claude/agents/specify.md
 .claude/commands/speckit.ralph.implement.md
 .claude/commands/speckit.lisa.analyze.md
 .claude/commands/speckit.homer.clarify.md

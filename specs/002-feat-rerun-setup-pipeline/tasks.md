@@ -81,10 +81,12 @@
 
 ### Implementation for User Story 3
 
+- [ ] T017a [US3] Create `.claude/agents/specify.md` agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
+- [ ] T017b [US3] Update `setup.sh` to copy the `specify.md` agent file to the target project's `.claude/agents/` directory (alongside the existing agent copies)
 - [ ] T017 [US3] Add `specify` to the `STEPS` array in `pipeline.sh` as step 0 (before `homer`)
 - [ ] T018 [US3] Add `--description` CLI option parsing to `pipeline.sh` for accepting a feature description string
 - [ ] T019 [US3] Update `--from` validation in `pipeline.sh` to accept `specify` as a valid step value
-- [ ] T020 [US3] Implement the specify step execution block in `pipeline.sh`: invoke the specify agent non-interactively with the feature description, auto-resolve clarifications
+- [ ] T020 [US3] Implement the specify step execution block in `pipeline.sh`: call `run_agent "specify" "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." "Create feature spec from description"` using the `.claude/agents/specify.md` agent wrapper created in T017a
 - [ ] T021 [US3] Add auto-detection logic in `pipeline.sh`: when no `--from` is specified and no `spec.md` exists but `--description` is provided, auto-start from the specify step
 - [ ] T022 [US3] Add error handling for specify step failure in `pipeline.sh`: halt pipeline with clear error message and non-zero exit code per FR-018
 - [ ] T023 [US3] Add error handling for missing description in `pipeline.sh`: exit with error when `--from specify` is used without `--description`
