@@ -149,7 +149,7 @@ log_section() {
 
 # ─── Step Tracking ──────────────────────────────────────────────────────────
 
-STEPS=("homer" "plan" "tasks" "lisa" "ralph")
+STEPS=("specify" "homer" "plan" "tasks" "lisa" "ralph")
 
 should_skip_step() {
     local step="$1"
