@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
-# Homer Loop - Iterative spec clarification & remediation with fresh context per iteration
-# Usage: ./homer-loop.sh <spec-dir> [max-iterations]
+# Ralph Loop - Task-by-task implementation with fresh context per iteration
+# Usage: ./ralph-loop.sh <spec-dir> [max-iterations] [quality-gates]
 #
 # Arg 1: A spec directory path (e.g. specs/a1b2-feat-foo)
+# Arg 2: Max iterations (default: 5)
+# Arg 3: Quality gates command (default: placeholder)
 
 set -uo pipefail
 
 FEATURE_DIR="${1:-}"
-MAX_ITERATIONS="${2:-20}"
+MAX_ITERATIONS="${2:-5}"
+QUALITY_GATES="${3:-echo \"PLACEHOLDER: Set quality gates via arg 3 or QUALITY_GATES env var\" && exit 1}"
+QUALITY_GATES="${QUALITY_GATES:-$QUALITY_GATES}"
 MODEL="${CLAUDE_MODEL:-opus}"
 ITERATION=0
 LOG_DIR=".specify/logs"
-LOG_FILE="$LOG_DIR/homer-$(date '+%Y%m%d-%H%M%S').log"
-LATEST_LOG="$LOG_DIR/homer-latest.log"
+LOG_FILE="$LOG_DIR/ralph-$(date '+%Y%m%d-%H%M%S').log"
+LATEST_LOG="$LOG_DIR/ralph-latest.log"
+STATE_FILE=".specify/.ralph-state"
 CONSECUTIVE_FAILURES=0
 MAX_CONSECUTIVE_FAILURES=3
 
@@ -22,6 +27,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
@@ -32,7 +38,7 @@ mkdir -p "$LOG_DIR"
 # Validate feature directory
 if [[ -z "$FEATURE_DIR" ]]; then
     echo -e "${RED}Error: Feature directory required${NC}"
-    echo "Usage: ./homer-loop.sh <spec-dir> [max-iterations]"
+    echo "Usage: ./ralph-loop.sh <spec-dir> [max-iterations] [quality-gates]"
     exit 1
 fi
 
@@ -41,9 +47,11 @@ if [[ ! -d "$FEATURE_DIR" ]]; then
     exit 1
 fi
 
-if [[ ! -f "$FEATURE_DIR/spec.md" ]]; then
-    echo -e "${RED}Error: spec.md not found in $FEATURE_DIR${NC}"
-    echo "Run /speckit.specify first"
+TASKS_FILE="$FEATURE_DIR/tasks.md"
+
+if [[ ! -f "$TASKS_FILE" ]]; then
+    echo -e "${RED}Error: tasks.md not found in $FEATURE_DIR${NC}"
+    echo "Run /speckit.tasks first"
     exit 1
 fi
 
@@ -65,9 +73,30 @@ log_section() {
     } >> "$LOG_FILE"
 }
 
+# Get current task from tasks.md
+get_current_task() {
+    if [[ -f "$TASKS_FILE" ]]; then
+        grep -m1 '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null | sed 's/^\s*- \[ \] //' | head -c 60
+    fi
+}
+
 # Get last git commit info
 get_last_commit() {
     git log -1 --format='%h %s' 2>/dev/null | head -c 70
+}
+
+# Calculate progress bar
+progress_bar() {
+    local complete=$1
+    local total=$2
+    local width=30
+    if [[ $total -eq 0 ]]; then
+        printf "[%${width}s]" ""
+        return
+    fi
+    local filled=$((complete * width / total))
+    local empty=$((width - filled))
+    printf "[%s%s]" "$(printf '█%.0s' $(seq 1 $filled 2>/dev/null) || echo "")" "$(printf '░%.0s' $(seq 1 $empty 2>/dev/null) || echo "")"
 }
 
 # Graceful exit on Ctrl+C
@@ -86,7 +115,7 @@ cleanup() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     log "INFO" "Interrupted after $ITERATION iterations (duration: ${duration}s)"
-    rm -f ".specify/.homer-prev-output"
+    rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
     exit 130
 }
 trap cleanup SIGINT SIGTERM
@@ -96,42 +125,72 @@ START_TIME=$(date +%s)
 
 # Header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${BOLD}Homer Loop${NC} - Iterative Spec Clarification & Remediation   ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}  ${BOLD}Ralph Loop${NC} - Fresh Context Per Iteration                  ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
 echo -e "${BLUE}║${NC}  Model: ${DIM}${MODEL}${NC}"
+echo -e "${BLUE}║${NC}  Tasks: ${DIM}${TASKS_FILE}${NC}"
 echo -e "${BLUE}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
 # Initialize log
-log_section "HOMER LOOP STARTED"
+log_section "RALPH LOOP STARTED"
 log "INFO" "Feature dir: $FEATURE_DIR"
 log "INFO" "Max iterations: $MAX_ITERATIONS"
+log "INFO" "Tasks file: $TASKS_FILE"
 
 # Create symlink to latest log
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
-while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
+# Initial task count
+INITIAL_INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INITIAL_INCOMPLETE=0
+INITIAL_COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || INITIAL_COMPLETE=0
+TOTAL_TASKS=$((INITIAL_INCOMPLETE + INITIAL_COMPLETE))
+log "INFO" "Initial state: $INITIAL_COMPLETE/$TOTAL_TASKS complete"
+
+while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
+
+    # Get current state
+    CURRENT_TASK=$(get_current_task)
+    INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
+    COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
+    TOTAL=$((INCOMPLETE + COMPLETE))
 
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  ITERATION ${BOLD}$ITERATION${NC}${CYAN} / $MAX_ITERATIONS  ${DIM}$(date '+%H:%M:%S')${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+    # Show progress
+    PROGRESS_BAR=$(progress_bar "$COMPLETE" "$TOTAL")
+    echo -e "  ${BLUE}Progress:${NC} $PROGRESS_BAR ${GREEN}$COMPLETE${NC}/${TOTAL} tasks"
+
+    # Show current task
+    if [[ -n "$CURRENT_TASK" ]]; then
+        echo -e "  ${MAGENTA}Next task:${NC} ${CURRENT_TASK}..."
+    fi
+
     echo ""
 
     # Log iteration start
     log_section "ITERATION $ITERATION"
     log "INFO" "Starting iteration $ITERATION"
+    log "INFO" "Current task: ${CURRENT_TASK:-unknown}"
+    log "INFO" "Progress: $COMPLETE/$TOTAL tasks complete"
+
+    # Save state for resumption
+    echo "ITERATION=$ITERATION" > "$STATE_FILE"
+    echo "TASK=$CURRENT_TASK" >> "$STATE_FILE"
 
     # Run Claude with fresh context (new process each time)
-    echo -e "  ${DIM}Running claude --agent homer ...${NC}"
+    echo -e "  ${DIM}Running claude --agent ralph ...${NC}"
 
     CLAUDE_EXIT=0
-    ITER_OUTPUT=$(claude --agent homer \
-        -p "Feature directory: $FEATURE_DIR" \
+    ITER_OUTPUT=$(claude --agent ralph \
+        -p "Feature directory: $FEATURE_DIR. Quality gates: $QUALITY_GATES" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
         2>&1) || CLAUDE_EXIT=$?
@@ -143,7 +202,7 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
         if [[ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]]; then
             echo -e "  ${RED}Aborting after $MAX_CONSECUTIVE_FAILURES consecutive failures${NC}"
             log "ERROR" "Aborting: $MAX_CONSECUTIVE_FAILURES consecutive failures"
-            rm -f ".specify/.homer-prev-output"
+            rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
             exit 2
         fi
         echo -e "  ${YELLOW}Retrying... (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
@@ -175,8 +234,8 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
 
     # Stuck detection: warn if output identical to previous
     STUCK=false
-    if [[ -f ".specify/.homer-prev-output" ]]; then
-        if diff -q ".specify/.homer-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
+    if [[ -f ".specify/.ralph-prev-output" ]]; then
+        if diff -q ".specify/.ralph-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
             # shellcheck disable=SC2034
             STUCK=true
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
@@ -185,25 +244,25 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
 
             if [[ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]]; then
                 echo -e "  ${RED}  Stuck after $MAX_CONSECUTIVE_FAILURES identical outputs${NC}"
-                echo -e "  ${YELLOW}   Suggestion: Ctrl+C and review spec artifacts manually${NC}"
+                echo -e "  ${YELLOW}   Suggestion: Ctrl+C and run /speckit.tasks to regenerate${NC}"
                 log "ERROR" "Aborting: stuck after $MAX_CONSECUTIVE_FAILURES consecutive identical outputs"
-                rm -f ".specify/.homer-prev-output"
+                rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
                 exit 2
             fi
         else
             CONSECUTIVE_FAILURES=0
         fi
     fi
-    echo "$ITER_OUTPUT" > ".specify/.homer-prev-output"
+    echo "$ITER_OUTPUT" > ".specify/.ralph-prev-output"
 
     # Check for completion promise in output
-    if echo "$ITER_OUTPUT" | grep -q "<promise>ALL_FINDINGS_RESOLVED</promise>"; then
+    if echo "$ITER_OUTPUT" | grep -q "<promise>ALL_TASKS_COMPLETE</promise>"; then
         END_TIME=$(date +%s)
         TOTAL_DURATION=$((END_TIME - START_TIME))
 
         echo ""
         echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-        echo -e "${GREEN}║  ALL FINDINGS RESOLVED                                     ║${NC}"
+        echo -e "${GREEN}║  ALL TASKS COMPLETE                                        ║${NC}"
         echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
         echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
         echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
@@ -211,10 +270,35 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
         echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 
         log_section "COMPLETE"
-        log "INFO" "All findings resolved after $ITERATION iterations"
+        log "INFO" "All tasks complete after $ITERATION iterations"
         log "INFO" "Total duration: ${TOTAL_DURATION}s"
 
-        rm -f ".specify/.homer-prev-output"
+        rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
+        exit 0
+    fi
+
+    # Also check tasks.md directly
+    INCOMPLETE=$(grep -c '^\s*- \[ \]' "$TASKS_FILE" 2>/dev/null) || INCOMPLETE=0
+    COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || COMPLETE=0
+
+    if [[ "$INCOMPLETE" -eq 0 ]] && [[ "$COMPLETE" -gt 0 ]]; then
+        END_TIME=$(date +%s)
+        TOTAL_DURATION=$((END_TIME - START_TIME))
+
+        echo ""
+        echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║  ALL TASKS COMPLETE (verified in tasks.md)                ║${NC}"
+        echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
+        echo -e "${GREEN}║${NC}  Iterations: $ITERATION"
+        echo -e "${GREEN}║${NC}  Duration: $((TOTAL_DURATION / 60))m $((TOTAL_DURATION % 60))s"
+        echo -e "${GREEN}║${NC}  Log: ${DIM}$LOG_FILE${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+
+        log_section "COMPLETE"
+        log "INFO" "All tasks complete (verified via tasks.md) after $ITERATION iterations"
+        log "INFO" "Total duration: ${TOTAL_DURATION}s"
+
+        rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
         exit 0
     fi
 
@@ -237,5 +321,5 @@ log_section "MAX ITERATIONS REACHED"
 log "WARN" "Max iterations ($MAX_ITERATIONS) reached"
 log "INFO" "Total duration: ${total_duration}s"
 
-rm -f ".specify/.homer-prev-output"
+rm -f ".specify/.ralph-prev-output" "$STATE_FILE"
 exit 1

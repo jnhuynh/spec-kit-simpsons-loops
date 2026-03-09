@@ -333,7 +333,7 @@ detect_from_step() {
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════
 
-cd "$REPO_ROOT" || exit
+cd "$REPO_ROOT" || exit 1
 
 PIPELINE_START=$(date +%s)
 FEATURE_DIR=""

@@ -1,8 +1,3 @@
-# Spec-kit (installed via `specify init`)
-.specify/
-.claude/commands/
-.claude/agents/
-
 # Simpsons loops - generated at runtime
 *.ralph-prompt.md*
 *.ralph-prev-output*

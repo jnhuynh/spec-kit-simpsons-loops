@@ -59,15 +59,18 @@ fi
 log() {
     local level="$1"
     local message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
 }
 
 log_section() {
-    echo "" >> "$LOG_FILE"
-    echo "═══════════════════════════════════════════════════════════════" >> "$LOG_FILE"
-    echo "$1" >> "$LOG_FILE"
-    echo "═══════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+    {
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "$1"
+        echo "═══════════════════════════════════════════════════════════════"
+    } >> "$LOG_FILE"
 }
 
 # Get current task from tasks.md
@@ -97,8 +100,10 @@ progress_bar() {
 }
 
 # Graceful exit on Ctrl+C
+# shellcheck disable=SC2329
 cleanup() {
-    local end_time=$(date +%s)
+    local end_time
+    end_time=$(date +%s)
     local duration=$((end_time - START_TIME))
 
     echo ""
@@ -144,7 +149,7 @@ INITIAL_COMPLETE=$(grep -c '^\s*- \[[Xx]\]' "$TASKS_FILE" 2>/dev/null) || INITIA
 TOTAL_TASKS=$((INITIAL_INCOMPLETE + INITIAL_COMPLETE))
 log "INFO" "Initial state: $INITIAL_COMPLETE/$TOTAL_TASKS complete"
 
-while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
 
@@ -231,6 +236,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     STUCK=false
     if [[ -f ".specify/.ralph-prev-output" ]]; then
         if diff -q ".specify/.ralph-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
+            # shellcheck disable=SC2034
             STUCK=true
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
             echo -e "  ${YELLOW}  Output identical to previous iteration (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"

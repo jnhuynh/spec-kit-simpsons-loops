@@ -63,15 +63,18 @@ fi
 log() {
     local level="$1"
     local message="$2"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
 }
 
 log_section() {
-    echo "" >> "$LOG_FILE"
-    echo "═══════════════════════════════════════════════════════════════" >> "$LOG_FILE"
-    echo "$1" >> "$LOG_FILE"
-    echo "═══════════════════════════════════════════════════════════════" >> "$LOG_FILE"
+    {
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "$1"
+        echo "═══════════════════════════════════════════════════════════════"
+    } >> "$LOG_FILE"
 }
 
 # Get last git commit info
@@ -80,8 +83,10 @@ get_last_commit() {
 }
 
 # Graceful exit on Ctrl+C
+# shellcheck disable=SC2329
 cleanup() {
-    local end_time=$(date +%s)
+    local end_time
+    end_time=$(date +%s)
     local duration=$((end_time - START_TIME))
 
     echo ""
@@ -119,7 +124,7 @@ log "INFO" "Max iterations: $MAX_ITERATIONS"
 # Create symlink to latest log
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
-while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
 
@@ -184,6 +189,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
     STUCK=false
     if [[ -f ".specify/.lisa-prev-output" ]]; then
         if diff -q ".specify/.lisa-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
+            # shellcheck disable=SC2034
             STUCK=true
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
             echo -e "  ${YELLOW}  Output identical to previous iteration (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"

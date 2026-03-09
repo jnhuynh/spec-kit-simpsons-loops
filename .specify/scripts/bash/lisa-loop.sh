@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Homer Loop - Iterative spec clarification & remediation with fresh context per iteration
-# Usage: ./homer-loop.sh <spec-dir> [max-iterations]
+# Lisa Loop - Iterative spec analysis & remediation with fresh context per iteration
+# Usage: ./lisa-loop.sh <spec-dir> [max-iterations]
 #
 # Arg 1: A spec directory path (e.g. specs/a1b2-feat-foo)
 
@@ -11,8 +11,8 @@ MAX_ITERATIONS="${2:-20}"
 MODEL="${CLAUDE_MODEL:-opus}"
 ITERATION=0
 LOG_DIR=".specify/logs"
-LOG_FILE="$LOG_DIR/homer-$(date '+%Y%m%d-%H%M%S').log"
-LATEST_LOG="$LOG_DIR/homer-latest.log"
+LOG_FILE="$LOG_DIR/lisa-$(date '+%Y%m%d-%H%M%S').log"
+LATEST_LOG="$LOG_DIR/lisa-latest.log"
 CONSECUTIVE_FAILURES=0
 MAX_CONSECUTIVE_FAILURES=3
 
@@ -32,7 +32,7 @@ mkdir -p "$LOG_DIR"
 # Validate feature directory
 if [[ -z "$FEATURE_DIR" ]]; then
     echo -e "${RED}Error: Feature directory required${NC}"
-    echo "Usage: ./homer-loop.sh <spec-dir> [max-iterations]"
+    echo "Usage: ./lisa-loop.sh <spec-dir> [max-iterations]"
     exit 1
 fi
 
@@ -44,6 +44,18 @@ fi
 if [[ ! -f "$FEATURE_DIR/spec.md" ]]; then
     echo -e "${RED}Error: spec.md not found in $FEATURE_DIR${NC}"
     echo "Run /speckit.specify first"
+    exit 1
+fi
+
+if [[ ! -f "$FEATURE_DIR/plan.md" ]]; then
+    echo -e "${RED}Error: plan.md not found in $FEATURE_DIR${NC}"
+    echo "Run /speckit.plan first"
+    exit 1
+fi
+
+if [[ ! -f "$FEATURE_DIR/tasks.md" ]]; then
+    echo -e "${RED}Error: tasks.md not found in $FEATURE_DIR${NC}"
+    echo "Run /speckit.tasks first"
     exit 1
 fi
 
@@ -86,7 +98,7 @@ cleanup() {
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
     log "INFO" "Interrupted after $ITERATION iterations (duration: ${duration}s)"
-    rm -f ".specify/.homer-prev-output"
+    rm -f ".specify/.lisa-prev-output"
     exit 130
 }
 trap cleanup SIGINT SIGTERM
@@ -96,7 +108,7 @@ START_TIME=$(date +%s)
 
 # Header
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  ${BOLD}Homer Loop${NC} - Iterative Spec Clarification & Remediation   ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}  ${BOLD}Lisa Loop${NC} - Iterative Spec Analysis & Remediation        ${BLUE}║${NC}"
 echo -e "${BLUE}╠════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${BLUE}║${NC}  Feature dir: ${DIM}${FEATURE_DIR}${NC}"
 echo -e "${BLUE}║${NC}  Max iterations: ${MAX_ITERATIONS}"
@@ -105,14 +117,14 @@ echo -e "${BLUE}║${NC}  Log: ${DIM}${LOG_FILE}${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
 
 # Initialize log
-log_section "HOMER LOOP STARTED"
+log_section "LISA LOOP STARTED"
 log "INFO" "Feature dir: $FEATURE_DIR"
 log "INFO" "Max iterations: $MAX_ITERATIONS"
 
 # Create symlink to latest log
 ln -sf "$(basename "$LOG_FILE")" "$LATEST_LOG"
 
-while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
+while [ "$ITERATION" -lt "$MAX_ITERATIONS" ]; do
     ITERATION=$((ITERATION + 1))
     ITER_START=$(date +%s)
 
@@ -127,10 +139,10 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     log "INFO" "Starting iteration $ITERATION"
 
     # Run Claude with fresh context (new process each time)
-    echo -e "  ${DIM}Running claude --agent homer ...${NC}"
+    echo -e "  ${DIM}Running claude --agent lisa ...${NC}"
 
     CLAUDE_EXIT=0
-    ITER_OUTPUT=$(claude --agent homer \
+    ITER_OUTPUT=$(claude --agent lisa \
         -p "Feature directory: $FEATURE_DIR" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
@@ -143,7 +155,7 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
         if [[ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]]; then
             echo -e "  ${RED}Aborting after $MAX_CONSECUTIVE_FAILURES consecutive failures${NC}"
             log "ERROR" "Aborting: $MAX_CONSECUTIVE_FAILURES consecutive failures"
-            rm -f ".specify/.homer-prev-output"
+            rm -f ".specify/.lisa-prev-output"
             exit 2
         fi
         echo -e "  ${YELLOW}Retrying... (${CONSECUTIVE_FAILURES}/${MAX_CONSECUTIVE_FAILURES})${NC}"
@@ -175,8 +187,8 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
 
     # Stuck detection: warn if output identical to previous
     STUCK=false
-    if [[ -f ".specify/.homer-prev-output" ]]; then
-        if diff -q ".specify/.homer-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
+    if [[ -f ".specify/.lisa-prev-output" ]]; then
+        if diff -q ".specify/.lisa-prev-output" <(echo "$ITER_OUTPUT") > /dev/null 2>&1; then
             # shellcheck disable=SC2034
             STUCK=true
             CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
@@ -187,14 +199,14 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
                 echo -e "  ${RED}  Stuck after $MAX_CONSECUTIVE_FAILURES identical outputs${NC}"
                 echo -e "  ${YELLOW}   Suggestion: Ctrl+C and review spec artifacts manually${NC}"
                 log "ERROR" "Aborting: stuck after $MAX_CONSECUTIVE_FAILURES consecutive identical outputs"
-                rm -f ".specify/.homer-prev-output"
+                rm -f ".specify/.lisa-prev-output"
                 exit 2
             fi
         else
             CONSECUTIVE_FAILURES=0
         fi
     fi
-    echo "$ITER_OUTPUT" > ".specify/.homer-prev-output"
+    echo "$ITER_OUTPUT" > ".specify/.lisa-prev-output"
 
     # Check for completion promise in output
     if echo "$ITER_OUTPUT" | grep -q "<promise>ALL_FINDINGS_RESOLVED</promise>"; then
@@ -214,7 +226,7 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
         log "INFO" "All findings resolved after $ITERATION iterations"
         log "INFO" "Total duration: ${TOTAL_DURATION}s"
 
-        rm -f ".specify/.homer-prev-output"
+        rm -f ".specify/.lisa-prev-output"
         exit 0
     fi
 
@@ -237,5 +249,5 @@ log_section "MAX ITERATIONS REACHED"
 log "WARN" "Max iterations ($MAX_ITERATIONS) reached"
 log "INFO" "Total duration: ${total_duration}s"
 
-rm -f ".specify/.homer-prev-output"
+rm -f ".specify/.lisa-prev-output"
 exit 1

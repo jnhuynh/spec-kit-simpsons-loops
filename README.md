@@ -244,13 +244,21 @@ The bash scripts provide a standalone alternative that runs outside of Claude Co
 
 ### Quality gates (Ralph)
 
-The quality gate in `speckit.ralph.implement.md` ships as a **placeholder** that will intentionally fail. Before running Ralph standalone, replace the placeholder in Step 3 with your project's actual quality gates (e.g., `npm run lint && npm run typecheck && npm test`).
-
-When running via the pipeline, set the `QUALITY_GATES` environment variable:
+This project uses [shellcheck](https://www.shellcheck.net/) as its quality gate — the only meaningful automated check for a bash + markdown codebase:
 
 ```bash
-QUALITY_GATES="npm run lint && npm run typecheck && npm test" .specify/scripts/bash/pipeline.sh
+shellcheck *.sh .specify/scripts/bash/*.sh openclaw/*.sh openclaw/claude-runner/*.sh
 ```
+
+When running via the pipeline, you can override with the `QUALITY_GATES` environment variable:
+
+```bash
+QUALITY_GATES="shellcheck *.sh .specify/scripts/bash/*.sh" .specify/scripts/bash/pipeline.sh
+```
+
+### Dogfooding
+
+This project uses itself to build itself — simpsons-loops builds simpsons-loops. The shellcheck quality gate ensures that every Ralph implementation iteration produces clean, lint-free shell scripts before committing.
 
 ### Max iterations
 
