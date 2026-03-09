@@ -414,6 +414,13 @@ if [[ -z "$FROM_STEP" ]]; then
     FROM_STEP=$(detect_from_step "$FEATURE_DIR") || exit 0
 fi
 
+# Validate that --description is provided when the specify step will run
+if [[ "$FROM_STEP" == "specify" ]] && [[ -z "$DESCRIPTION" ]]; then
+    echo -e "${RED}Error: Feature description required for specify step.${NC}" >&2
+    echo "Pass --description \"your feature description\" to use the specify step." >&2
+    exit 1
+fi
+
 # ─── Stop-After Menu ──────────────────────────────────────────────────────────
 
 STOP_AFTER="ralph"  # default: run all the way through
