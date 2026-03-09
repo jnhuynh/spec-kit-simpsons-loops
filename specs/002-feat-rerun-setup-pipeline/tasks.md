@@ -44,7 +44,7 @@
 ### Implementation for User Story 1
 
 - [x] T005 [US1] Verify the existence check guard implemented in T003 correctly prevents `setup.sh` from overwriting `.specify/quality-gates.sh` when it already exists — review the guard logic, confirm it short-circuits before any write operation, and validate with a manual test (create file, rerun setup.sh, confirm file unchanged)
-- [ ] T006 [US1] Verify `setup.sh` detects the sentinel comment `# SPECKIT_DEFAULT_QUALITY_GATE` in the target project's `.claude/commands/speckit.ralph.implement.md` and creates a placeholder quality gate file when sentinel is present in `setup.sh`
+- [x] T006 [US1] Verify `setup.sh` detects the sentinel comment `# SPECKIT_DEFAULT_QUALITY_GATE` in the target project's `.claude/commands/speckit.ralph.implement.md` and creates a placeholder quality gate file when sentinel is present in `setup.sh`
 - [ ] T007 [US1] Verify `setup.sh` correctly extracts custom quality gates when the sentinel is absent — run `setup.sh` against a target project whose `.claude/commands/speckit.ralph.implement.md` has had its sentinel removed and contains custom quality gate commands, then confirm that `.specify/quality-gates.sh` is created with the extracted content (including `#!/usr/bin/env bash` header) and executable permissions
 - [ ] T008 [US1] Verify `setup.sh` creates placeholder quality gate file on first-time installation (no existing Ralph command file) in `setup.sh`
 - [ ] T009 [US1] Run `shellcheck setup.sh` and fix any linting errors
