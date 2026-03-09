@@ -10,8 +10,7 @@ set -uo pipefail
 
 FEATURE_DIR="${1:-}"
 MAX_ITERATIONS="${2:-5}"
-QUALITY_GATES="${3:-echo \"PLACEHOLDER: Set quality gates via arg 3 or QUALITY_GATES env var\" && exit 1}"
-QUALITY_GATES="${QUALITY_GATES:-$QUALITY_GATES}"
+QUALITY_GATES_CLI_ARG="${3:-}"
 MODEL="${CLAUDE_MODEL:-opus}"
 ITERATION=0
 LOG_DIR=".specify/logs"
@@ -31,6 +30,45 @@ MAGENTA='\033[0;35m'
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# Resolve quality gates using precedence: CLI arg > env var > file > error
+resolve_quality_gates() {
+    local cli_arg="${1:-}"
+    local qg_file=".specify/quality-gates.sh"
+
+    # Priority 1: CLI argument
+    if [[ -n "$cli_arg" ]]; then
+        QUALITY_GATES="$cli_arg"
+        return 0
+    fi
+
+    # Priority 2: Environment variable (QUALITY_GATES may already be set)
+    if [[ -n "${QUALITY_GATES:-}" ]]; then
+        return 0
+    fi
+
+    # Priority 3: Quality gate file
+    if [[ -f "$qg_file" ]]; then
+        # Validate file is non-empty after stripping comments and whitespace
+        local effective_content
+        effective_content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
+        if [[ -z "$effective_content" ]]; then
+            echo -e "${RED}Error: Quality gate file exists but contains no executable commands.${NC}" >&2
+            echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
+            exit 1
+        fi
+        QUALITY_GATES="$qg_file"
+        return 0
+    fi
+
+    # Priority 4: Error — nothing configured
+    echo -e "${RED}Error: No quality gates configured.${NC}" >&2
+    echo "Create .specify/quality-gates.sh or pass quality gates as argument 3 or set QUALITY_GATES env var." >&2
+    exit 1
+}
+
+# Resolve quality gates
+resolve_quality_gates "$QUALITY_GATES_CLI_ARG"
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
