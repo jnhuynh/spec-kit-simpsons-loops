@@ -1,5 +1,5 @@
 ---
-description: Orchestrate the full SpecKit pipeline (homer, plan, tasks, lisa, ralph) after spec is complete.
+description: Orchestrate the full SpecKit pipeline (specify, homer, plan, tasks, lisa, ralph) from feature description to implementation.
 ---
 
 ## User Input
@@ -10,14 +10,15 @@ $ARGUMENTS
 
 ## Overview
 
-Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. This command assumes `/speckit.specify` has already been completed interactively and a `spec.md` exists in the feature's spec directory.
+Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. The pipeline can start from a feature description (using the specify step) or from an existing `spec.md`.
 
 **AUTONOMOUS EXECUTION**: This pipeline runs unattended. Do NOT ask the user for confirmation between iterations or steps. Do NOT pause for permission requests. Execute all steps and iterations back-to-back until the pipeline completes or a failure condition is met.
 
 **STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Within each loop step, wait for one iteration to finish before starting the next. Between pipeline steps, wait for the entire step to complete before advancing. The pipeline order is non-negotiable:
 
-The pipeline runs these steps in sequence:
+The pipeline runs these 6 steps in sequence:
 
+0. **specify** — Create feature spec from description (optional, auto-detected)
 1. **homer** — Iterative spec clarification & remediation
 2. **plan** — Generate technical implementation plan
 3. **tasks** — Generate dependency-ordered task list
@@ -29,13 +30,17 @@ The pipeline runs these steps in sequence:
 ### Step 1: Determine the spec directory
 
 - If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
-- If `$ARGUMENTS` contains `--from <step>`, note the starting step (homer, plan, tasks, lisa, ralph)
+- If `$ARGUMENTS` contains `--from <step>`, note the starting step (specify, homer, plan, tasks, lisa, ralph)
+- If `$ARGUMENTS` contains `--description <text>`, capture the feature description for the specify step
 - Otherwise, auto-detect from the current git branch name (extract the 4-char prefix and find the matching `specs/<prefix>-*` directory)
 
-### Step 2: Validate spec exists
+### Step 2: Validate spec exists or can be created
 
-- Confirm that `spec.md` exists in the resolved spec directory
-- If not found, inform the user they need to run `/speckit.specify` first
+- If `spec.md` exists in the resolved spec directory, proceed normally
+- If `spec.md` does not exist:
+  - If `--from specify` is set or `--description` is provided, allow the pipeline to continue (the specify step will create spec.md)
+  - Otherwise, exit with an error instructing the user to run `/speckit.specify` first or pass `--description`
+- If `--from specify` is set but no `--description` is provided, exit with an error requesting a feature description
 
 ### Step 3: Auto-detect starting step (if `--from` not specified)
 
@@ -43,7 +48,8 @@ Check which artifacts exist to determine where to start:
 - `tasks.md` with some `- [x]` complete → start at **ralph**
 - `tasks.md` with none complete → start at **lisa**
 - `plan.md` exists → start at **tasks**
-- `spec.md` exists → start at **homer** (first step)
+- `spec.md` exists → start at **homer**
+- No `spec.md` but `--description` provided → start at **specify**
 
 ### Step 4: Configuration
 
@@ -61,6 +67,14 @@ When composing the prompt for each sub agent, always include:
 - Instruct the agent to read and follow the corresponding agent file from `.claude/agents/`
 - When those instructions reference a slash command (e.g., `/speckit.clarify`), read the corresponding file from `.claude/commands/` and follow its instructions directly
 - Provide: `Feature directory: <FEATURE_DIR>`
+
+#### Specify (single-shot step)
+Skip if `spec.md` already exists. Otherwise, spawn a sub agent:
+- **subagent_type**: `general-purpose`
+- **agent file**: `.claude/agents/specify.md`
+- **prompt**: `Feature directory: <FEATURE_DIR>. Feature description: <DESCRIPTION>. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user.`
+
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (specify) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Print: "Specify step failed. Fix the issue and re-invoke with --from specify". Suggest manual review and resuming with `--from specify`.
 
 #### Homer (loop step)
 For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
@@ -96,11 +110,12 @@ Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if
 
 #### Ralph (loop step)
 
-> **IMPORTANT**: Before running Ralph, extract quality gates.
+> **IMPORTANT**: Before running Ralph, resolve quality gates. Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass. CLI arguments (`--quality-gates`) and environment variables (`QUALITY_GATES`) override the file when provided.
 
 Quality gates:
 ```bash
-shellcheck *.sh .specify/scripts/bash/*.sh openclaw/*.sh openclaw/claude-runner/*.sh
+# SPECKIT_DEFAULT_QUALITY_GATE
+bash .specify/quality-gates.sh
 ```
 
 For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
@@ -126,3 +141,5 @@ After all steps complete, report:
 - `/speckit.pipeline specs/a1b2-feat-user-auth` — Run pipeline for specific spec
 - `/speckit.pipeline --from homer` — Start from homer step (auto-detect spec dir)
 - `/speckit.pipeline --from ralph specs/a1b2-feat-user-auth` — Resume ralph for specific spec
+- `/speckit.pipeline --description "Add user auth" specs/a1b2-feat-user-auth` — End-to-end from description
+- `/speckit.pipeline --from specify --description "Add user auth"` — Explicit specify step start
