@@ -41,6 +41,7 @@ LISA_MAX=20
 RALPH_MAX=20
 QUALITY_GATES_CLI_ARG=""
 QUALITY_GATES_ENV="${QUALITY_GATES:-}"
+QUALITY_GATES_SOURCE=""
 
 # Colors
 RED='\033[0;31m'
@@ -247,6 +248,7 @@ run_agent() {
 # ─── Resolve Quality Gates ─────────────────────────────────────────────────
 
 # Resolve quality gates using precedence: CLI arg > env var > file > error
+# Sets QUALITY_GATES (value) and QUALITY_GATES_SOURCE ("cli", "env", or "file")
 resolve_quality_gates() {
     local cli_arg="${1:-}"
     local env_val="${2:-}"
@@ -255,12 +257,14 @@ resolve_quality_gates() {
     # Priority 1: CLI argument
     if [[ -n "$cli_arg" ]]; then
         QUALITY_GATES="$cli_arg"
+        QUALITY_GATES_SOURCE="cli"
         return 0
     fi
 
     # Priority 2: Environment variable
     if [[ -n "$env_val" ]]; then
         QUALITY_GATES="$env_val"
+        QUALITY_GATES_SOURCE="env"
         return 0
     fi
 
@@ -275,6 +279,7 @@ resolve_quality_gates() {
             exit 1
         fi
         QUALITY_GATES="$qg_file"
+        QUALITY_GATES_SOURCE="file"
         return 0
     fi
 
@@ -563,8 +568,16 @@ if ! should_skip_step "ralph" && ! past_stop_after "ralph"; then
     STEP_START=$(date +%s)
     print_step_header 5 "Ralph: Implementation"
 
-    RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX \"$QUALITY_GATES\""
-    log "INFO" "Running: $RALPH_CMD"
+    # Build the ralph-loop.sh command based on quality gates source:
+    # - File source: omit CLI arg so ralph-loop.sh discovers the file itself
+    #   (preserves file-source semantics for prompt differentiation)
+    # - CLI/env source: pass the command string as CLI arg for ralph-loop.sh
+    if [[ "$QUALITY_GATES_SOURCE" == "file" ]]; then
+        RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX"
+    else
+        RALPH_CMD="$REPO_ROOT/.specify/scripts/bash/ralph-loop.sh $FEATURE_DIR $RALPH_MAX \"$QUALITY_GATES\""
+    fi
+    log "INFO" "Running: $RALPH_CMD (quality gates source: $QUALITY_GATES_SOURCE)"
     echo -e "  ${DIM}Running: $RALPH_CMD${NC}"
 
     if $DRY_RUN; then
