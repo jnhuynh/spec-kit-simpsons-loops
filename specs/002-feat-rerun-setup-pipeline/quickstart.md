@@ -57,6 +57,14 @@ resolve_quality_gates() {
     elif [[ -n "${QUALITY_GATES:-}" ]]; then
         echo "$QUALITY_GATES"
     elif [[ -x "$qg_file" ]]; then
+        # Validate file has executable content (not just comments/whitespace)
+        local content
+        content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
+        if [[ -z "$content" ]]; then
+            echo "ERROR: Quality gate file exists but contains no executable commands." >&2
+            echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
+            return 1
+        fi
         echo "$qg_file"
     else
         echo "ERROR: No quality gates configured." >&2
