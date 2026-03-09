@@ -18,7 +18,7 @@
 **Purpose**: Prepare the Ralph command template with sentinel marker, which is a prerequisite for both the setup.sh extraction logic and the file-based quality gate reading.
 
 - [ ] T001 Add `# SPECKIT_DEFAULT_QUALITY_GATE` sentinel comment to the placeholder quality gate code block in `speckit.ralph.implement.md` and replace inline quality gate instructions with a reference to `.specify/quality-gates.sh`
-- [ ] T002 Copy updated template to `.claude/commands/speckit.ralph.implement.md` to keep both copies in sync
+- [ ] T002 Update `.claude/commands/speckit.ralph.implement.md` to match the T001 template changes (add sentinel comment and replace inline quality gate instructions with a file reference to `.specify/quality-gates.sh`) while preserving the project's existing quality gate commands in a new `.specify/quality-gates.sh` file first — **CRITICAL**: before replacing the inline quality gate code block, extract the current custom quality gate command (`shellcheck *.sh ...`) from `.claude/commands/speckit.ralph.implement.md` and write it to `.specify/quality-gates.sh` (with `#!/usr/bin/env bash` header and `chmod +x`), since this repo dogfoods itself and would otherwise lose its configured quality gates
 
 ---
 
