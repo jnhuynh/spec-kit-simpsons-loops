@@ -2,7 +2,7 @@
 
 ## Implementation Overview
 
-This feature touches 6 existing files and creates no new source files (the quality gate file is created per-project by `setup.sh`). Changes are organized into three workstreams:
+This feature touches 6 existing files and creates 1 new source file (`agents/specify.md`). The quality gate file is created per-project by `setup.sh`, not in this repo. Changes are organized into three workstreams:
 
 1. **Quality Gate File** — Create, extract, and read `.specify/quality-gates.sh`
 2. **Setup.sh Rerun Safety** — Never overwrite the quality gate file
@@ -16,6 +16,7 @@ This feature touches 6 existing files and creates no new source files (the quali
 | `ralph-loop.sh` | Add quality gate file reading as fallback source | P1 |
 | `pipeline.sh` | Add quality gate file reading + specify step | P1/P2 |
 | `speckit.ralph.implement.md` | Replace inline quality gate placeholder with file reference + sentinel | P1 |
+| `agents/specify.md` | New agent wrapper for `/speckit.specify` (non-interactive mode for pipeline use) | P2 |
 | `speckit.pipeline.md` | Add specify step documentation + quality gate file reference | P2 |
 
 ## Implementation Sequence
