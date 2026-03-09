@@ -90,8 +90,9 @@
 - [ ] T023 [US3] Add auto-detection logic in `pipeline.sh`: when no `--from` is specified and no `spec.md` exists but `--description` is provided, auto-start from the specify step; **IMPORTANT**: this requires modifying the existing hardcoded `spec.md` existence guard (which currently aborts the pipeline unconditionally when `spec.md` is missing) to instead conditionalize the abort — only exit with error if no `--description` is provided AND `--from specify` is not set, otherwise allow the pipeline to continue to the specify step
 - [ ] T024 [US3] Add error handling for specify step failure in `pipeline.sh`: halt pipeline with clear error message and non-zero exit code per FR-018
 - [ ] T025 [US3] Add error handling for missing description in `pipeline.sh`: exit with error when `--from specify` is used without `--description`
-- [ ] T026 [US3] Update `speckit.pipeline.md` to document the new specify step, `--description` option, updated `--from` values, and usage examples
-- [ ] T027 [US3] Run `shellcheck pipeline.sh` and fix any linting errors
+- [ ] T026 [US3] Update `pipeline.sh` `show_help()` function and header comment block to document the new `--description` option, `specify` as a valid `--from` value, and the updated step list (step 0: specify); also update the interactive stop-after menu to include a "stop after specify" option so users can halt the pipeline after spec creation
+- [ ] T027 [US3] Update `speckit.pipeline.md` to document the new specify step, `--description` option, updated `--from` values, and usage examples
+- [ ] T028 [US3] Run `shellcheck pipeline.sh` and fix any linting errors
 
 **Checkpoint**: Pipeline supports full end-to-end flow from feature description to implementation. All three acceptance scenarios from US3 pass.
 
@@ -105,8 +106,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Verify that the quality gate file created by `setup.sh` extraction (T007) correctly captures the full command content from the Ralph command file, enabling migration from inline to file-based config in `setup.sh`
-- [ ] T029 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
+- [ ] T029 [US4] Verify that the quality gate file created by `setup.sh` extraction (T007) correctly captures the full command content from the Ralph command file, enabling migration from inline to file-based config in `setup.sh`
+- [ ] T030 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
 
 **Checkpoint**: Existing projects can migrate to file-based quality gates. Env var and CLI overrides remain fully functional.
 
@@ -116,9 +117,9 @@
 
 **Purpose**: Final validation across all modified files
 
-- [ ] T030 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
-- [ ] T031 Validate all acceptance scenarios from quickstart.md testing checklist against a test project
-- [ ] T032 Verify idempotency: run `setup.sh` three times in succession on a test project and confirm identical results each time
+- [ ] T031 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
+- [ ] T032 Validate all acceptance scenarios from quickstart.md testing checklist against a test project
+- [ ] T033 Verify idempotency: run `setup.sh` three times in succession on a test project and confirm identical results each time
 
 ---
 
