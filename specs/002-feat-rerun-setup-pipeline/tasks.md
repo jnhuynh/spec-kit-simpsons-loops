@@ -28,7 +28,7 @@
 
 **CRITICAL**: No user story work (file reading in loops) can begin until setup.sh can create the quality gate file.
 
-- [ ] T003 Add quality gate file creation logic to `setup.sh` after existing file copies: check if `.specify/quality-gates.sh` exists in target project, if not check Ralph command file for sentinel, create placeholder or extract custom gates accordingly, use atomic write (`mktemp` + `mv`), set executable permissions (`chmod +x`)
+- [ ] T003 Add quality gate file creation logic to `setup.sh` **BEFORE** existing file copies (so the original Ralph command file is still present for sentinel detection): check if `.specify/quality-gates.sh` exists in target project, if not check the target project's `.claude/commands/speckit.ralph.implement.md` for sentinel, create placeholder or extract custom gates accordingly, use atomic write (`mktemp` + `mv`), set executable permissions (`chmod +x`). **CRITICAL**: This MUST execute before `cp speckit.ralph.implement.md` overwrites the target's Ralph command file, otherwise the newly-copied template (which always contains the sentinel) will mask any custom quality gates the user configured.
 - [ ] T004 Validate `setup.sh` changes pass `shellcheck` linting
 
 **Checkpoint**: `setup.sh` can now create/extract quality gate files on first run and re-run. Manual validation: fresh install creates placeholder, rerun preserves existing file, migration extracts custom gates.

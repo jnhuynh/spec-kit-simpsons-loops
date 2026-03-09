@@ -25,11 +25,12 @@ This feature touches 6 existing files and creates 1 new source file (`agents/spe
 
 **Step 1**: Update `speckit.ralph.implement.md` — Add `# SPECKIT_DEFAULT_QUALITY_GATE` sentinel to the existing placeholder code block. Replace the instruction text to reference `.specify/quality-gates.sh`.
 
-**Step 2**: Update `setup.sh` — After existing file copies (Section 1), add a new Section 1b that:
+**Step 2**: Update `setup.sh` — **BEFORE** existing file copies (Section 1), add a new Section 0 that:
 - Checks if `.specify/quality-gates.sh` exists in the target project
 - If not, checks the target's Ralph command file for the sentinel
 - Creates or extracts the quality gate file accordingly
 - Sets executable permissions
+- **CRITICAL**: This MUST run before the `cp` commands that overwrite the Ralph command file, otherwise the newly-copied template (which always contains the sentinel) will mask any custom quality gates the user previously configured.
 
 **Step 3**: Update `ralph-loop.sh` — Modify the quality gate resolution at the top of the script to check the file as a fallback after CLI arg and env var.
 
@@ -68,7 +69,7 @@ resolve_quality_gates() {
 ## Setup.sh Quality Gate Logic
 
 ```bash
-# After existing file copies...
+# BEFORE existing file copies (must read original Ralph command file before it's overwritten)
 QG_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
 RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
 
