@@ -464,6 +464,28 @@ log_section "PIPELINE STARTED"
 log "INFO" "Feature dir: $FEATURE_DIR, starting from: $FROM_STEP, stop after: $STOP_AFTER"
 log "INFO" "Model: $MODEL"
 
+# ─── Step 0: Specify ─────────────────────────────────────────────────────
+
+if ! should_skip_step "specify" && ! past_stop_after "specify"; then
+    STEP_START=$(date +%s)
+    print_step_header 0 "Specify: Create Feature Spec"
+
+    if [[ -f "$REPO_ROOT/$FEATURE_DIR/spec.md" ]]; then
+        print_step_skip "specify" "spec.md already exists"
+    else
+        run_agent "specify" \
+            "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." \
+            "Create feature spec from description" || {
+            echo -e "${RED}Failed to create feature spec from description${NC}" >&2
+            log "ERROR" "Specify step failed"
+            exit 1
+        }
+    fi
+
+    STEP_END=$(date +%s)
+    print_step_complete "Specify" "$((STEP_END - STEP_START))"
+fi
+
 # ─── Step 1: Homer Loop ───────────────────────────────────────────────────
 
 if ! should_skip_step "homer" && ! past_stop_after "homer"; then
