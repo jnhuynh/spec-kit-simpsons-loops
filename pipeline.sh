@@ -39,6 +39,7 @@ DRY_RUN=false
 HOMER_MAX=20
 LISA_MAX=20
 RALPH_MAX=20
+DESCRIPTION=""
 QUALITY_GATES_CLI_ARG=""
 QUALITY_GATES_ENV="${QUALITY_GATES:-}"
 QUALITY_GATES_SOURCE=""
@@ -105,6 +106,7 @@ SPEC_DIR_ARG=""
 i=1
 while [ $i -le $# ]; do
     arg="${!i}"
+    # shellcheck disable=SC2034  # DESCRIPTION used by specify step (T022)
     case "$arg" in
         --help|-h) show_help ;;
         --from)
@@ -123,6 +125,8 @@ while [ $i -le $# ]; do
             i=$((i + 1)); RALPH_MAX="${!i}" ;;
         --quality-gates)
             i=$((i + 1)); QUALITY_GATES_CLI_ARG="${!i}" ;;
+        --description)
+            i=$((i + 1)); DESCRIPTION="${!i}" ;;
         --dry-run)
             DRY_RUN=true ;;
         *)
