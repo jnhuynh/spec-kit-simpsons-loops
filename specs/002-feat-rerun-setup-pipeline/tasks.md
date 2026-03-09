@@ -81,17 +81,17 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017a [US3] Create `agents/specify.md` (source template at repo root, following the same pattern as `agents/homer.md`, `agents/plan.md`, etc.) agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
-- [ ] T017b [US3] Update `setup.sh` to copy `agents/specify.md` to the target project's `.claude/agents/specify.md` directory (alongside the existing agent copies like `agents/homer.md` → `.claude/agents/homer.md`)
-- [ ] T017 [US3] Add `specify` to the `STEPS` array in `pipeline.sh` as step 0 (before `homer`)
-- [ ] T018 [US3] Add `--description` CLI option parsing to `pipeline.sh` for accepting a feature description string
-- [ ] T019 [US3] Update `--from` validation in `pipeline.sh` to accept `specify` as a valid step value
-- [ ] T020 [US3] Implement the specify step execution block in `pipeline.sh`: call `run_agent "specify" "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." "Create feature spec from description"` using the `.claude/agents/specify.md` agent wrapper created in T017a
-- [ ] T021 [US3] Add auto-detection logic in `pipeline.sh`: when no `--from` is specified and no `spec.md` exists but `--description` is provided, auto-start from the specify step; **IMPORTANT**: this requires modifying the existing hardcoded `spec.md` existence guard (which currently aborts the pipeline unconditionally when `spec.md` is missing) to instead conditionalize the abort — only exit with error if no `--description` is provided AND `--from specify` is not set, otherwise allow the pipeline to continue to the specify step
-- [ ] T022 [US3] Add error handling for specify step failure in `pipeline.sh`: halt pipeline with clear error message and non-zero exit code per FR-018
-- [ ] T023 [US3] Add error handling for missing description in `pipeline.sh`: exit with error when `--from specify` is used without `--description`
-- [ ] T024 [US3] Update `speckit.pipeline.md` to document the new specify step, `--description` option, updated `--from` values, and usage examples
-- [ ] T025 [US3] Run `shellcheck pipeline.sh` and fix any linting errors
+- [ ] T017 [US3] Create `agents/specify.md` (source template at repo root, following the same pattern as `agents/homer.md`, `agents/plan.md`, etc.) agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
+- [ ] T018 [US3] Update `setup.sh` to copy `agents/specify.md` to the target project's `.claude/agents/specify.md` directory (alongside the existing agent copies like `agents/homer.md` → `.claude/agents/homer.md`)
+- [ ] T019 [US3] Add `specify` to the `STEPS` array in `pipeline.sh` as step 0 (before `homer`)
+- [ ] T020 [US3] Add `--description` CLI option parsing to `pipeline.sh` for accepting a feature description string
+- [ ] T021 [US3] Update `--from` validation in `pipeline.sh` to accept `specify` as a valid step value
+- [ ] T022 [US3] Implement the specify step execution block in `pipeline.sh`: call `run_agent "specify" "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." "Create feature spec from description"` using the `.claude/agents/specify.md` agent wrapper created in T017
+- [ ] T023 [US3] Add auto-detection logic in `pipeline.sh`: when no `--from` is specified and no `spec.md` exists but `--description` is provided, auto-start from the specify step; **IMPORTANT**: this requires modifying the existing hardcoded `spec.md` existence guard (which currently aborts the pipeline unconditionally when `spec.md` is missing) to instead conditionalize the abort — only exit with error if no `--description` is provided AND `--from specify` is not set, otherwise allow the pipeline to continue to the specify step
+- [ ] T024 [US3] Add error handling for specify step failure in `pipeline.sh`: halt pipeline with clear error message and non-zero exit code per FR-018
+- [ ] T025 [US3] Add error handling for missing description in `pipeline.sh`: exit with error when `--from specify` is used without `--description`
+- [ ] T026 [US3] Update `speckit.pipeline.md` to document the new specify step, `--description` option, updated `--from` values, and usage examples
+- [ ] T027 [US3] Run `shellcheck pipeline.sh` and fix any linting errors
 
 **Checkpoint**: Pipeline supports full end-to-end flow from feature description to implementation. All three acceptance scenarios from US3 pass.
 
@@ -105,8 +105,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T026 [US4] Verify that the quality gate file created by `setup.sh` extraction (T007) correctly captures the full command content from the Ralph command file, enabling migration from inline to file-based config in `setup.sh`
-- [ ] T027 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
+- [ ] T028 [US4] Verify that the quality gate file created by `setup.sh` extraction (T007) correctly captures the full command content from the Ralph command file, enabling migration from inline to file-based config in `setup.sh`
+- [ ] T029 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
 
 **Checkpoint**: Existing projects can migrate to file-based quality gates. Env var and CLI overrides remain fully functional.
 
@@ -116,9 +116,9 @@
 
 **Purpose**: Final validation across all modified files
 
-- [ ] T028 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
-- [ ] T029 Validate all acceptance scenarios from quickstart.md testing checklist against a test project
-- [ ] T030 Verify idempotency: run `setup.sh` three times in succession on a test project and confirm identical results each time
+- [ ] T030 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
+- [ ] T031 Validate all acceptance scenarios from quickstart.md testing checklist against a test project
+- [ ] T032 Verify idempotency: run `setup.sh` three times in succession on a test project and confirm identical results each time
 
 ---
 
