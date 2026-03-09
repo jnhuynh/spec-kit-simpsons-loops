@@ -33,8 +33,11 @@ Orchestrate the Ralph loop directly within this Claude Code session. Each iterat
 
 ### Step 3: Extract Quality Gates
 
+Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass.
+
 ```bash
-shellcheck *.sh .specify/scripts/bash/*.sh openclaw/*.sh openclaw/claude-runner/*.sh
+# SPECKIT_DEFAULT_QUALITY_GATE
+bash .specify/quality-gates.sh
 ```
 
 ### Step 4: Configuration
