@@ -117,7 +117,7 @@
 
 **Purpose**: Final validation across all modified files
 
-- [ ] T031 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
+- [x] T031 [P] Run `shellcheck` on all modified shell scripts: `setup.sh`, `ralph-loop.sh`, `pipeline.sh`
 - [ ] T032 Validate all acceptance scenarios from quickstart.md testing checklist against a test project
 - [ ] T033 Verify idempotency: run `setup.sh` three times in succession on a test project and confirm identical results each time
 
