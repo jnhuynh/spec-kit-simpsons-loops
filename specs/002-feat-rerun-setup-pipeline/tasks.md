@@ -61,8 +61,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [P] [US2] Add `resolve_quality_gates` function to `ralph-loop.sh` implementing the precedence chain: `--quality-gates` CLI arg > `QUALITY_GATES` env var > `.specify/quality-gates.sh` file > error exit
-- [ ] T011 [P] [US2] Add `resolve_quality_gates` function to `pipeline.sh` implementing the same precedence chain: `--quality-gates` CLI arg > `QUALITY_GATES` env var > `.specify/quality-gates.sh` file > error exit
+- [ ] T010 [P] [US2] Add `resolve_quality_gates` function to `ralph-loop.sh` implementing the precedence chain: `--quality-gates` CLI arg > `QUALITY_GATES` env var > `.specify/quality-gates.sh` file > error exit; when the file source is selected, validate the file is non-empty after stripping comments (`#` lines) and whitespace — if empty or comments-only, treat as "not configured" and exit with an error prompting the user to add quality gate commands
+- [ ] T011 [P] [US2] Add `resolve_quality_gates` function to `pipeline.sh` implementing the same precedence chain: `--quality-gates` CLI arg > `QUALITY_GATES` env var > `.specify/quality-gates.sh` file > error exit; when the file source is selected, validate the file is non-empty after stripping comments (`#` lines) and whitespace — if empty or comments-only, treat as "not configured" and exit with an error prompting the user to add quality gate commands
 - [ ] T012 [US2] Update `ralph-loop.sh` to use the resolved quality gates when invoking the Ralph agent, handling both file execution and command string evaluation
 - [ ] T013 [US2] Update `pipeline.sh` to use the resolved quality gates when invoking the Ralph step, handling both file execution and command string evaluation
 - [ ] T014 [US2] Add clear error message and non-zero exit when no quality gates are configured (no file, no env var, no CLI arg) in both `ralph-loop.sh` and `pipeline.sh`
