@@ -81,8 +81,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017a [US3] Create `.claude/agents/specify.md` agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
-- [ ] T017b [US3] Update `setup.sh` to copy the `specify.md` agent file to the target project's `.claude/agents/` directory (alongside the existing agent copies)
+- [ ] T017a [US3] Create `agents/specify.md` (source template at repo root, following the same pattern as `agents/homer.md`, `agents/plan.md`, etc.) agent wrapper that invokes `/speckit.specify` non-interactively (auto-resolve all clarifications with best guesses), following the same thin-wrapper pattern as `plan.md` and `tasks.md` agents; the agent receives the feature directory and description via the `-p` prompt
+- [ ] T017b [US3] Update `setup.sh` to copy `agents/specify.md` to the target project's `.claude/agents/specify.md` directory (alongside the existing agent copies like `agents/homer.md` → `.claude/agents/homer.md`)
 - [ ] T017 [US3] Add `specify` to the `STEPS` array in `pipeline.sh` as step 0 (before `homer`)
 - [ ] T018 [US3] Add `--description` CLI option parsing to `pipeline.sh` for accepting a feature description string
 - [ ] T019 [US3] Update `--from` validation in `pipeline.sh` to accept `specify` as a valid step value
