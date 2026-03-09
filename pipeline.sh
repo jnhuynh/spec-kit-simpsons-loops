@@ -483,8 +483,8 @@ if ! should_skip_step "specify" && ! past_stop_after "specify"; then
         run_agent "specify" \
             "Feature directory: $FEATURE_DIR. Feature description: $DESCRIPTION. Run non-interactively: auto-resolve all clarifications with best guesses, do not present questions to the user." \
             "Create feature spec from description" || {
-            echo -e "${RED}Failed to create feature spec from description${NC}" >&2
-            log "ERROR" "Specify step failed"
+            echo -e "${RED}Specify step failed. Fix the issue and re-invoke with --from specify${NC}" >&2
+            log "ERROR" "Specify step failed for feature dir: $FEATURE_DIR"
             exit 1
         }
     fi
