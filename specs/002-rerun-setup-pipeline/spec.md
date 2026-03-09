@@ -78,6 +78,7 @@ A project maintainer who previously configured quality gates via environment var
 - What happens when setup.sh is interrupted mid-run? Since the quality gate file is never overwritten, partial runs cannot corrupt it. Other files being overwritten mid-copy are acceptable since they'll be correct on the next successful run.
 - What happens when the quality gate file has a syntax error? The quality gate commands are executed as-is; shell errors propagate naturally and fail the quality gate check, which is the correct behavior.
 - What happens when the pipeline is invoked with `--from specify` but no feature description is provided? The pipeline exits with an error requesting a feature description.
+- What happens when the specify step fails mid-pipeline? The pipeline halts immediately with a clear error message and non-zero exit code. The user can fix the issue and re-invoke with `--from specify` to retry from that step.
 
 ## Out of Scope
 
@@ -96,9 +97,9 @@ The following are explicitly excluded from this feature:
 
 - **FR-001**: System MUST store quality gate configuration in a dedicated file at a well-known path within the project (`.specify/quality-gates.sh`).
 - **FR-002**: `setup.sh` MUST NOT overwrite the quality gate file if it already exists when rerun.
-- **FR-003**: `setup.sh` MUST create the quality gate file with placeholder content on first installation (when the file does not exist and no existing quality gates are found in command files).
+- **FR-003**: `setup.sh` MUST create the quality gate file with placeholder content on first installation (when the file does not exist and no existing quality gates are found in command files). Placeholder content is defined by FR-015.
 - **FR-012**: `setup.sh` MUST detect existing quality gates embedded in the Ralph command file (`speckit.ralph.implement.md`) during re-run and extract them to the quality gate file if no quality gate file exists yet.
-- **FR-013**: `setup.sh` MUST distinguish between the default placeholder quality gate and a custom user-configured quality gate; only custom gates are extracted (placeholder results in a new placeholder file).
+- **FR-013**: `setup.sh` MUST distinguish between the default placeholder quality gate and a custom user-configured quality gate using the sentinel comment mechanism defined in FR-016; only custom gates are extracted (placeholder results in a new placeholder file).
 - **FR-014**: The Ralph command template MUST replace the inline quality gate code block with a reference to `.specify/quality-gates.sh`, keeping the "Extract Quality Gates" section for visibility while centralizing configuration in the file.
 - **FR-004**: All loop scripts (`ralph-loop.sh`, `pipeline.sh`) MUST read quality gates from the dedicated file when no CLI argument or environment variable override is provided.
 - **FR-005**: CLI arguments (`--quality-gates`) and environment variables (`QUALITY_GATES`) MUST take precedence over the quality gate file when provided.
@@ -107,7 +108,17 @@ The following are explicitly excluded from this feature:
 - **FR-008**: The pipeline MUST accept a feature description as input when the specify step is included.
 - **FR-009**: The quality gate file MUST be executable as a shell script (sourced or executed by the loop scripts).
 - **FR-010**: `setup.sh` MUST continue to overwrite all other artifacts (scripts, agents, commands) on re-run to enable updates.
-- **FR-011**: The system MUST exit with a clear error message when no quality gates are configured (no file, no env var, no CLI arg).
+- **FR-011**: The system MUST exit with a clear error message and non-zero exit code when no quality gates are configured (no file, no env var, no CLI arg).
+- **FR-015**: The quality gate placeholder file MUST contain a commented shell script with usage instructions, an example command, and an `exit 1` statement so that the placeholder fails the quality gate check until the user configures it.
+- **FR-016**: `setup.sh` MUST detect the default placeholder in the Ralph command file by pattern-matching a sentinel comment (`# SPECKIT_DEFAULT_QUALITY_GATE`); presence of the sentinel means unconfigured (create placeholder file), absence means custom (extract to quality gate file).
+- **FR-017**: `setup.sh` MUST create the quality gate file with executable permissions (`chmod +x`).
+- **FR-018**: If the specify step fails during the pipeline, the pipeline MUST halt immediately with a clear error message and non-zero exit code; the user can re-invoke with `--from specify` to retry.
+
+### Non-Functional Requirements
+
+- **NFR-001**: `setup.sh` MUST be idempotent — running it multiple times in succession produces the same result as running it once, with no cumulative side effects.
+- **NFR-002**: All error conditions MUST produce a clear, actionable error message and exit with a non-zero exit code.
+- **NFR-003**: The quality gate file MUST never be partially written or corrupted; `setup.sh` writes it atomically (write to temp file, then move) or skips it entirely if it already exists.
 
 ### Key Entities
 
@@ -131,6 +142,11 @@ The following are explicitly excluded from this feature:
 - Q: After migration to file-based quality gates, should the Ralph command template still contain an inline quality gate section? → A: Keep the section but replace the inline code block with a reference to `.specify/quality-gates.sh`, preserving visibility while centralizing configuration.
 - Q: When the specify step runs as part of the pipeline, should it operate interactively or non-interactively? → A: Non-interactive; auto-resolve all clarifications with best guesses. Homer loop refines gaps afterward.
 - Q: What is explicitly out of scope for this feature? → A: Multi-project/shared quality gates, remote quality gate sources, file format versioning, GUI management, dependency resolution/ordering between gate commands, and parallel/conditional gate execution.
+- Q: Should the spec include measurable non-functional requirements for setup.sh and pipeline operations? → A: Yes, add minimal practical NFRs: idempotency guarantee for setup.sh, clear error messages with non-zero exit codes on failure, and no partial corruption of the quality gate file.
+- Q: What should happen if the specify step fails during the pipeline? → A: Pipeline halts with a clear error message; the user can fix the issue and re-invoke with `--from specify`.
+- Q: What should the quality gate placeholder file contain? → A: A commented shell script with instructions, an example command, and an `exit 1` so the placeholder fails the quality gate check until the user configures it.
+- Q: How does setup.sh distinguish custom quality gates from the default placeholder in the Ralph command file? → A: Pattern match against a known sentinel comment (`# SPECKIT_DEFAULT_QUALITY_GATE`); if the sentinel is present, treat as unconfigured (create placeholder file); if absent, treat as custom (extract to file).
+- Q: Should the quality gate file be created with executable permissions? → A: Yes, `setup.sh` creates the file with executable permissions (`chmod +x`) since FR-009 requires it to be executable as a shell script.
 
 ## Assumptions
 
