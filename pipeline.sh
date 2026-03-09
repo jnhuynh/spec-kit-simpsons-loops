@@ -111,8 +111,8 @@ while [ $i -le $# ]; do
         --help|-h) show_help ;;
         --from)
             i=$((i + 1)); FROM_STEP="${!i}"
-            if [[ ! "$FROM_STEP" =~ ^(homer|plan|tasks|lisa|ralph)$ ]]; then
-                echo -e "${RED}Error: --from must be one of: homer, plan, tasks, lisa, ralph${NC}" >&2
+            if [[ ! "$FROM_STEP" =~ ^(specify|homer|plan|tasks|lisa|ralph)$ ]]; then
+                echo -e "${RED}Error: --from must be one of: specify, homer, plan, tasks, lisa, ralph${NC}" >&2
                 exit 1
             fi ;;
         --model)
