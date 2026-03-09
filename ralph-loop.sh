@@ -32,6 +32,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 # Resolve quality gates using precedence: CLI arg > env var > file > error
+# Sets QUALITY_GATES (value) and QUALITY_GATES_SOURCE ("cli", "env", or "file")
 resolve_quality_gates() {
     local cli_arg="${1:-}"
     local qg_file=".specify/quality-gates.sh"
@@ -39,11 +40,13 @@ resolve_quality_gates() {
     # Priority 1: CLI argument
     if [[ -n "$cli_arg" ]]; then
         QUALITY_GATES="$cli_arg"
+        QUALITY_GATES_SOURCE="cli"
         return 0
     fi
 
     # Priority 2: Environment variable (QUALITY_GATES may already be set)
     if [[ -n "${QUALITY_GATES:-}" ]]; then
+        QUALITY_GATES_SOURCE="env"
         return 0
     fi
 
@@ -58,6 +61,7 @@ resolve_quality_gates() {
             exit 1
         fi
         QUALITY_GATES="$qg_file"
+        QUALITY_GATES_SOURCE="file"
         return 0
     fi
 
@@ -226,9 +230,18 @@ while [ $ITERATION -lt "$MAX_ITERATIONS" ]; do
     # Run Claude with fresh context (new process each time)
     echo -e "  ${DIM}Running claude --agent ralph ...${NC}"
 
+    # Build the quality gates prompt based on source type:
+    # - File source: tell the agent to execute the file directly
+    # - CLI/env source: pass the command string for shell evaluation
+    if [[ "$QUALITY_GATES_SOURCE" == "file" ]]; then
+        QG_PROMPT="Quality gates: $QUALITY_GATES (execute this file directly)"
+    else
+        QG_PROMPT="Quality gates: $QUALITY_GATES"
+    fi
+
     CLAUDE_EXIT=0
     ITER_OUTPUT=$(claude --agent ralph \
-        -p "Feature directory: $FEATURE_DIR. Quality gates: $QUALITY_GATES" \
+        -p "Feature directory: $FEATURE_DIR. $QG_PROMPT" \
         --dangerously-skip-permissions \
         --model "$MODEL" \
         2>&1) || CLAUDE_EXIT=$?
