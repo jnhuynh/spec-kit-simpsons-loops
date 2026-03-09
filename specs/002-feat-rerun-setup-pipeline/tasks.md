@@ -45,7 +45,7 @@
 
 - [ ] T005 [US1] Verify `setup.sh` never overwrites `.specify/quality-gates.sh` when it already exists by adding an existence check guard at the top of the quality gate creation section in `setup.sh`
 - [ ] T006 [US1] Verify `setup.sh` detects the sentinel comment `# SPECKIT_DEFAULT_QUALITY_GATE` in the target project's `.claude/commands/speckit.ralph.implement.md` and creates a placeholder quality gate file when sentinel is present in `setup.sh`
-- [ ] T007 [US1] Verify `setup.sh` extracts custom quality gates from the target project's `.claude/commands/speckit.ralph.implement.md` when sentinel is absent and writes them to `.specify/quality-gates.sh` in `setup.sh`
+- [ ] T007 [US1] Verify `setup.sh` extracts custom quality gates from the target project's `.claude/commands/speckit.ralph.implement.md` when sentinel is absent: extract the bash code block content from the `### Step 3: Extract Quality Gates` section (delimited by ` ```bash ` and ` ``` ` markers), wrap it in a `#!/usr/bin/env bash` header, and write the result to `.specify/quality-gates.sh` using atomic write (`mktemp` + `mv`) in `setup.sh`
 - [ ] T008 [US1] Verify `setup.sh` creates placeholder quality gate file on first-time installation (no existing Ralph command file) in `setup.sh`
 - [ ] T009 [US1] Run `shellcheck setup.sh` and fix any linting errors
 
