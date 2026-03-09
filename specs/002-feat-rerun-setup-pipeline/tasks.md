@@ -107,7 +107,7 @@
 ### Implementation for User Story 4
 
 - [x] T029 [US4] Verify that the quality gate file created by `setup.sh` extraction (T007) correctly captures the full command content from the Ralph command file, enabling migration from inline to file-based config in `setup.sh`
-- [ ] T030 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
+- [x] T030 [US4] Verify backward compatibility: confirm `QUALITY_GATES` env var and `--quality-gates` CLI arg continue to override the file in both `ralph-loop.sh` and `pipeline.sh`
 
 **Checkpoint**: Existing projects can migrate to file-based quality gates. Env var and CLI overrides remain fully functional.
 
