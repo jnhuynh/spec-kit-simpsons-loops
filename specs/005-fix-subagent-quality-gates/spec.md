@@ -20,6 +20,7 @@
 - Q: Do agent files need content changes, and should the source directories be reorganized? → A: No content changes to agent files. Reorganize source directories: `agents/` → `claude-agents/`, root-level `speckit.*.md` files → `speckit-commands/` directory. Update `setup.sh` to install from new source locations.
 - Q: To enable homer right after specify (without plan.md/tasks.md), should the prerequisite script be refactored or should homer handle its own validation? → A: Homer switches to `--json --paths-only` and validates spec.md itself; the prerequisite script stays unchanged.
 - Q: Should quality gate validation (FR-010) apply to all loop commands or only ralph? → A: Only ralph (and the pipeline's ralph phase) validates quality-gates.sh; homer and lisa skip it entirely.
+- Q: Should `setup.sh` also clean up previously-installed bash script copies at `.specify/scripts/bash/` and their permissions in `.claude/settings.local.json` when run on existing installations? → A: Yes — `setup.sh` must remove previously-installed bash loop scripts from `.specify/scripts/bash/` and remove their corresponding permissions entries from `.claude/settings.local.json` to prevent orphaned artifacts and stale configuration.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -84,7 +85,8 @@ The bash script fallback mechanism (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.s
 
 1. **Given** the repository after implementation, **When** a developer searches for `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, or `ralph-loop.sh`, **Then** none of these files exist at root level.
 2. **Given** the `setup.sh` script, **When** it runs, **Then** it does not copy or install any loop bash scripts.
-3. **Given** the updated README, **When** a developer reads the documentation, **Then** there are no references to bash script invocation, `pipeline.sh`, or the loop `.sh` scripts.
+3. **Given** a project that previously had bash loop scripts installed at `.specify/scripts/bash/`, **When** `setup.sh` runs, **Then** it removes `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, and `ralph-loop.sh` from `.specify/scripts/bash/` and removes their corresponding permissions entries from `.claude/settings.local.json`.
+4. **Given** the updated README, **When** a developer reads the documentation, **Then** there are no references to bash script invocation, `pipeline.sh`, or the loop `.sh` scripts.
 
 ---
 
@@ -123,7 +125,7 @@ A developer reads the project README to understand how the pipeline and loops wo
 - **FR-002**: Each loop command (homer, lisa, ralph) MUST spawn each iteration as a separate subagent using the Agent tool with `subagent_type: general-purpose`
 - **FR-003**: Subagent prompts MUST instruct the subagent to read and follow its corresponding agent file from `.claude/agents/` and to treat slash command references as file reads from `.claude/commands/`
 - **FR-004**: All quality gate references MUST be resolved exclusively from `.specify/quality-gates.sh` — no CLI argument, no environment variable, no alternative sources
-- **FR-005**: The bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) MUST be deleted from the root level. The `setup.sh` script MUST be updated to stop installing these files
+- **FR-005**: The bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) MUST be deleted from the root level. The `setup.sh` script MUST be updated to stop installing these files AND MUST remove previously-installed copies from `.specify/scripts/bash/` and their corresponding permissions entries from `.claude/settings.local.json` when run on existing installations
 - **FR-006**: Source directories MUST be reorganized: `agents/` renamed to `claude-agents/`, root-level `speckit.*.md` command files moved into a new `speckit-commands/` directory. All command file edits MUST target files in `speckit-commands/`. `setup.sh` MUST be updated to install from the new source locations (`claude-agents/` → `.claude/agents/`, `speckit-commands/` → `.claude/commands/`)
 - **FR-007**: The ralph command file and the pipeline's ralph phase MUST reference quality gates as `bash .specify/quality-gates.sh` without any override mechanism
 - **FR-008**: The pipeline command MUST wait for each subagent to complete before spawning the next (strict sequential execution)
@@ -158,7 +160,7 @@ A developer reads the project README to understand how the pipeline and loops wo
 - **SC-003**: Zero code paths exist that read quality gates from CLI arguments or environment variables
 - **SC-004**: All quality gate references in command files resolve to `.specify/quality-gates.sh` exclusively
 - **SC-005**: A developer can set up quality gates by editing a single file (`.specify/quality-gates.sh`) with no additional configuration required
-- **SC-006**: Bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) do not exist at root level and `setup.sh` no longer installs them
+- **SC-006**: Bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) do not exist at root level, `setup.sh` no longer installs them, and `setup.sh` removes previously-installed copies from `.specify/scripts/bash/` and their permissions from `.claude/settings.local.json`
 - **SC-007**: Source directories are reorganized: `claude-agents/` contains agent source files, `speckit-commands/` contains command source files. Old `agents/` directory and root-level `speckit.*.md` files no longer exist
 - **SC-008**: `setup.sh` installs from `claude-agents/` → `.claude/agents/` and `speckit-commands/` → `.claude/commands/`
 - **SC-009**: Homer and lisa default max iterations are 30 (standalone commands and pipeline)
