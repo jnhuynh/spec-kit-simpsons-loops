@@ -57,7 +57,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 ### Step 2: Resolve Feature Directory
 
 - If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
-- Otherwise, run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON output for `FEATURE_DIR`
+- Otherwise, run `bash .specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON output for `FEATURE_DIR`. **Error handling**: If the script exits with a non-zero status (e.g., missing feature dir, invalid branch), display the script's stderr/stdout output to the user and **STOP** — do not proceed with execution.
 
 ### Step 3: Analyze Tasks
 

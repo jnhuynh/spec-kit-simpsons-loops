@@ -57,7 +57,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 - **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 
-If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically by running `.specify/scripts/bash/check-prerequisites.sh --json` from repo root via Bash tool and parsing the JSON output for `feature_dir`.
+If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically by running `bash .specify/scripts/bash/check-prerequisites.sh --json` from repo root via Bash tool and parsing the JSON output for `feature_dir`. **Error handling**: If the script exits with a non-zero status (e.g., missing feature dir, invalid branch), display the script's stderr/stdout output to the user and **STOP** — do not proceed with pipeline execution.
 
 ### Step 2: Validate spec exists or can be created
 
