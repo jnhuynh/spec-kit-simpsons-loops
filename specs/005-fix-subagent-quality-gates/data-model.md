@@ -21,7 +21,8 @@
 
 | Attribute | Type | Description |
 |---|---|---|
-| Path | String | `.claude/commands/speckit.{name}.md` (+ root-level copy `speckit.{name}.md`) |
+| Source path | String | `speckit-commands/speckit.{name}.md` (source file, edited here) |
+| Installed path | String | `.claude/commands/speckit.{name}.md` (installed by `setup.sh`) |
 | Type | Enum | `pipeline` (multi-step) or `loop` (iterative: homer, lisa, ralph) |
 | Agent spawning | Instruction block | Describes Agent tool invocation with `subagent_type`, agent file path, and prompt |
 | Quality gate reference | Instruction block | (Ralph-related only) References `.specify/quality-gates.sh` as sole source |
@@ -34,21 +35,9 @@
 | `speckit.lisa.analyze.md` | loop | lisa iterations | No |
 | `speckit.ralph.implement.md` | loop | ralph iterations | Yes |
 
-### Bash Script (Orchestrator)
+### Bash Script (Orchestrator) — DELETED per FR-005
 
-| Attribute | Type | Description |
-|---|---|---|
-| Path | String | `.specify/scripts/bash/{name}.sh` (+ root-level copy `{name}.sh`) |
-| resolve_quality_gates() | Function | Validates and resolves quality gates from file |
-| Agent invocation | Shell command | `claude --agent {name} -p "{prompt}"` |
-
-**Script types**:
-| Script | Quality gates | Agent invocation |
-|---|---|---|
-| `pipeline.sh` | Yes (resolve + pass to ralph) | `run_agent()` for specify/plan/tasks; delegates to loop scripts for homer/lisa/ralph |
-| `ralph-loop.sh` | Yes (resolve + include in prompt) | `claude --agent ralph -p "..."` per iteration |
-| `homer-loop.sh` | No | `claude --agent homer -p "..."` per iteration |
-| `lisa-loop.sh` | No | `claude --agent lisa -p "..."` per iteration |
+All bash script orchestrators (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) are deleted from both root level and `.specify/scripts/bash/`. The sole invocation path is Claude Code command files. This entity is documented here only for historical context of the migration.
 
 ### Agent File
 
@@ -68,25 +57,28 @@ Command File (orchestrator)
   │             └── reads → Agent File (.claude/agents/{name}.md)
   └── references → Quality Gates File (Ralph-related only)
 
-Bash Script (orchestrator)
-  ├── spawns → Agent (via `claude --agent`, one per iteration)
-  │             └── reads → Agent File (.claude/agents/{name}.md)
-  └── resolves → Quality Gates File (Ralph-related only)
-
 Quality Gates File
   └── single source of truth — no CLI args, no env vars
+
+Setup Script (setup.sh)
+  ├── copies → claude-agents/*.md → .claude/agents/*.md
+  └── copies → speckit-commands/speckit.*.md → .claude/commands/speckit.*.md
 ```
+
+**Note**: Bash script orchestrators are deleted per FR-005. No bash-based invocation path exists post-implementation.
 
 ### Loop Configuration Defaults
 
-| Parameter | Homer (all paths) | Lisa (all paths) | Ralph (commands) | Ralph (bash) |
-|---|---|---|---|---|
-| Max iterations | 30 | 30 | `incomplete_tasks + 10` | 30 |
-| Stuck detection threshold | 2 consecutive | 2 consecutive | 2 consecutive | 2 consecutive |
-| Completion promise | `ALL_FINDINGS_RESOLVED` | `ALL_FINDINGS_RESOLVED` | `ALL_TASKS_COMPLETE` | `ALL_TASKS_COMPLETE` |
+| Parameter | Homer | Lisa | Ralph |
+|---|---|---|---|
+| Max iterations | 30 | 30 | `incomplete_tasks + 10` |
+| Stuck detection threshold | 2 consecutive | 2 consecutive | 2 consecutive |
+| Completion promise | `ALL_FINDINGS_RESOLVED` | `ALL_FINDINGS_RESOLVED` | `ALL_TASKS_COMPLETE` |
+
+**Note**: Only command file invocation paths exist (bash scripts deleted per FR-005).
 
 **Validation rules**:
-- Stuck detection compares consecutive iterations for identical output (bash) or no file changes (commands)
+- Stuck detection compares consecutive iterations for no file changes and no completion signal
 - Max iterations is a hard ceiling — loop exits with "max iterations reached" message
 - Completion promise in subagent output triggers immediate clean exit
 
@@ -107,5 +99,6 @@ Quality gate resolution:
 Quality gate resolution:
   file (.specify/quality-gates.sh) → error
 
-1 entry point, 2 scripts with simplified resolve_quality_gates(), uniform prompt formatting
+Single invocation path (command files only — bash scripts deleted per FR-005).
+Quality gate validation in ralph command file and pipeline's ralph phase only.
 ```
