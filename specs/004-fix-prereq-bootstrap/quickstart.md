@@ -25,7 +25,7 @@ Two files need modifications (plus their root-level copies kept in sync):
 
 **Current behavior**: Step 1 (line 89) always runs `check-prerequisites.sh --json` for auto-detection, which triggers full validation (requires feature dir + plan.md to exist).
 
-**New behavior**: When `--from specify` is set or `--description` is provided and no `spec-dir` argument is given, use `check-prerequisites.sh --json --paths-only` instead of `check-prerequisites.sh --json`. This returns path information without validation errors. If `--paths-only` also fails (e.g., on `main` branch with no feature branch), fall back to constructing the path from the description context.
+**New behavior**: When `--from specify` is set or `--description` is provided and no `spec-dir` argument is given, the logic MUST first check the current branch type: (1) if on a feature branch (matches `^[0-9]{3}-` pattern), use `check-prerequisites.sh --json --paths-only` for path resolution without validation; (2) if on a non-feature branch (e.g., `main` or `HEAD`), skip `check-prerequisites.sh` entirely because `check_feature_branch()` in `common.sh` rejects non-feature branches before the `--paths-only` code path is reached — proceed with an empty/unresolved `FEATURE_DIR`. In either case, treat resolution failure as non-fatal when bootstrapping and allow the specify step to proceed. After the specify step completes, re-run `check-prerequisites.sh --json` to obtain the now-valid `FEATURE_DIR` for subsequent steps.
 
 **Location in code**: Step 1, the paragraph starting "If no `spec-dir` is provided" (line 89). Add conditional logic for the bootstrap case.
 
