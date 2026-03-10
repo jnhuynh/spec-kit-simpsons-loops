@@ -1,59 +1,59 @@
 # Research: Fix Pipeline and Loop Command Delegation
 
-## R1: Claude Code Slash Command File Format
+**Feature**: 003-fix-pipeline-delegation
+**Date**: 2026-03-09
 
-**Decision**: Slash command files are Markdown files with optional YAML frontmatter (between `---` delimiters). The `description` field in frontmatter provides the help text. The body contains instructions that Claude follows when the command is invoked. `$ARGUMENTS` is replaced with user-provided arguments at invocation time.
+## R1: Current Command File State Analysis
 
-**Rationale**: This is the existing format used by all current command files in the project. No format change is needed.
+**Decision**: All 4 orchestrator command files already implement the hybrid Agent tool orchestration pattern. The `.claude/commands/` copies and repo root copies are functionally identical and already use Agent tool sub-agents for loop orchestration with Bash tool calls for `check-prerequisites.sh`.
 
-**Alternatives considered**: None — this is an established convention, not a design choice.
+**Rationale**: Reading all 8 files (4 commands x 2 locations) confirms they share the same content. The hybrid architecture is already in place: Agent tool sub-agents per iteration, Bash tool for feature dir resolution, promise tag checking, and stuck detection.
 
-## R2: Bash Tool Background Execution for Long-Running Scripts
+**Alternatives considered**: Full rewrite from scratch. Rejected because the commands already implement the correct pattern.
 
-**Decision**: Use the Bash tool's `run_in_background` parameter for loop scripts (homer-loop.sh, lisa-loop.sh, ralph-loop.sh) that may exceed the 10-minute Bash tool timeout. The slash command instructs Claude to use `run_in_background: true` when invoking the script.
+## R2: Stuck Detection Gap (Commands vs Spec)
 
-**Rationale**: Loop scripts can run 20+ iterations, each spawning a `claude --agent` call. A single iteration may take several minutes, so the total runtime can exceed 10 minutes. The `run_in_background` mode prevents timeout termination while still allowing Claude to receive the result when the script completes.
+**Decision**: Update stuck detection from "3 consecutive identical outputs" to git diff-based detection with 2-iteration threshold per spec FR-007.
 
-**Alternatives considered**:
-- Splitting scripts into per-iteration calls from the command file: Rejected because this reintroduces the orchestration logic in Claude instructions, which is the root cause of the current bug.
-- Using `timeout` parameter on Bash tool: Rejected because the max timeout is 10 minutes, which may still be insufficient.
+**Rationale**: The spec defines stuck as: sub-agent exits without a meaningful git diff (no file changes committed) AND the completion promise tag was not emitted. Two consecutive stuck iterations abort. The current commands use output-hash comparison with a 3-iteration threshold, which is a different mechanism and threshold. Git diff-based detection is more reliable because it measures actual file changes rather than output similarity (which can vary due to timestamps, formatting).
 
-## R3: Hybrid Orchestration Architecture for Pipeline Command
+**Alternatives considered**: Keeping the current 3-iteration output-hash approach. Rejected because it contradicts the spec's explicit definition in FR-007.
 
-**Decision**: The pipeline command uses a hybrid approach: Claude Code sequences the 6 pipeline steps (using Agent tool sub-agents for single-shot steps like specify/plan/tasks, and Bash tool for loop steps like homer/lisa/ralph), while bash scripts handle all loop iteration logic internally.
+## R3: Utility Script Existence Check
 
-**Rationale**: Step sequencing (6 ordered steps) is simple and reliable in Claude instructions. Loop iteration (20+ cycles with stuck detection) is complex and must remain in deterministic bash scripts. The pipeline.sh script serves as a reference for step ordering and argument handling, but the slash command reimplements step sequencing to leverage Claude Code's Agent tool for single-shot sub-agents (specify, plan, tasks) that need Claude Code-specific features (reading agent files, following slash command instructions).
+**Decision**: Add explicit existence check for `.specify/scripts/bash/check-prerequisites.sh` at the top of each command, before any execution. Display actionable error with remediation instructions if missing.
 
-**Alternatives considered**:
-- Pure bash delegation (just call pipeline.sh): This would work for the pipeline, but pipeline.sh internally calls `claude --agent` which creates its own sessions. The slash command approach allows the orchestrator session to use Agent tool sub-agents, which have better integration with the Claude Code session context. However, this is actually the simpler path and should be preferred per KISS principle. The spec explicitly states hybrid orchestration, so we follow the spec.
-- Pure Claude instructions: Rejected — this is the current broken approach.
+**Rationale**: FR-002 requires checking for utility scripts before execution. FR-003 requires actionable error messages. Currently, commands call the script directly without checking existence first, which would produce a confusing bash error rather than a helpful message.
 
-**Update after deeper analysis**: Re-reading the spec more carefully, the architecture section says for standalone loop commands the pattern is simply: check script exists -> run bash script via Bash tool -> report results. For the pipeline command, the spec says "Claude Code session MUST act as the step-level orchestrator, spawning one Agent tool sub-agent per pipeline phase." However, given that pipeline.sh already handles all step sequencing and invokes the loop scripts internally, the simplest approach that satisfies FR-001 through FR-010 is to delegate pipeline.sh execution via Bash tool as well — pipeline.sh already calls homer-loop.sh, lisa-loop.sh, etc. The spec's hybrid architecture diagram shows Agent sub-agents, but the unified execution path requirement (FR-008) and the delegation requirement (FR-001) are better served by delegating to pipeline.sh directly. The pipeline command will run `bash .specify/scripts/bash/pipeline.sh $ARGUMENTS` and let pipeline.sh handle all orchestration.
+**Alternatives considered**: Checking for all scripts in `.specify/scripts/bash/`. Unnecessary because `check-prerequisites.sh` is the only utility the commands call directly. Checking for executable permission (`-x`) rejected per spec edge case -- `bash <script>` does not require execute permission.
 
-## R4: Script Existence Check Pattern
+## R4: Pipeline Unified Execution Path (FR-008)
 
-**Decision**: Each command file checks for its corresponding script using `[[ -f .specify/scripts/bash/<script>.sh ]]` before attempting execution. On failure, display a clear error message with remediation instructions.
+**Decision**: The pipeline command uses the same Agent tool sub-agent pattern as standalone loop commands. For feature dir resolution, the pipeline keeps its own inline logic because it handles `--from` and `--description` arguments that `check-prerequisites.sh` does not support.
 
-**Rationale**: Simple, reliable, and produces an immediate actionable error (FR-002, FR-003, SC-004).
+**Rationale**: FR-008 requires one orchestration pattern across all commands. The Agent tool loop pattern IS unified. The feature dir resolution differs because the pipeline has additional argument handling. Modifying `check-prerequisites.sh` to support `--from`/`--description` is out of scope per the spec.
 
-**Alternatives considered**:
-- Checking for executable permission (`-x`): Rejected per edge case in spec — the command uses `bash <script>` which doesn't require execute permission.
-- Checking for all scripts at once: Rejected — each command only needs its own script.
+**Alternatives considered**: Delegating pipeline execution to `pipeline.sh` via Bash tool. Rejected because: (1) `pipeline.sh` uses `claude --agent` internally which creates separate CLI sessions rather than Agent tool sub-agents, (2) FR-009 explicitly requires "the Claude Code session MUST act as the step-level orchestrator, spawning one Agent tool sub-agent per pipeline phase."
 
-## R5: Argument Pass-Through Pattern
+## R5: File Sync Strategy
 
-**Decision**: Pass `$ARGUMENTS` directly to the bash script invocation: `bash .specify/scripts/bash/<script>.sh $ARGUMENTS`. The `$ARGUMENTS` variable is already expanded by Claude Code before the command body is interpreted.
+**Decision**: Use `.claude/commands/` as the canonical source. After all modifications, copy each file to repo root and `~/.openclaw/.claude/commands/`. Verify with `diff` that all 3 copies are byte-identical.
 
-**Rationale**: Direct pass-through preserves all arguments without modification (FR-004, SC-003). The bash scripts handle their own argument parsing.
+**Rationale**: `.claude/commands/` is what Claude Code resolves commands from directly. FR-006 and SC-005 require all 3 copies to be identical. Using `cp` for exact copies is the simplest approach for 4 files.
 
-**Alternatives considered**: None — direct pass-through is the simplest correct approach.
+**Alternatives considered**: Symlinks (rejected -- Claude Code may not follow symlinks, global copy is outside repo). Sync script (overengineering for 4 files).
 
-## R6: File Sync Strategy (3 Locations)
+## R6: Claude Code Slash Command File Format
 
-**Decision**: Edit the repo root copies (upstream source) first, then copy to `.claude/commands/` and `~/.openclaw/.claude/commands/`. Use `cp` for exact copies.
+**Decision**: Slash command files are Markdown with optional YAML frontmatter (between `---` delimiters). The `description` field provides help text. `$ARGUMENTS` is replaced with user-provided arguments at invocation time.
 
-**Rationale**: The repo root files are the upstream source of truth. The other two locations are copies that must stay in sync (FR-006, SC-005).
+**Rationale**: Established convention used by all existing command files. No format change needed.
 
-**Alternatives considered**:
-- Symlinks: Rejected — Claude Code may not follow symlinks for command resolution, and the global copy is outside the repo.
-- A sync script: Overengineering for 4 files. Manual `cp` during implementation is sufficient.
+**Alternatives considered**: None -- this is an established convention.
+
+## Summary
+
+All research items resolved. The implementation work is:
+1. Update stuck detection from output-hash to git-diff based (2-iteration threshold) in all 4 commands
+2. Add utility script existence checks with actionable error messages to all 4 commands
+3. Sync all file copies across 3 locations (12 files total)

@@ -9,21 +9,23 @@
 
 ### Session 2026-03-09
 
-- Q: Should the delegation fix apply to all 4 orchestrator commands (pipeline, homer, lisa, ralph), not just pipeline? → A: Yes, rewrite all 4 commands to delegate to their respective bash scripts.
-- Q: Does this unify the execution logic so `/speckit.pipeline` and individual loop commands share the same code path? → A: Yes. `pipeline.sh` already calls `homer-loop.sh`, `lisa-loop.sh`, and `ralph-loop.sh` internally. After this fix, both `/speckit.pipeline` (via pipeline.sh) and `/speckit.homer.clarify` (directly) invoke the same `homer-loop.sh` — one unified execution path, no divergent implementations.
-- Q: What orchestration architecture should be used? → A: Hybrid — Claude Code session orchestrates at the step level via Agent tool sub-agents, but each sub-agent runs its corresponding bash script via Bash tool. Bash scripts handle loop iteration, stuck detection, and quality gates deterministically. Claude Code handles step sequencing and sub-agent lifecycle.
-- Q: What are the precise line-count limits for rewritten command files? → A: Standalone loop commands (homer, lisa, ralph) must not exceed 40 lines. The pipeline command must not exceed 60 lines. These are hard upper bounds replacing the previous vague "approximately 30" and "~50" targets.
+- Q: Should the delegation fix apply to all 4 orchestrator commands (pipeline, homer, lisa, ralph), not just pipeline? → A: Yes, fix all 4 commands.
+- Q: Should commands delegate entirely to bash scripts? → A: No. Hybrid architecture: commands use the Agent tool for loop orchestration (one sub-agent per iteration), and call bash utilities via Bash tool for deterministic operations (feature dir resolution, task counting, quality gates, stuck detection).
+- Q: Does this unify the execution logic so `/speckit.pipeline` and individual loop commands share the same code path? → A: Yes. Both `/speckit.pipeline` and standalone loop commands (e.g., `/speckit.homer.clarify`) use the same Agent tool loop pattern and the same bash utility scripts (e.g., `check-prerequisites.sh`). One orchestration pattern, no divergent implementations.
+- Q: What orchestration architecture should be used? → A: Hybrid — Claude Code commands orchestrate loops via Agent tool sub-agents (one per iteration), calling bash utilities via Bash tool for deterministic operations. Agent tool handles iteration lifecycle; bash utilities handle feature dir resolution, task/finding counting, quality gate checks, and stuck detection.
+- Q: What are the precise line-count limits for rewritten command files? → A: No hard line-count limits. The previous 40/60 limits were sized for thin bash delegation wrappers and are not appropriate for commands containing Agent tool loop orchestration. Focus on SC-001 (reliability — commands complete full execution) rather than arbitrary line counts.
+- Q: What constitutes a "stuck" iteration for stuck detection? → A: An iteration is stuck when the sub-agent exits without producing a meaningful git diff (no file changes committed) AND the completion promise tag (e.g., `ALL_FINDINGS_RESOLVED`) was not emitted. Two consecutive stuck iterations should abort the loop.
+- Q: Should SC-003 and SC-004 be updated to reflect hybrid terminology? → A: Yes. SC-003 updated to reference argument interpretation (not forwarding to bash scripts). SC-004 updated to reference utility scripts (not loop scripts).
 - Q: What is explicitly out of scope for this fix? → A: Modifications to the bash scripts themselves, changes to agent files, adding new pipeline phases, and changes to supporting infrastructure scripts.
 
 ## Out of Scope
 
 The following are explicitly excluded from this fix:
 
-- **Bash orchestrator scripts**: No modifications to `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, or `ralph-loop.sh`. These are assumed to be functionally correct.
 - **Agent definition files**: No modifications to `homer.md`, `lisa.md`, or `ralph.md` agent files.
 - **New pipeline phases or steps**: No additions to the existing 6-phase pipeline sequence.
 - **Claude Code tooling infrastructure**: No changes to the Agent tool, Bash tool, or their underlying behavior.
-- **Supporting scripts**: No modifications to `check-prerequisites.sh` or other utility scripts under `.specify/scripts/`.
+- **Bash utility scripts**: No modifications to `check-prerequisites.sh` or other utility scripts under `.specify/scripts/`. These are called as-is for deterministic operations.
 - **Non-orchestrator slash commands**: Only the 4 orchestrator commands (pipeline, homer, lisa, ralph) are in scope. Other slash commands (e.g., `/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) are not modified.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -38,9 +40,9 @@ A developer invokes `/speckit.pipeline` from a Claude Code session and the pipel
 
 **Acceptance Scenarios**:
 
-1. **Given** a project with the bash scripts installed and a feature branch checked out, **When** the user runs `/speckit.pipeline`, **Then** the Claude Code session orchestrates all 6 phases by spawning one Agent sub-agent per step, each running the corresponding bash script.
+1. **Given** a project with utility scripts installed and a feature branch checked out, **When** the user runs `/speckit.pipeline`, **Then** the Claude Code session orchestrates all 6 phases by spawning one Agent sub-agent per step. Loop steps (homer, lisa, ralph) use Agent tool sub-agents for iteration.
 2. **Given** a project with an existing `spec.md`, **When** the user runs `/speckit.pipeline`, **Then** the orchestrator auto-detects the starting step (skipping specify) and runs the remaining phases.
-3. **Given** a project with the bash scripts, **When** the user runs `/speckit.pipeline --from homer`, **Then** the orchestrator starts from the homer phase, passing the feature directory to `homer-loop.sh`.
+3. **Given** a project with utility scripts, **When** the user runs `/speckit.pipeline --from homer`, **Then** the orchestrator starts from the homer phase, resolving the feature directory via `check-prerequisites.sh`.
 
 ---
 
@@ -48,47 +50,47 @@ A developer invokes `/speckit.pipeline` from a Claude Code session and the pipel
 
 A developer invokes any of the standalone loop commands (`/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`) and the loop runs all iterations until its completion condition is met (all findings resolved, all tasks complete, or max iterations reached), rather than running a single iteration and stopping.
 
-**Why this priority**: The loop commands suffer the same root cause as pipeline — Agent-tool orchestration reimplemented in Claude instructions fails on weaker models or when agent files are missing. Delegating to the existing bash loop scripts makes them reliable.
+**Why this priority**: The loop commands must iterate reliably. The hybrid approach uses Agent tool sub-agents (one per iteration) for orchestration, with bash utilities for deterministic checks (counting findings/tasks, stuck detection, quality gates).
 
 **Independent Test**: Can be tested by invoking each loop command in a project with findings/tasks to resolve and verifying multiple iterations execute until a completion condition is met.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project with `homer-loop.sh` installed and a spec with findings, **When** the user runs `/speckit.homer.clarify`, **Then** the command delegates to `homer-loop.sh` and iterates until all findings are resolved or max iterations reached.
-2. **Given** a project with `lisa-loop.sh` installed and spec/plan/tasks artifacts, **When** the user runs `/speckit.lisa.analyze`, **Then** the command delegates to `lisa-loop.sh` and iterates until all findings are resolved or max iterations reached.
-3. **Given** a project with `ralph-loop.sh` installed and incomplete tasks, **When** the user runs `/speckit.ralph.implement`, **Then** the command delegates to `ralph-loop.sh` and iterates until all tasks are complete or max iterations reached.
+1. **Given** a project with utility scripts installed and a spec with findings, **When** the user runs `/speckit.homer.clarify`, **Then** the command loops via Agent tool sub-agents (one per iteration), each reading the agent file and doing work, until all findings are resolved or max iterations reached.
+2. **Given** a project with utility scripts installed and spec/plan/tasks artifacts, **When** the user runs `/speckit.lisa.analyze`, **Then** the command loops via Agent tool sub-agents until all findings are resolved or max iterations reached.
+3. **Given** a project with utility scripts installed and incomplete tasks, **When** the user runs `/speckit.ralph.implement`, **Then** the command loops via Agent tool sub-agents until all tasks are complete or max iterations reached.
 
 ---
 
 ### User Story 3 - Helpful Error When Script Missing (Priority: P2)
 
-A developer invokes any of the 4 commands in a project where the simpsons-loops setup has not been run (corresponding bash script does not exist). The command displays a clear error message with remediation instructions instead of silently failing.
+A developer invokes any of the 4 commands in a project where the simpsons-loops setup has not been run (utility scripts do not exist). The command displays a clear error message with remediation instructions instead of silently failing.
 
-**Why this priority**: Without the bash scripts, the commands cannot function. A clear error prevents confusion and guides the developer toward the fix.
+**Why this priority**: Without the utility scripts (e.g., `check-prerequisites.sh`), the commands cannot resolve the feature directory or perform quality checks. A clear error prevents confusion and guides the developer toward the fix.
 
-**Independent Test**: Can be tested by invoking each command in a project without the corresponding bash script and verifying the error message appears with setup instructions.
+**Independent Test**: Can be tested by invoking each command in a project without the utility scripts and verifying the error message appears with setup instructions.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project where `.specify/scripts/bash/pipeline.sh` does not exist, **When** the user runs `/speckit.pipeline`, **Then** the command displays an error explaining the script is missing and instructs the user to run setup.
-2. **Given** a project where `.specify/scripts/bash/homer-loop.sh` does not exist, **When** the user runs `/speckit.homer.clarify`, **Then** the command displays a similar error with setup instructions.
-3. **Given** a project where any of the 4 bash scripts is missing, **When** the corresponding slash command is invoked, **Then** no partial execution occurs — the command exits cleanly after displaying the error.
+1. **Given** a project where `.specify/scripts/bash/check-prerequisites.sh` does not exist, **When** the user runs `/speckit.pipeline`, **Then** the command displays an error explaining the script is missing and instructs the user to run setup.
+2. **Given** a project where `.specify/scripts/bash/check-prerequisites.sh` does not exist, **When** the user runs `/speckit.homer.clarify`, **Then** the command displays a similar error with setup instructions.
+3. **Given** a project where utility scripts are missing, **When** the corresponding slash command is invoked, **Then** no partial execution occurs — the command exits cleanly after displaying the error.
 
 ---
 
 ### User Story 4 - Arguments Pass Through to Scripts (Priority: P2)
 
-A developer invokes any of the 4 commands with arguments and all arguments are forwarded to the corresponding bash script unchanged.
+A developer invokes any of the 4 commands with arguments and the command interprets them correctly (e.g., spec-dir, max iterations, --from for pipeline).
 
-**Why this priority**: The bash scripts support options (--from, --dry-run, --model, max iterations, spec-dir, etc.). The slash commands must act as transparent pass-throughs to preserve this functionality.
+**Why this priority**: The commands support options (--from, max iterations, spec-dir, etc.). Arguments must be parsed and applied correctly within the Agent tool orchestration.
 
-**Independent Test**: Can be tested by running `/speckit.pipeline --dry-run` and verifying the dry-run output from `pipeline.sh` shows all planned steps without executing them.
+**Independent Test**: Can be tested by running `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5` and verifying the spec-dir and max-iterations are applied correctly.
 
 **Acceptance Scenarios**:
 
-1. **Given** a project with the scripts installed, **When** the user runs `/speckit.pipeline --dry-run`, **Then** the `--dry-run` flag is passed to `pipeline.sh` and dry-run output is displayed.
-2. **Given** a project with the scripts installed, **When** the user runs `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5`, **Then** the spec-dir and max-iterations arguments are forwarded to `homer-loop.sh`.
-3. **Given** a project with the scripts installed, **When** the user runs any command with no arguments, **Then** the bash script receives no arguments and uses its own defaults (auto-detect from branch, default max iterations).
+1. **Given** a project with utility scripts installed, **When** the user runs `/speckit.pipeline --from homer`, **Then** the `--from` flag is interpreted and the pipeline starts from the homer phase.
+2. **Given** a project with utility scripts installed, **When** the user runs `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5`, **Then** the spec-dir and max-iterations arguments are applied correctly.
+3. **Given** a project with utility scripts installed, **When** the user runs any command with no arguments, **Then** the command uses defaults (auto-detect feature dir from branch via `check-prerequisites.sh`, default max iterations).
 
 ---
 
@@ -108,62 +110,66 @@ After the fix is applied, each command file is identical across all 3 locations 
 
 ### Edge Cases
 
-- What happens when a bash script exists but is not executable? The command should still work because `bash <script>` invokes it via the bash interpreter, not as a direct executable.
-- What happens when a bash script exits with a non-zero status? The slash command should report the failure and the exit status to the user.
-- What happens when the user provides no arguments? The slash command should pass no arguments, and the bash script will use its own defaults (auto-detect feature directory from the current branch, default max iterations).
-- What happens when a bash script is present but its dependencies (agent files, other scripts) are missing? This is handled by the bash scripts themselves, which validate their own dependencies. The slash command's only responsibility is to check for the corresponding bash script.
-- What happens when `pipeline.sh` is invoked non-interactively (from Claude's Bash tool)? The `[[ -t 0 ]]` check in the stop-after menu returns false, defaulting to "run all the way through." This is the desired behavior.
-- What happens when a loop bash script takes longer than the Bash tool's 10-minute timeout? Long-running scripts (loop steps especially) must be run with `run_in_background` so they are not killed by the timeout. The bash scripts log all output to `.specify/logs/`.
+- What happens when utility scripts exist but are not executable? The command should still work because `bash <script>` invokes them via the bash interpreter, not as a direct executable.
+- What happens when a bash utility call exits with a non-zero status? The command should report the failure to the user and stop iteration.
+- What happens when the user provides no arguments? The command uses defaults: auto-detect feature directory from the current branch via `check-prerequisites.sh`, default max iterations.
+- What happens when agent files (e.g., `homer.md`) are missing? The Agent tool sub-agent will fail to read the agent file. The orchestrator should detect this and report the error.
+- What happens when a Bash tool call within a sub-agent takes longer than 10 minutes (600s)? Individual Bash tool calls within sub-agents still have the 10-minute/600s limit. However, since each iteration is a separate sub-agent, and Agent tool sub-agents themselves have no fixed timeout, this is only a concern for single bash operations that exceed 10 minutes. Most operations (running a single agent iteration, counting tasks, checking quality gates) complete well within this limit.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: All 4 orchestrator slash commands (`/speckit.pipeline`, `/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`) MUST delegate loop/iteration execution to their corresponding bash scripts (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) instead of implementing orchestration logic in Claude instructions.
-- **FR-002**: Each slash command MUST check for the existence of its corresponding bash script before attempting execution.
-- **FR-003**: Each slash command MUST display a clear error message with remediation steps when its bash script is not found.
-- **FR-004**: Each slash command MUST pass all user-provided arguments through to its bash script without modification.
-- **FR-005**: Each slash command MUST report the result of script execution (success or failure) back to the user.
+- **FR-001**: All 4 orchestrator slash commands (`/speckit.pipeline`, `/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`) MUST use the Agent tool for loop orchestration (one sub-agent per iteration) and call bash utilities via Bash tool for deterministic operations (feature dir resolution via `check-prerequisites.sh`, task/finding counting, quality gates, stuck detection).
+- **FR-002**: Each slash command MUST check for the existence of required utility scripts (e.g., `check-prerequisites.sh`) before attempting execution.
+- **FR-003**: Each slash command MUST display a clear error message with remediation steps when required utility scripts are not found.
+- **FR-004**: Each slash command MUST accept and correctly interpret user-provided arguments (spec-dir, max-iterations, --from for pipeline).
+- **FR-005**: Each slash command MUST report the result of execution (success or failure) back to the user.
 - **FR-006**: All 3 copies of each command file (repo root, `.claude/commands/`, and `~/.openclaw/.claude/commands/`) MUST contain identical content after the fix is applied.
-- **FR-007**: The rewritten commands MUST NOT re-implement any orchestration logic that already exists in the bash scripts (no loop iteration, no stuck detection, no quality gate resolution, no agent spawning for individual iterations).
-- **FR-008**: The execution path MUST be unified: when `/speckit.pipeline` runs the homer phase, it MUST invoke the same `homer-loop.sh` script that `/speckit.homer.clarify` invokes directly. The same applies to lisa and ralph. There MUST be exactly one implementation of each loop's orchestration logic.
-- **FR-009**: For `/speckit.pipeline`, the Claude Code session MUST act as the step-level orchestrator, spawning one Agent tool sub-agent per pipeline phase. Each sub-agent runs the bash script for its assigned step. The session sequences the 6 steps and manages sub-agent lifecycle.
-- **FR-010**: Long-running bash scripts (loop steps that may exceed 10 minutes) MUST be executed using the Bash tool's background execution mode to avoid timeout termination.
+- **FR-007**: Commands MUST iterate via Agent tool sub-agents (one per iteration). Each sub-agent reads the agent file, does its work, commits, and exits. The orchestrator performs stuck detection between iterations: an iteration is "stuck" when the sub-agent exits without a meaningful git diff (no file changes committed) AND the completion promise tag (e.g., `ALL_FINDINGS_RESOLVED`) was not emitted. Two consecutive stuck iterations MUST abort the loop.
+- **FR-008**: The execution path MUST be unified: both `/speckit.pipeline` (running the homer phase) and `/speckit.homer.clarify` (standalone) MUST use the same Agent tool loop pattern and the same bash utility scripts. There MUST be exactly one orchestration pattern, not divergent implementations.
+- **FR-009**: For `/speckit.pipeline`, the Claude Code session MUST act as the step-level orchestrator, spawning one Agent tool sub-agent per pipeline phase. Loop phases (homer, lisa, ralph) use the same Agent tool iteration pattern as their standalone commands. The session sequences the 6 steps and manages sub-agent lifecycle.
 
 ### Architecture: Hybrid Orchestration
 
-**Principle**: Claude Code orchestrates step sequencing; bash scripts handle loop iteration and step-internal complexity.
+**Principle**: Agent tool handles loop orchestration (one sub-agent per iteration); bash utilities handle deterministic operations (feature dir resolution, task counting, quality gates, stuck detection).
 
 **For `/speckit.pipeline`** (multi-step orchestrator):
 ```
 Claude Code session (orchestrator)
-  ├─ determines feature dir, starting step, stop-after
-  ├─ Step 1: Agent sub-agent → bash homer-loop.sh (loop logic in bash)
-  ├─ Step 2: Agent sub-agent → bash plan agent call (single-shot)
-  ├─ Step 3: Agent sub-agent → bash tasks agent call (single-shot)
-  ├─ Step 4: Agent sub-agent → bash lisa-loop.sh (loop logic in bash)
-  ├─ Step 5: Agent sub-agent → bash ralph-loop.sh (loop logic in bash)
-  └─ reports final results
+  ├─ Bash tool: check-prerequisites.sh --json (feature dir)
+  ├─ Step 1: Loop — Agent tool sub-agent per iteration (homer)
+  │   ├─ Sub-agent reads agent file + command file
+  │   ├─ Sub-agent does work, commits, exits
+  │   └─ Orchestrator checks promise tag + git diff (stuck detection)
+  ├─ Step 2: Agent sub-agent (plan — single-shot)
+  ├─ Step 3: Agent sub-agent (tasks — single-shot)
+  ├─ Step 4: Loop — Agent tool sub-agent per iteration (lisa)
+  ├─ Step 5: Loop — Agent tool sub-agent per iteration (ralph)
+  └─ Reports results
 ```
 
 **For standalone loop commands** (`/speckit.homer.clarify`, etc.):
 ```
-Claude Code session
-  ├─ checks script exists
-  ├─ runs bash homer-loop.sh via Bash tool (background for long runs)
-  └─ reports results
+Claude Code session (orchestrator)
+  ├─ Bash tool: check-prerequisites.sh --json (feature dir)
+  ├─ Loop: Agent tool sub-agent per iteration
+  │   ├─ Sub-agent reads agent file + command file
+  │   ├─ Sub-agent does work, commits, exits
+  │   └─ Orchestrator checks promise tag + git diff (stuck detection)
+  └─ Reports results
 ```
 
-**Why hybrid**: Step sequencing (6 ordered steps) is simple enough for Claude Code instructions to handle reliably. Loop iteration (20+ cycles with stuck detection, output parsing, and error handling) is complex and must remain in deterministic bash scripts. This separation keeps slash commands thin (~30 lines) while ensuring reliable end-to-end execution.
+**Why hybrid**: Agent tool sub-agents provide isolated context windows per iteration and have no fixed timeout, making them ideal for orchestrating loops. Bash utilities provide deterministic, testable operations (parsing JSON output from `check-prerequisites.sh`, counting unchecked tasks, detecting stuck iterations via git diff). This separation keeps each concern in the right layer.
 
-### Command-to-Script Mapping
+### Command-to-Utility Mapping
 
-| Slash Command | Bash Script | Script Location |
-|---------------|-------------|-----------------|
-| `/speckit.pipeline` | `pipeline.sh` (step sequencing reference) + individual loop scripts | `.specify/scripts/bash/pipeline.sh` |
-| `/speckit.homer.clarify` | `homer-loop.sh` | `.specify/scripts/bash/homer-loop.sh` |
-| `/speckit.lisa.analyze` | `lisa-loop.sh` | `.specify/scripts/bash/lisa-loop.sh` |
-| `/speckit.ralph.implement` | `ralph-loop.sh` | `.specify/scripts/bash/ralph-loop.sh` |
+| Slash Command | Bash Utilities Used | Utility Location |
+|---------------|---------------------|------------------|
+| `/speckit.pipeline` | `check-prerequisites.sh` (feature dir resolution) | `.specify/scripts/bash/check-prerequisites.sh` |
+| `/speckit.homer.clarify` | `check-prerequisites.sh` (feature dir resolution) | `.specify/scripts/bash/check-prerequisites.sh` |
+| `/speckit.lisa.analyze` | `check-prerequisites.sh` (feature dir resolution) | `.specify/scripts/bash/check-prerequisites.sh` |
+| `/speckit.ralph.implement` | `check-prerequisites.sh` (feature dir resolution) | `.specify/scripts/bash/check-prerequisites.sh` |
 
 ### File Locations Per Command
 
@@ -176,25 +182,27 @@ Each command file exists in 3 locations that must be kept in sync:
 ### Key Entities
 
 - **Slash Command Files**: The Claude Code command definitions (`.md` files) invoked when a user types the corresponding slash command. Each exists in 3 locations.
-- **Bash Orchestrator Scripts**: The deterministic shell scripts under `.specify/scripts/bash/` that handle loop iteration, stuck detection, quality gates, logging, error handling, and `claude --agent` invocations.
-- **Agent Sub-agents**: Claude Code sub-agents spawned via the Agent tool within the pipeline orchestrator session. Each sub-agent handles one pipeline step and has its own context window.
+- **Bash Utility Scripts**: Deterministic shell scripts under `.specify/scripts/bash/` called via Bash tool for specific operations (feature dir resolution, prerequisite checks). Not used for loop orchestration.
+- **Agent Sub-agents**: Claude Code sub-agents spawned via the Agent tool. For loop commands, one sub-agent per iteration (reads agent file, does work, commits, exits). For pipeline, one sub-agent per step. Each has its own context window.
 
 ## Assumptions
 
-- All 4 bash scripts (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) are functionally correct and do not need modifications.
+- Bash utility scripts (e.g., `check-prerequisites.sh`) are functionally correct and do not need modifications.
 - The slash command file format supports frontmatter (YAML between `---` delimiters) for the description field.
-- Claude Code's Bash tool `run_in_background` mode allows scripts to run without the 10-minute timeout constraint.
+- Agent tool sub-agents have no fixed timeout — they run until completion, making them suitable for loop iteration orchestration.
+- Individual Bash tool calls within sub-agents have a 10-minute (600s) timeout, but single iteration operations complete well within this limit.
 - The global copy location is `~/.openclaw/.claude/commands/` and is managed outside the repository.
 - The `.claude/commands/` directory within the repo is a local project copy that Claude Code also resolves when looking up commands.
 - Claude Code can reliably sequence 6 ordered Agent tool calls when the instructions are simple and explicit (no complex conditional logic, just "run step N, check result, proceed to step N+1").
+- The Agent tool loop pattern (one sub-agent per iteration) has been proven working — homer ran 3 iterations successfully in the current session.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: All 4 orchestrator commands complete their full execution (all phases for pipeline, all iterations for loops) when invoked in a properly configured project, with zero manual intervention required.
-- **SC-002**: Each standalone loop slash command file (homer, lisa, ralph) MUST NOT exceed 40 lines of delegation logic. The pipeline command MUST NOT exceed 60 lines. All commands MUST be reduced from their current sizes (64-146 lines) by removing orchestration logic that duplicates the bash scripts.
-- **SC-003**: 100% of bash script CLI arguments are correctly forwarded when passed through the corresponding slash command.
-- **SC-004**: When a bash script is missing, the user sees an actionable error message within 1 second of invocation (no hanging or partial execution).
+- **SC-002**: No hard line-count limits on command files. Commands should be as concise as the hybrid architecture allows, but reliability (SC-001) takes precedence over brevity. Commands MUST NOT contain duplicated orchestration logic — the same Agent tool loop pattern and bash utilities must be used consistently across all commands.
+- **SC-003**: 100% of user-provided arguments (spec-dir, max-iterations, --from) are correctly interpreted and applied by the corresponding slash command.
+- **SC-004**: When required utility scripts (e.g., `check-prerequisites.sh`) are missing, the user sees an actionable error message within 1 second of invocation (no hanging or partial execution).
 - **SC-005**: All 3 copies of each command file (repo root, `.claude/commands/`, global) are identical after deployment. 12 files total (4 commands x 3 locations).
-- **SC-006**: Running `/speckit.pipeline` and running `/speckit.homer.clarify` independently both invoke the same `homer-loop.sh` — verified by checking that the script path in both execution flows is identical.
+- **SC-006**: Running `/speckit.pipeline` and running `/speckit.homer.clarify` independently both use the same Agent tool loop pattern and the same bash utility scripts — verified by checking that both execution flows follow the identical orchestration pattern.
