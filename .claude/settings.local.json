@@ -2,11 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(chmod:*)",
-      "Bash(ls:*)",
-      "Bash(.specify/scripts/bash/ralph-loop.sh*)",
-      "Bash(.specify/scripts/bash/lisa-loop.sh*)",
-      "Bash(.specify/scripts/bash/homer-loop.sh*)",
-      "Bash(.specify/scripts/bash/pipeline.sh*)"
+      "Bash(ls:*)"
     ]
   }
 }

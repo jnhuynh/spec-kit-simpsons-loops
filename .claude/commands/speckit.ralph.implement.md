@@ -87,9 +87,27 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 2. Count completed tasks (`- [x]` lines)
 3. Exit early if nothing to do
 
-### Step 4: Extract Quality Gates
+### Step 4: Validate and Extract Quality Gates
 
-Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass.
+**Validation (MUST pass before proceeding)**: Run the following checks using the Bash tool:
+
+1. **File existence**: `test -f .specify/quality-gates.sh && echo "EXISTS" || echo "MISSING"`
+2. **Non-empty executable content**: `grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1`
+
+If the file is **MISSING** or the grep produces no output (file contains only comments/whitespace), display this error and **STOP** — do not proceed with execution:
+
+```
+ERROR: Quality gates file is missing or empty.
+
+Expected: .specify/quality-gates.sh with executable commands
+Found: File missing or contains only comments/whitespace
+
+The quality gates file is required for Ralph to validate task implementations.
+Create or update .specify/quality-gates.sh with your project's quality gate
+commands (e.g., npm test && npm run lint). The file must exit 0 for gates to pass.
+```
+
+If validation passes, quality gates are read from `.specify/quality-gates.sh` in the project root:
 
 ```bash
 # SPECKIT_DEFAULT_QUALITY_GATE

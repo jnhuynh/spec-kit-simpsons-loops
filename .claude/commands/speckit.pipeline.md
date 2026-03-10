@@ -117,9 +117,9 @@ Check which artifacts exist to determine where to start:
 
 ### Step 4: Configuration
 
-- Homer max iterations: **20**
-- Lisa max iterations: **20**
-- Ralph max iterations: **incomplete_tasks + 10** (calculated at ralph step)
+- Homer max iterations: **30**
+- Lisa max iterations: **30**
+- Ralph max iterations: **incomplete_tasks + 10** (count `- [ ]` lines in tasks.md at the start of the ralph step, then add 10)
 
 ### Step 5: Execute Pipeline Steps
 
@@ -210,6 +210,15 @@ Create the file with your project's quality gate commands, e.g.:
 
 The ralph phase requires quality gates to validate implementation work.
 ```
+
+**Calculate ralph max iterations**: Count incomplete tasks in tasks.md and add 10:
+
+```bash
+incomplete_count=$(grep -c '^\s*- \[ \]' "<FEATURE_DIR>/tasks.md" 2>/dev/null || echo "0")
+echo $((incomplete_count + 10))
+```
+
+Use the resulting number as `ralph_max_iterations`.
 
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
