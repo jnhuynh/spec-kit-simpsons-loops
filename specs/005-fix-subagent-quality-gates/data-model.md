@@ -77,6 +77,19 @@ Quality Gates File
   └── single source of truth — no CLI args, no env vars
 ```
 
+### Loop Configuration Defaults
+
+| Parameter | Homer (all paths) | Lisa (all paths) | Ralph (commands) | Ralph (bash) |
+|---|---|---|---|---|
+| Max iterations | 30 | 30 | `incomplete_tasks + 10` | 30 |
+| Stuck detection threshold | 2 consecutive | 2 consecutive | 2 consecutive | 2 consecutive |
+| Completion promise | `ALL_FINDINGS_RESOLVED` | `ALL_FINDINGS_RESOLVED` | `ALL_TASKS_COMPLETE` | `ALL_TASKS_COMPLETE` |
+
+**Validation rules**:
+- Stuck detection compares consecutive iterations for identical output (bash) or no file changes (commands)
+- Max iterations is a hard ceiling — loop exits with "max iterations reached" message
+- Completion promise in subagent output triggers immediate clean exit
+
 ## Change Impact
 
 ### Before (current state)

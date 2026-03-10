@@ -62,22 +62,68 @@ The "bug" was not that instructions were missing, but that the pipeline command 
 - Instruct the LLM to read the file and check manually: Less reliable than a deterministic bash check
 - Create a shared validation script: Over-engineering for a single `test + grep` command
 
+## Decision 6: Iteration Default Standardization
+
+**Decision**: Standardize all loop defaults to 30 iterations for homer and lisa (all paths), 30 for ralph bash scripts, and `incomplete_tasks + 10` for ralph command files.
+
+**Rationale**: Current defaults are inconsistent across invocation paths:
+- Homer: 20 (bash), 10 (commands) → both become 30
+- Lisa: 20 (bash), 10 (commands) → both become 30
+- Ralph: 5 (bash) → 30; commands keep `incomplete_tasks + 10` (dynamic sizing appropriate for task-based loops)
+
+The increase to 30 provides headroom for complex features with many findings. Premature termination loses work; extra iteration capacity costs nothing when the loop exits early on completion.
+
+**Alternatives considered**:
+- Keep 20 as standard → Rejected: spec explicitly requires 30
+- Make ralph commands also use 30 → Rejected: dynamic sizing based on task count is more precise
+
+## Decision 7: Stuck Detection Threshold Standardization
+
+**Decision**: Standardize stuck detection at 2 consecutive iterations across all invocation paths (command files and bash scripts).
+
+**Rationale**: Current state: bash scripts use `MAX_CONSECUTIVE_FAILURES=3`, command files describe threshold of 2. Two consecutive identical iterations is sufficient signal — a third rarely recovers. Reducing from 3 to 2 saves one wasted subagent invocation per stuck event.
+
+**Alternatives considered**:
+- Keep 3 for bash scripts → Rejected: spec requires uniform behavior (FR-014)
+- Use 1 → Rejected: transient issues can cause false positives
+
+## Decision 8: README Architecture Updates
+
+**Decision**: Add a new "Architecture" section to README with two mermaid diagrams, update all configuration tables, and remove references to `--quality-gates` and `QUALITY_GATES`.
+
+**Rationale**: The README currently documents removed/changed features:
+- References `--quality-gates` CLI flag (being removed)
+- References `QUALITY_GATES` env var (being removed)
+- Shows 20 as default iterations (changing to 30)
+- Shows 3 as stuck detection threshold (changing to 2)
+
+Two mermaid diagrams provide visual architecture documentation:
+1. Pipeline flow: specify → homer loop → plan → tasks → lisa loop → ralph loop, each spawning subagents
+2. Loop lifecycle: orchestrator → spawn subagent → check completion/stuck → next or exit
+
+**Alternatives considered**:
+- ASCII art → Rejected: harder to maintain, renders poorly on GitHub
+- External diagram tool → Rejected: adds binary artifacts
+
 ## Files Requiring Changes
 
 ### Must Modify (implementation required)
 
 | File | Change | FR |
 |---|---|---|
-| `pipeline.sh` + `.specify/scripts/bash/pipeline.sh` | Remove `--quality-gates` CLI arg parsing, remove env var resolution, simplify `resolve_quality_gates()` to file-only | FR-004, FR-005, FR-006, FR-007 |
-| `ralph-loop.sh` + `.specify/scripts/bash/ralph-loop.sh` | Remove CLI arg `$3` parsing, remove env var resolution, simplify `resolve_quality_gates()` to file-only | FR-004, FR-006, FR-007 |
-| `speckit.pipeline.md` + `.claude/commands/speckit.pipeline.md` | Remove CLI/env override text in Ralph section, add quality gate file validation | FR-004, FR-008, FR-011 |
-| `speckit.ralph.implement.md` + `.claude/commands/speckit.ralph.implement.md` | Add quality gate file validation step | FR-011 |
+| `pipeline.sh` + `.specify/scripts/bash/pipeline.sh` | Remove `--quality-gates` CLI arg, remove env var, simplify `resolve_quality_gates()`, update homer/lisa defaults to 30, stuck detection to 2 | FR-004–FR-007, FR-012, FR-014 |
+| `ralph-loop.sh` + `.specify/scripts/bash/ralph-loop.sh` | Remove CLI arg `$3`, remove env var, simplify `resolve_quality_gates()`, update default to 30, stuck detection to 2 | FR-004, FR-006, FR-007, FR-013, FR-014 |
+| `homer-loop.sh` + `.specify/scripts/bash/homer-loop.sh` | Update default iterations 20→30, stuck detection 3→2 | FR-012, FR-014 |
+| `lisa-loop.sh` + `.specify/scripts/bash/lisa-loop.sh` | Update default iterations 20→30, stuck detection 3→2 | FR-012, FR-014 |
+| `speckit.pipeline.md` + `.claude/commands/speckit.pipeline.md` | Remove CLI/env override text, add QG file validation, update iteration defaults to 30, stuck detection to 2 | FR-004, FR-008, FR-011, FR-012, FR-014 |
+| `speckit.homer.clarify.md` + `.claude/commands/speckit.homer.clarify.md` | Update default iterations to 30, stuck detection to 2 | FR-012, FR-014 |
+| `speckit.lisa.analyze.md` + `.claude/commands/speckit.lisa.analyze.md` | Update default iterations to 30, stuck detection to 2 | FR-012, FR-014 |
+| `speckit.ralph.implement.md` + `.claude/commands/speckit.ralph.implement.md` | Add QG file validation, stuck detection to 2 | FR-011, FR-014 |
+| `README.md` | Remove `--quality-gates`/`QUALITY_GATES` refs, update defaults to 30, stuck detection to 2, add Architecture section with mermaid diagrams | FR-015–FR-019 |
 
 ### Read-Only (no changes needed)
 
 | File | Reason |
 |---|---|
-| `speckit.homer.clarify.md` / `.claude/commands/speckit.homer.clarify.md` | Already uses Agent tool correctly; no quality gate references |
-| `speckit.lisa.analyze.md` / `.claude/commands/speckit.lisa.analyze.md` | Already uses Agent tool correctly; no quality gate references |
 | `.claude/agents/homer.md`, `lisa.md`, `ralph.md` | Agent files define single-iteration behavior; no changes needed |
-| `homer-loop.sh`, `lisa-loop.sh` | Already use `claude --agent`; no quality gate references |
+| `.specify/quality-gates.sh` | Quality gate content unchanged |

@@ -2,7 +2,13 @@
 
 ## Overview
 
-This feature makes two changes: (1) removes CLI/env quality gate override mechanisms so `.specify/quality-gates.sh` is the sole source, and (2) adds quality gate file validation to command files. No structural changes to subagent spawning are needed — command files already describe Agent tool spawning correctly.
+This feature makes four changes:
+1. Removes CLI/env quality gate override mechanisms so `.specify/quality-gates.sh` is the sole source
+2. Adds quality gate file validation to command files (empty-file edge case)
+3. Standardizes iteration defaults to 30 and stuck detection to 2 across all invocation paths
+4. Updates README with architecture diagrams and corrected configuration tables
+
+No structural changes to subagent spawning are needed — command files already describe Agent tool spawning correctly.
 
 ## Implementation Order
 
@@ -14,13 +20,33 @@ This feature makes two changes: (1) removes CLI/env quality gate override mechan
 2. **`ralph-loop.sh`**: Remove `QUALITY_GATES_CLI_ARG="${3:-}"`, simplify `resolve_quality_gates()` to check only the file, remove source-dependent prompt formatting
 3. Apply identical changes to both root-level and `.specify/scripts/bash/` copies
 
-### Phase 2: Quality Gate Text in Command Files
+### Phase 2: Iteration Defaults and Stuck Detection in Bash Scripts
 
-**Files**: `speckit.pipeline.md` (+ `.claude/commands/speckit.pipeline.md`), `speckit.ralph.implement.md` (+ `.claude/commands/speckit.ralph.implement.md`)
+**Files**: `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh` (all + `.specify/scripts/bash/` copies)
 
-1. **`speckit.pipeline.md`**: Update Ralph IMPORTANT note to remove CLI/env override text, add quality gate file validation instruction
-2. **`speckit.ralph.implement.md`**: Add quality gate file validation step before execution
-3. Apply identical changes to both root-level and `.claude/commands/` copies
+1. **`homer-loop.sh`**: Change `MAX_ITERATIONS="${2:-20}"` to `MAX_ITERATIONS="${2:-30}"`, change `MAX_CONSECUTIVE_FAILURES=3` to `MAX_CONSECUTIVE_FAILURES=2`
+2. **`lisa-loop.sh`**: Same changes as homer
+3. **`ralph-loop.sh`**: Change `MAX_ITERATIONS="${2:-5}"` to `MAX_ITERATIONS="${2:-30}"`, change stuck threshold to 2
+4. **`pipeline.sh`**: Update any hardcoded iteration defaults and stuck detection thresholds to match
+
+### Phase 3: Quality Gate Text and Defaults in Command Files
+
+**Files**: `speckit.pipeline.md`, `speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md` (all + `.claude/commands/` copies)
+
+1. **`speckit.pipeline.md`**: Update Ralph IMPORTANT note to remove CLI/env override text, add quality gate file validation instruction, update iteration defaults to 30, stuck detection to 2
+2. **`speckit.homer.clarify.md`**: Update default iterations to 30, stuck detection to 2
+3. **`speckit.lisa.analyze.md`**: Update default iterations to 30, stuck detection to 2
+4. **`speckit.ralph.implement.md`**: Add quality gate file validation step, update stuck detection to 2
+
+### Phase 4: README Updates
+
+**File**: `README.md`
+
+1. Remove all references to `--quality-gates` CLI flag and `QUALITY_GATES` environment variable
+2. Update iteration defaults: homer/lisa → 30, ralph bash → 30
+3. Update stuck detection: "two consecutive iterations" (not three)
+4. Add new "Architecture" section with two mermaid diagrams
+5. Consolidate "Quality gates" section to document file-only source
 
 ## Key Patterns
 
@@ -63,4 +89,12 @@ If the file is missing or the check returns empty, abort with: "Quality gates fi
 - [ ] `grep -r 'QUALITY_GATES_SOURCE' pipeline.sh ralph-loop.sh` returns empty
 - [ ] `speckit.pipeline.md` Ralph section mentions only `.specify/quality-gates.sh`
 - [ ] `speckit.ralph.implement.md` includes file validation step
+- [ ] Homer/lisa bash scripts default to 30 iterations
+- [ ] Ralph bash script defaults to 30 iterations
+- [ ] Homer/lisa command files default to 30 iterations
+- [ ] All stuck detection thresholds are 2
+- [ ] README has no `--quality-gates` or `QUALITY_GATES` references
+- [ ] README shows 30 for homer/lisa defaults
+- [ ] README shows "two consecutive iterations" for stuck detection
+- [ ] README has "Architecture" section with two mermaid diagrams
 - [ ] All root-level files match their `.specify/scripts/bash/` or `.claude/commands/` counterparts

@@ -1,23 +1,23 @@
 # Implementation Plan: Fix Subagent Delegation and Quality Gate Consolidation
 
-**Branch**: `005-fix-subagent-quality-gates` | **Date**: 2026-03-10 | **Spec**: `specs/005-fix-subagent-quality-gates/spec.md`
-**Input**: Feature specification from `specs/005-fix-subagent-quality-gates/spec.md`
+**Branch**: `005-fix-subagent-quality-gates` | **Date**: 2026-03-10 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/specs/005-fix-subagent-quality-gates/spec.md`
 
 ## Summary
 
-Fix two related issues: (1) pipeline and loop command files do not spawn fresh-context subagents via the Agent tool — they describe the behavior but execute inline, causing context accumulation and hallucination drift; (2) quality gate resolution uses a 3-tier precedence (CLI arg > env var > file) when the file should be the sole source. The fix updates 4 command files to use the Agent tool for subagent spawning, simplifies `resolve_quality_gates()` in 2 bash scripts to read only from `.specify/quality-gates.sh`, and removes CLI/env override mechanisms.
+Consolidate quality gate resolution to use `.specify/quality-gates.sh` exclusively (removing CLI arg and env var overrides), ensure all pipeline steps and loop iterations spawn fresh-context subagents via the Agent tool (command files only — bash script fallbacks are deleted), reorganize source directories (`agents/` → `claude-agents/`, root-level `speckit.*.md` → `speckit-commands/`), standardize iteration defaults to 30 and stuck detection to 2 consecutive iterations in command files, and update the README to reflect these changes with architecture diagrams.
 
 ## Technical Context
 
 **Language/Version**: Bash 4+ (shell scripts), Markdown (Claude Code command/agent files)
 **Primary Dependencies**: Claude CLI (`claude` command), Claude Code Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `bash`)
 **Storage**: Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration
-**Testing**: Manual verification via pipeline/loop execution; no automated test framework for markdown command files; bash script changes verified by running the scripts
-**Target Platform**: macOS/Linux (developer workstation with Claude Code CLI installed)
+**Testing**: Manual verification (no test framework — shell scripts and markdown files validated by shellcheck and runtime behavior)
+**Target Platform**: macOS / Linux (developer workstations)
 **Project Type**: CLI tooling / developer workflow automation
-**Performance Goals**: N/A — developer tool, no latency or throughput requirements
-**Constraints**: Command files are interpreted by Claude Code LLM, not executed directly; changes must preserve backward compatibility with existing feature specs
-**Scale/Scope**: 4 command files, 2 bash scripts, ~15 targeted edits
+**Performance Goals**: N/A (interactive developer tool, not latency-sensitive)
+**Constraints**: Must work within Claude Code Agent tool capabilities; subagent prompts limited by Claude context window
+**Scale/Scope**: ~15 files affected — 4 command files modified, 4 bash scripts deleted (root + `.specify/scripts/bash/`), source directories reorganized (`agents/` → `claude-agents/`, root-level `speckit.*.md` → `speckit-commands/`), `setup.sh` updated, 1 README updated
 
 ## Constitution Check
 
@@ -25,13 +25,17 @@ Fix two related issues: (1) pipeline and loop command files do not spawn fresh-c
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Readability First | PASS | Changes simplify code by removing override precedence logic; clearer intent |
-| II. Functional Design | PASS | Orchestrators take inputs (feature dir) and produce deterministic outputs (subagent calls); no hidden side effects |
-| III. Maintainability Over Cleverness | PASS | Removing complexity (3-tier resolution) improves maintainability |
-| IV. Best Practices | PASS | Using Agent tool as designed; following established `claude --agent` pattern in bash |
-| V. Simplicity (KISS & YAGNI) | PASS | Removing unused override mechanisms aligns directly with YAGNI |
-| Test-First Development | JUSTIFIED | Markdown command files are LLM instruction documents, not executable code — traditional unit tests do not apply. Bash script changes are to configuration resolution logic verified by running the pipeline. See Complexity Tracking. |
-| Quality Gates | PASS | No linting/type-checking applies to markdown/bash in this project |
+| I. Readability First | PASS | Removing bash script fallbacks and consolidating quality gate resolution (3-tier → 1-tier) simplifies the codebase |
+| II. Functional Design | PASS | Quality gate validation in command files is a deterministic check. No hidden side effects from env vars or CLI args |
+| III. Maintainability Over Cleverness | PASS | Deleting 8 duplicate bash script files eliminates maintenance drift risk entirely |
+| IV. Best Practices | PASS | Source directory reorganization follows clear naming conventions (`claude-agents/`, `speckit-commands/`) |
+| V. Simplicity (KISS & YAGNI) | PASS | Eliminating bash script fallback path — single invocation method (command files) reduces complexity |
+| Test-First Development | N/A | No test framework in project; validation is shellcheck + manual runtime verification |
+| Dev Server Verification | N/A | No web UI or API — CLI tooling only |
+| Process Cleanup | PASS | No new processes introduced; subagent lifecycle managed by Claude Code |
+| Quality Gates | PASS | shellcheck remains the quality gate via `.specify/quality-gates.sh` |
+
+**Gate Result**: PASS — no violations requiring justification.
 
 ## Project Structure
 
@@ -39,42 +43,77 @@ Fix two related issues: (1) pipeline and loop command files do not spawn fresh-c
 
 ```text
 specs/005-fix-subagent-quality-gates/
-├── spec.md              # Feature specification
 ├── plan.md              # This file
-├── research.md          # Phase 0: codebase analysis and design decisions
-├── data-model.md        # Phase 1: entity relationships and file contracts
-├── quickstart.md        # Phase 1: implementation guide
+├── research.md          # Phase 0 output
+├── data-model.md        # Phase 1 output
+├── quickstart.md        # Phase 1 output (verification guide)
 └── tasks.md             # Phase 2 output (/speckit.tasks command)
 ```
 
-### Source Code (repository root)
+### Source Code — Current State (before implementation)
 
 ```text
-.claude/
-├── commands/
-│   ├── speckit.pipeline.md          # Pipeline orchestrator (modify: add Agent tool spawning)
-│   ├── speckit.homer.clarify.md     # Homer loop orchestrator (verify: already uses Agent tool)
-│   ├── speckit.lisa.analyze.md      # Lisa loop orchestrator (verify: already uses Agent tool)
-│   └── speckit.ralph.implement.md   # Ralph loop orchestrator (modify: add quality gate validation)
-└── agents/
-    ├── homer.md                     # Homer single-iteration agent (read-only reference)
-    ├── lisa.md                       # Lisa single-iteration agent (read-only reference)
-    └── ralph.md                      # Ralph single-iteration agent (read-only reference)
+# Root-level source files (CURRENT)
+agents/                              # Agent source files (rename to claude-agents/)
+├── homer.md, lisa.md, ralph.md, plan.md, tasks.md, specify.md
+speckit.pipeline.md                  # Command source files (move to speckit-commands/)
+speckit.homer.clarify.md
+speckit.lisa.analyze.md
+speckit.ralph.implement.md
+pipeline.sh                          # Bash script fallbacks (DELETE per FR-005)
+homer-loop.sh                        # (DELETE per FR-005)
+lisa-loop.sh                         # (DELETE per FR-005)
+ralph-loop.sh                        # (DELETE per FR-005)
+setup.sh                             # Installer (modify to use new source dirs)
+README.md                            # Project documentation (modify)
 
-.specify/
-├── scripts/bash/
-│   ├── pipeline.sh                  # Bash pipeline orchestrator (modify: remove CLI/env quality gate resolution)
-│   ├── ralph-loop.sh                # Ralph bash loop (modify: remove CLI/env quality gate resolution)
-│   ├── homer-loop.sh                # Homer bash loop (read-only: already uses claude --agent)
-│   ├── lisa-loop.sh                 # Lisa bash loop (read-only: already uses claude --agent)
-│   └── common.sh                    # Shared utilities (may need resolve_quality_gates update)
-└── quality-gates.sh                 # Single source of truth for quality gates
+# Installed locations (managed by setup.sh)
+.claude/commands/                    # Installed command files (from speckit-commands/)
+.claude/agents/                      # Installed agent files (from claude-agents/)
+.specify/scripts/bash/               # Installed bash scripts (DELETE installed copies too)
 ```
 
-**Structure Decision**: No new files or directories created. All changes are edits to existing command files (`.claude/commands/`) and bash scripts (`.specify/scripts/bash/`). The project structure remains unchanged.
+### Source Code — Target State (after implementation)
 
-## Complexity Tracking
+```text
+# Root-level source files (TARGET)
+claude-agents/                       # Renamed from agents/ (FR-006)
+├── homer.md, lisa.md, ralph.md, plan.md, tasks.md, specify.md
+speckit-commands/                    # New directory for command source files (FR-006)
+├── speckit.pipeline.md              # Pipeline orchestrator (modify)
+├── speckit.homer.clarify.md         # Homer loop orchestrator (modify)
+├── speckit.lisa.analyze.md          # Lisa loop orchestrator (modify)
+├── speckit.ralph.implement.md       # Ralph loop orchestrator (modify)
+setup.sh                             # Updated to install from new source dirs
+README.md                            # Updated with architecture diagrams
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Test-First for markdown command files | Command files are natural-language instructions interpreted by an LLM — they cannot be unit tested with a test framework | Verification is done by running the pipeline/loops and confirming subagent spawning behavior in the Claude Code UI |
+# Installed locations (managed by setup.sh)
+.claude/commands/                    # Installed from speckit-commands/
+.claude/agents/                      # Installed from claude-agents/
+.specify/quality-gates.sh            # Quality gate commands (no change)
+```
+
+**Structure Decision**: Source directories are reorganized per FR-006 (`agents/` → `claude-agents/`, root-level `speckit.*.md` → `speckit-commands/`). Bash script fallbacks are deleted per FR-005 (both root-level and `.specify/scripts/bash/` copies). `setup.sh` is updated to install from the new source locations. The sole invocation path is Claude Code command files.
+
+**File flow** (source → installed):
+
+| Source location | Installed location | Action |
+|---|---|---|
+| `claude-agents/*.md` | `.claude/agents/*.md` | `setup.sh` copies (renamed from `agents/`) |
+| `speckit-commands/speckit.*.md` | `.claude/commands/speckit.*.md` | `setup.sh` copies (moved from root) |
+| `pipeline.sh` (root) | `.specify/scripts/bash/pipeline.sh` | **DELETE both** (FR-005) |
+| `homer-loop.sh` (root) | `.specify/scripts/bash/homer-loop.sh` | **DELETE both** (FR-005) |
+| `lisa-loop.sh` (root) | `.specify/scripts/bash/lisa-loop.sh` | **DELETE both** (FR-005) |
+| `ralph-loop.sh` (root) | `.specify/scripts/bash/ralph-loop.sh` | **DELETE both** (FR-005) |
+
+## Post-Design Constitution Re-Check
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. Readability First | PASS | Fewer files, clearer directory naming, single invocation path |
+| II. Functional Design | PASS | Quality gate validation is a deterministic bash check with no external inputs |
+| III. Maintainability Over Cleverness | PASS | Deleting bash scripts eliminates 8 duplicate files and maintenance drift risk |
+| IV. Best Practices | PASS | Source directory names (`claude-agents/`, `speckit-commands/`) clearly describe their contents; mermaid for diagrams |
+| V. Simplicity (KISS & YAGNI) | PASS | Net file reduction — deleting bash fallback path, consolidating source directories |
+
+**Post-Design Gate Result**: PASS — design reduces complexity by removing dead-weight invocation paths.
