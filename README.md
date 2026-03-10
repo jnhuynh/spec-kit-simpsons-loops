@@ -1,4 +1,4 @@
-# 🍩 Simpsons Loops for Speckit + Claude Code
+# Simpsons Loops for Speckit + Claude Code
 
 Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
@@ -6,21 +6,69 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 
 | Loop | What it does |
 | --- | --- |
-| 🍩 **Homer** | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain. |
-| 🎷 **Lisa** | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain. |
-| 🖍️ **Ralph** | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates, commits, and repeats until all tasks are done. |
-| 🏭 **Pipeline** | End-to-end orchestrator: homer → plan → tasks → lisa → ralph. Auto-detects where to start based on existing artifacts. |
+| Homer | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain. |
+| Lisa | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain. |
+| Ralph | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done. |
+| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph. Auto-detects where to start based on existing artifacts. |
 
 > **Note on permissions**
-> When using the recommended workflow (slash commands with sub agents), the loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. When using the bash script fallback, `--dangerously-skip-permissions` is passed to `claude --agent`. In both cases, review the agent files and understand what each loop does before running them.
+> The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
 
-## 💡 Recommended workflow
+## Architecture
+
+### Pipeline flow
+
+The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each step and each loop iteration. Steps execute strictly in sequence — each sub agent must complete before the next is spawned.
+
+```mermaid
+flowchart TD
+    A["/speckit.pipeline"] --> B{Auto-detect\nstarting step}
+    B --> C["Specify\n(sub agent)"]
+    C --> D["Homer Loop"]
+    D --> D1["Iteration 1\n(sub agent)"]
+    D1 --> D2["Iteration 2\n(sub agent)"]
+    D2 --> D3["... until resolved\nor max iterations"]
+    D3 --> E["Plan\n(sub agent)"]
+    E --> F["Tasks\n(sub agent)"]
+    F --> G["Lisa Loop"]
+    G --> G1["Iteration 1\n(sub agent)"]
+    G1 --> G2["Iteration 2\n(sub agent)"]
+    G2 --> G3["... until resolved\nor max iterations"]
+    G3 --> H["Ralph Loop"]
+    H --> H1["Iteration 1\n(sub agent)"]
+    H1 --> H2["Iteration 2\n(sub agent)"]
+    H2 --> H3["... until all tasks\ncomplete or max iterations"]
+    H3 --> I["Report Results"]
+```
+
+### Standalone loop iteration lifecycle
+
+Each standalone loop command (`/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`) follows the same iteration lifecycle.
+
+```mermaid
+flowchart TD
+    A["Loop Orchestrator"] --> B["Spawn Sub Agent\n(fresh context)"]
+    B --> C["Sub Agent Executes\n(one iteration)"]
+    C --> D{Check completion\npromise tag?}
+    D -->|"Found"| E["Report Success\nExit Loop"]
+    D -->|"Not Found"| F{File changes\nsince last iteration?}
+    F -->|"Yes"| G["Reset stuck counter\nNext iteration"]
+    F -->|"No"| H{Stuck counter\n>= 2?}
+    H -->|"No"| I["Increment stuck counter\nNext iteration"]
+    H -->|"Yes"| J["Abort: Stuck detected\n2 consecutive iterations\nwith no changes"]
+    G --> K{Max iterations\nreached?}
+    I --> K
+    K -->|"No"| B
+    K -->|"Yes"| L["Report: Max iterations reached"]
+```
+
+## Recommended workflow
 
 Before kicking off the pipeline or any loop, refine your specs manually. Run `/speckit.specify` to draft the initial spec, then use `/speckit.clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
 
 You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
-## 🔑 API key vs. Claude subscription
+## API key vs. Claude subscription
 
 If `ANTHROPIC_API_KEY` is set, every iteration will consume API credits from that key. To use your **Claude subscription** (Pro/Max) instead:
 
@@ -28,15 +76,15 @@ If `ANTHROPIC_API_KEY` is set, every iteration will consume API credits from tha
 unset ANTHROPIC_API_KEY
 ```
 
-## ✅ Prerequisites
+## Prerequisites
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed
 - Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
 
-## 🛠️ Setup
+## Setup
 
-### 🤖 Option A: Automated (recommended)
+### Option A: Automated (recommended)
 
 From the root of your target project:
 
@@ -44,9 +92,9 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This copies all files (bash loop scripts, pipeline, agent definitions, and loop commands), makes scripts executable, appends `.gitignore` entries, and updates `.claude/settings.local.json` permissions. Requires `jq` for the permissions step (you'll get manual instructions if it's missing).
+This copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
-### 📝 Option B: Manual
+### Option B: Manual
 
 <details>
 <summary>Click to expand manual steps</summary>
@@ -56,36 +104,22 @@ This copies all files (bash loop scripts, pipeline, agent definitions, and loop 
 From the root of your project:
 
 ```bash
-# Bash loop scripts (manual fallback) → .specify/scripts/bash/
-cp <path-to-simpsons-loops>/ralph-loop.sh   .specify/scripts/bash/ralph-loop.sh
-cp <path-to-simpsons-loops>/lisa-loop.sh     .specify/scripts/bash/lisa-loop.sh
-cp <path-to-simpsons-loops>/homer-loop.sh    .specify/scripts/bash/homer-loop.sh
-cp <path-to-simpsons-loops>/pipeline.sh      .specify/scripts/bash/pipeline.sh
+# Agent definitions -> .claude/agents/
+cp <path-to-simpsons-loops>/claude-agents/homer.md  .claude/agents/homer.md
+cp <path-to-simpsons-loops>/claude-agents/lisa.md   .claude/agents/lisa.md
+cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
+cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
+cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
+cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
 
-# Agent definitions → .claude/agents/
-cp <path-to-simpsons-loops>/agents/homer.md  .claude/agents/homer.md
-cp <path-to-simpsons-loops>/agents/lisa.md   .claude/agents/lisa.md
-cp <path-to-simpsons-loops>/agents/ralph.md  .claude/agents/ralph.md
-cp <path-to-simpsons-loops>/agents/plan.md   .claude/agents/plan.md
-cp <path-to-simpsons-loops>/agents/tasks.md  .claude/agents/tasks.md
-
-# Loop commands → .claude/commands/
-cp <path-to-simpsons-loops>/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
-cp <path-to-simpsons-loops>/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
-cp <path-to-simpsons-loops>/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
-cp <path-to-simpsons-loops>/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
+# Loop commands -> .claude/commands/
+cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
 ```
 
-#### 2. Make scripts executable
-
-```bash
-chmod +x .specify/scripts/bash/ralph-loop.sh
-chmod +x .specify/scripts/bash/lisa-loop.sh
-chmod +x .specify/scripts/bash/homer-loop.sh
-chmod +x .specify/scripts/bash/pipeline.sh
-```
-
-#### 3. Update `.gitignore`
+#### 2. Update `.gitignore`
 
 ```gitignore
 # Simpsons loops - generated at runtime
@@ -107,30 +141,30 @@ chmod +x .specify/scripts/bash/pipeline.sh
 .specify/logs/          # All log files
 ```
 
-#### 4. Allow bash loop scripts in Claude Code permissions
+#### 3. Create quality gates file
 
-Add to `.claude/settings.local.json`:
+Create `.specify/quality-gates.sh` with your project's quality gate commands:
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(.specify/scripts/bash/ralph-loop.sh*)",
-      "Bash(.specify/scripts/bash/lisa-loop.sh*)",
-      "Bash(.specify/scripts/bash/homer-loop.sh*)",
-      "Bash(.specify/scripts/bash/pipeline.sh*)"
-    ]
-  }
-}
+```bash
+# Example for a Node.js project:
+npm test && npm run lint
+
+# Example for a Python project:
+pytest && ruff check .
+
+# Example for a shell script project:
+shellcheck *.sh
 ```
+
+The file must exit 0 for quality gates to pass. This file is required for the Ralph loop to validate implementation work.
 
 </details>
 
-## 🚀 Usage (Recommended: Slash Commands)
+## Usage
 
 Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
 
-### 🍩 Homer (clarification)
+### Homer (clarification)
 
 After running `/speckit.specify` to create `spec.md`:
 
@@ -138,7 +172,9 @@ After running `/speckit.specify` to create `spec.md`:
 /speckit.homer.clarify
 ```
 
-### 🎷 Lisa (analysis)
+Homer only requires `spec.md` to exist — it does not need `plan.md` or `tasks.md`. This means you can run Homer immediately after creating your spec.
+
+### Lisa (analysis)
 
 Once you have `spec.md`, `plan.md`, and `tasks.md`:
 
@@ -146,7 +182,7 @@ Once you have `spec.md`, `plan.md`, and `tasks.md`:
 /speckit.lisa.analyze
 ```
 
-### 🖍️ Ralph (implementation)
+### Ralph (implementation)
 
 Once you have `tasks.md` from `/speckit.tasks`:
 
@@ -154,7 +190,9 @@ Once you have `tasks.md` from `/speckit.tasks`:
 /speckit.ralph.implement
 ```
 
-### 🏭 Pipeline (end-to-end)
+Ralph validates that `.specify/quality-gates.sh` exists and contains executable content before starting. If the file is missing or empty, Ralph aborts with a clear error.
+
+### Pipeline (end-to-end)
 
 After creating a spec with `/speckit.specify`, run the full pipeline:
 
@@ -190,70 +228,45 @@ Pick a letter and press Enter (or just Enter for the full pipeline). This works 
 
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
-- `tasks.md` with some tasks completed → **ralph**
-- `tasks.md` with no tasks started → **lisa**
-- `plan.md` exists → **tasks**
-- `spec.md` exists → **homer**
+- `tasks.md` with some tasks completed -> **ralph**
+- `tasks.md` with no tasks started -> **lisa**
+- `plan.md` exists -> **tasks**
+- `spec.md` exists -> **homer**
 
 **Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
 
-## 🔧 Manual Fallback: Bash Scripts
-
-The bash scripts provide a standalone alternative that runs outside of Claude Code. They spawn `claude --agent` CLI processes and can be used with any coding agent that supports the same interface.
-
-### Running individual loops
-
-```bash
-# Homer
-.specify/scripts/bash/homer-loop.sh <FEATURE_DIR> 20
-
-# Lisa
-.specify/scripts/bash/lisa-loop.sh <FEATURE_DIR> 20
-
-# Ralph
-.specify/scripts/bash/ralph-loop.sh <FEATURE_DIR> 20
-
-# Pipeline (end-to-end)
-.specify/scripts/bash/pipeline.sh specs/a1b2-feat-user-auth
-```
-
-### Pipeline options (bash)
-
-| Flag                    | Description                                              | Default      |
-| ----------------------- | -------------------------------------------------------- | ------------ |
-| `--from <step>`         | Resume from a specific step (homer/plan/tasks/lisa/ralph) | auto-detect |
-| `--homer-max <n>`       | Max homer loop iterations                                | 20           |
-| `--lisa-max <n>`        | Max lisa loop iterations                                 | 20           |
-| `--ralph-max <n>`       | Max ralph loop iterations                                | 20           |
-| `--quality-gates <cmd>` | Quality gates command for Ralph                          | placeholder  |
-| `--model <model>`       | Claude model to use                                      | opus         |
-| `--dry-run`             | Show what would run without executing                    | —            |
-
-## ⚙️ How the loops work
+## How the loops work
 
 **Completion detection** — Each loop looks for promise tags in the output:
 
 - Homer / Lisa: `<promise>ALL_FINDINGS_RESOLVED</promise>`
 - Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
 
-**Stuck detection** — If three consecutive iterations produce identical output, the loop aborts to avoid infinite cycling.
+**Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling.
 
 **Logging** — All iterations are logged to `.specify/logs/` with timestamps (e.g. `ralph-20260218-130522.log`).
 
-## 🎨 Customization
+## Customization
 
 ### Quality gates (Ralph)
 
-This project uses [shellcheck](https://www.shellcheck.net/) as its quality gate — the only meaningful automated check for a bash + markdown codebase:
+Quality gates are defined in a single file: `.specify/quality-gates.sh`. This is the sole source of quality gate configuration — there are no CLI arguments or environment variable overrides.
+
+Ralph validates this file before starting:
+- The file must exist at `.specify/quality-gates.sh`
+- The file must contain at least one non-comment, non-whitespace line
+- The file must exit 0 for quality gates to pass
+
+Example for a shell script project:
 
 ```bash
-shellcheck *.sh .specify/scripts/bash/*.sh openclaw/*.sh openclaw/claude-runner/*.sh
+shellcheck *.sh
 ```
 
-When running via the pipeline, you can override with the `QUALITY_GATES` environment variable:
+Example for a Node.js project:
 
 ```bash
-QUALITY_GATES="shellcheck *.sh .specify/scripts/bash/*.sh" .specify/scripts/bash/pipeline.sh
+npm test && npm run lint
 ```
 
 ### Dogfooding
@@ -262,14 +275,14 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 
 ### Max iterations
 
-| Loop  | Standalone default          | Pipeline default |
-| ----- | --------------------------- | ---------------- |
-| Homer | 20                          | 20               |
-| Lisa  | 20                          | 20               |
-| Ralph | incomplete tasks + 10       | 20               |
+| Loop  | Default                     |
+| ----- | --------------------------- |
+| Homer | 30                          |
+| Lisa  | 30                          |
+| Ralph | incomplete tasks + 10       |
 
-Override with `--homer-max`, `--lisa-max`, `--ralph-max` flags (pipeline) or by editing the generated bash command (standalone).
+All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
 
-## 📚 References
+## References
 
 - [Speckit Ralph Loop: Fresh Context AI Development](https://dominic-boettger.com/blog/speckit-ralph-loop-fresh-context-ai-development/)
