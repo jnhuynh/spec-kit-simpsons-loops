@@ -13,6 +13,18 @@
 - Q: Does this unify the execution logic so `/speckit.pipeline` and individual loop commands share the same code path? → A: Yes. `pipeline.sh` already calls `homer-loop.sh`, `lisa-loop.sh`, and `ralph-loop.sh` internally. After this fix, both `/speckit.pipeline` (via pipeline.sh) and `/speckit.homer.clarify` (directly) invoke the same `homer-loop.sh` — one unified execution path, no divergent implementations.
 - Q: What orchestration architecture should be used? → A: Hybrid — Claude Code session orchestrates at the step level via Agent tool sub-agents, but each sub-agent runs its corresponding bash script via Bash tool. Bash scripts handle loop iteration, stuck detection, and quality gates deterministically. Claude Code handles step sequencing and sub-agent lifecycle.
 - Q: What are the precise line-count limits for rewritten command files? → A: Standalone loop commands (homer, lisa, ralph) must not exceed 40 lines. The pipeline command must not exceed 60 lines. These are hard upper bounds replacing the previous vague "approximately 30" and "~50" targets.
+- Q: What is explicitly out of scope for this fix? → A: Modifications to the bash scripts themselves, changes to agent files, adding new pipeline phases, and changes to supporting infrastructure scripts.
+
+## Out of Scope
+
+The following are explicitly excluded from this fix:
+
+- **Bash orchestrator scripts**: No modifications to `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, or `ralph-loop.sh`. These are assumed to be functionally correct.
+- **Agent definition files**: No modifications to `homer.md`, `lisa.md`, or `ralph.md` agent files.
+- **New pipeline phases or steps**: No additions to the existing 6-phase pipeline sequence.
+- **Claude Code tooling infrastructure**: No changes to the Agent tool, Bash tool, or their underlying behavior.
+- **Supporting scripts**: No modifications to `check-prerequisites.sh` or other utility scripts under `.specify/scripts/`.
+- **Non-orchestrator slash commands**: Only the 4 orchestrator commands (pipeline, homer, lisa, ralph) are in scope. Other slash commands (e.g., `/speckit.specify`, `/speckit.plan`, `/speckit.tasks`) are not modified.
 
 ## User Scenarios & Testing *(mandatory)*
 
