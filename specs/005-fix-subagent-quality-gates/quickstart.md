@@ -2,39 +2,43 @@
 
 ## Overview
 
-This feature makes four changes:
-1. Removes CLI/env quality gate override mechanisms so `.specify/quality-gates.sh` is the sole source
-2. Adds quality gate file validation to command files (empty-file edge case)
-3. Standardizes iteration defaults to 30 and stuck detection to 2 across all invocation paths
-4. Updates README with architecture diagrams and corrected configuration tables
+This feature makes five changes:
+1. Deletes bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) — command files are the sole invocation path (FR-005)
+2. Reorganizes source directories: `agents/` → `claude-agents/`, root-level `speckit.*.md` → `speckit-commands/` (FR-006)
+3. Consolidates quality gates to `.specify/quality-gates.sh` as sole source, with validation in ralph-related command files only (FR-004, FR-007, FR-010)
+4. Standardizes iteration defaults to 30 (homer/lisa) and stuck detection to 2 in command files (FR-011, FR-013)
+5. Updates README with architecture diagrams, corrected configuration tables, and removed bash script docs (FR-014–FR-018)
 
 No structural changes to subagent spawning are needed — command files already describe Agent tool spawning correctly.
 
 ## Implementation Order
 
-### Phase 1: Quality Gate Consolidation in Bash Scripts
+### Phase 1: Delete Bash Script Fallbacks (FR-005)
 
-**Files**: `pipeline.sh` (+ `.specify/scripts/bash/pipeline.sh`), `ralph-loop.sh` (+ `.specify/scripts/bash/ralph-loop.sh`)
+**Delete these files**:
+- `pipeline.sh` (root)
+- `homer-loop.sh` (root)
+- `lisa-loop.sh` (root)
+- `ralph-loop.sh` (root)
 
-1. **`pipeline.sh`**: Remove `--quality-gates` from help text, remove `QUALITY_GATES_CLI_ARG` variable, remove `QUALITY_GATES_ENV` variable, remove the CLI arg case in argument parsing, simplify `resolve_quality_gates()` to check only the file, remove source-dependent ralph command construction
-2. **`ralph-loop.sh`**: Remove `QUALITY_GATES_CLI_ARG="${3:-}"`, simplify `resolve_quality_gates()` to check only the file, remove source-dependent prompt formatting
-3. Apply identical changes to both root-level and `.specify/scripts/bash/` copies
+**Update `setup.sh`** to:
+- Stop installing bash scripts to `.specify/scripts/bash/`
+- Remove previously-installed copies from `.specify/scripts/bash/` when run on existing installations
+- Remove corresponding permissions entries from `.claude/settings.local.json`
 
-### Phase 2: Iteration Defaults and Stuck Detection in Bash Scripts
+### Phase 2: Reorganize Source Directories (FR-006)
 
-**Files**: `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`, `pipeline.sh` (all + `.specify/scripts/bash/` copies)
-
-1. **`homer-loop.sh`**: Change `MAX_ITERATIONS="${2:-20}"` to `MAX_ITERATIONS="${2:-30}"`, change `MAX_CONSECUTIVE_FAILURES=3` to `MAX_CONSECUTIVE_FAILURES=2`
-2. **`lisa-loop.sh`**: Same changes as homer
-3. **`ralph-loop.sh`**: Change `MAX_ITERATIONS="${2:-5}"` to `MAX_ITERATIONS="${2:-30}"`, change stuck threshold to 2
-4. **`pipeline.sh`**: Update any hardcoded iteration defaults and stuck detection thresholds to match
+1. Rename `agents/` → `claude-agents/`
+2. Create `speckit-commands/` directory
+3. Move root-level `speckit.*.md` files into `speckit-commands/`
+4. Update `setup.sh` to install from `claude-agents/` → `.claude/agents/` and `speckit-commands/` → `.claude/commands/`
 
 ### Phase 3: Quality Gate Text and Defaults in Command Files
 
-**Files**: `speckit.pipeline.md`, `speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md` (all + `.claude/commands/` copies)
+**Files**: `speckit-commands/speckit.pipeline.md`, `speckit-commands/speckit.homer.clarify.md`, `speckit-commands/speckit.lisa.analyze.md`, `speckit-commands/speckit.ralph.implement.md`
 
-1. **`speckit.pipeline.md`**: Update Ralph IMPORTANT note to remove CLI/env override text, add quality gate file validation instruction, update iteration defaults to 30, stuck detection to 2
-2. **`speckit.homer.clarify.md`**: Update default iterations to 30, stuck detection to 2
+1. **`speckit.pipeline.md`**: Update Ralph section to remove CLI/env override text, add quality gate file validation instruction, update iteration defaults to 30, stuck detection to 2
+2. **`speckit.homer.clarify.md`**: Update default iterations to 30, stuck detection to 2, use `--json --paths-only` for prereqs
 3. **`speckit.lisa.analyze.md`**: Update default iterations to 30, stuck detection to 2
 4. **`speckit.ralph.implement.md`**: Add quality gate file validation step, update stuck detection to 2
 
@@ -42,39 +46,15 @@ No structural changes to subagent spawning are needed — command files already 
 
 **File**: `README.md`
 
-1. Remove all references to `--quality-gates` CLI flag and `QUALITY_GATES` environment variable
-2. Update iteration defaults: homer/lisa → 30, ralph bash → 30
+1. Remove all references to `--quality-gates` CLI flag, `QUALITY_GATES` environment variable, and bash script invocation
+2. Update iteration defaults: homer/lisa → 30, ralph → `incomplete_tasks + 10`
 3. Update stuck detection: "two consecutive iterations" (not three)
 4. Add new "Architecture" section with two mermaid diagrams
 5. Consolidate "Quality gates" section to document file-only source
 
 ## Key Patterns
 
-### Simplified resolve_quality_gates() pattern (bash)
-
-```bash
-resolve_quality_gates() {
-    local qg_file=".specify/quality-gates.sh"
-
-    if [[ ! -f "$qg_file" ]]; then
-        echo "Error: Quality gates file not found: $qg_file" >&2
-        echo "Create .specify/quality-gates.sh with your project's quality gate commands." >&2
-        exit 1
-    fi
-
-    local effective_content
-    effective_content=$(grep -v '^\s*#' "$qg_file" | grep -v '^\s*$' || true)
-    if [[ -z "$effective_content" ]]; then
-        echo "Error: Quality gate file exists but contains no executable commands." >&2
-        echo "Edit .specify/quality-gates.sh and add your project's quality gate commands." >&2
-        exit 1
-    fi
-
-    QUALITY_GATES="$qg_file"
-}
-```
-
-### Quality gate validation in command files
+### Quality gate validation in command files (ralph only)
 
 ```markdown
 Validate quality gates file exists and contains executable content:
@@ -84,17 +64,35 @@ If the file is missing or the check returns empty, abort with: "Quality gates fi
 
 ## Verification Checklist
 
-- [ ] `grep -r 'quality-gates' pipeline.sh` shows no `--quality-gates` flag references
-- [ ] `grep -r 'QUALITY_GATES_ENV\|QUALITY_GATES_CLI' pipeline.sh ralph-loop.sh` returns empty
-- [ ] `grep -r 'QUALITY_GATES_SOURCE' pipeline.sh ralph-loop.sh` returns empty
-- [ ] `speckit.pipeline.md` Ralph section mentions only `.specify/quality-gates.sh`
-- [ ] `speckit.ralph.implement.md` includes file validation step
-- [ ] Homer/lisa bash scripts default to 30 iterations
-- [ ] Ralph bash script defaults to 30 iterations
+### Bash Script Deletion (FR-005)
+
+- [ ] `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh` do not exist at root level
+- [ ] `.specify/scripts/bash/` does not contain loop scripts after `setup.sh` runs
+- [ ] `.claude/settings.local.json` does not contain permissions for deleted bash scripts after `setup.sh` runs
+
+### Source Directory Reorganization (FR-006)
+
+- [ ] `claude-agents/` directory exists with agent source files (renamed from `agents/`)
+- [ ] `speckit-commands/` directory exists with command source files (moved from root level)
+- [ ] Old `agents/` directory does not exist
+- [ ] No root-level `speckit.*.md` files exist outside `speckit-commands/`
+- [ ] `setup.sh` installs from `claude-agents/` → `.claude/agents/` and `speckit-commands/` → `.claude/commands/`
+
+### Quality Gates (FR-004, FR-007, FR-010)
+
+- [ ] `speckit-commands/speckit.pipeline.md` Ralph section mentions only `.specify/quality-gates.sh`
+- [ ] `speckit-commands/speckit.ralph.implement.md` includes file validation step
+- [ ] Homer and lisa command files do NOT reference quality gates
+
+### Iteration Defaults and Stuck Detection (FR-011, FR-013)
+
 - [ ] Homer/lisa command files default to 30 iterations
+- [ ] Ralph command file uses `incomplete_tasks + 10`
 - [ ] All stuck detection thresholds are 2
-- [ ] README has no `--quality-gates` or `QUALITY_GATES` references
+
+### README (FR-014–FR-018)
+
+- [ ] README has no `--quality-gates`, `QUALITY_GATES`, or bash script invocation references
 - [ ] README shows 30 for homer/lisa defaults
 - [ ] README shows "two consecutive iterations" for stuck detection
 - [ ] README has "Architecture" section with two mermaid diagrams
-- [ ] All root-level files match their `.specify/scripts/bash/` or `.claude/commands/` counterparts
