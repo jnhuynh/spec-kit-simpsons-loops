@@ -10,6 +10,28 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Pre-Flight Check
+
+Before doing anything else, verify that the required utility scripts are installed:
+
+1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
+2. If **MISSING**, display this error and **STOP** — do not proceed with any execution:
+
+```
+ERROR: Required utility script not found.
+
+Missing: .specify/scripts/bash/check-prerequisites.sh
+
+This script is required for feature directory resolution and prerequisite validation.
+To install it, run the SpecKit setup command:
+
+  /speckit.setup
+
+Or manually install from the openclaw repository.
+```
+
+3. If **EXISTS**, proceed to the Goal section below.
+
 ## Goal
 
 Orchestrate the Lisa loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that analyzes cross-artifact consistency, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
