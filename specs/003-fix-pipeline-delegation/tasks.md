@@ -49,8 +49,9 @@
 - [ ] T002 [US1] Add utility script existence check to `.claude/commands/speckit.pipeline.md` — verify `.specify/scripts/bash/check-prerequisites.sh` exists before execution, display actionable error with remediation instructions if missing (FR-002, FR-003)
 - [ ] T003 [US1] Update stuck detection in `.claude/commands/speckit.pipeline.md` from output-hash comparison (3-iteration threshold) to git diff-based detection (2-iteration threshold) per FR-007 — before each loop sub-agent, record `PRE_ITERATION_SHA=$(git rev-parse HEAD)`; after sub-agent returns, check `git diff $PRE_ITERATION_SHA --stat` for file changes and check output for completion promise tag; increment consecutive_stuck_count when no diff AND no promise tag; abort when count reaches 2
 - [ ] T004 [US1] Verify pipeline step sequencing in `.claude/commands/speckit.pipeline.md` — confirm the command orchestrates all 6 phases (specify -> homer -> plan -> tasks -> lisa -> ralph) via Agent tool sub-agents per FR-009, with loop phases using the same iteration pattern as standalone loop commands per FR-008
+- [ ] T004b [US1] Verify auto-detection of starting step in `.claude/commands/speckit.pipeline.md` — confirm the command implements the auto-detection logic from US1 Acceptance Scenario 2: if `tasks.md` exists with some `- [x]` completed tasks, start at ralph; if `tasks.md` exists with no completed tasks, start at lisa; if `plan.md` exists but no `tasks.md`, start at tasks; if `spec.md` exists but no `plan.md`, start at homer; if no `spec.md` but `--description` is provided, start at specify (FR-009, SC-001)
 
-**Checkpoint**: Pipeline command should orchestrate all 6 phases end-to-end.
+**Checkpoint**: Pipeline command should orchestrate all 6 phases end-to-end with correct auto-detection of starting step.
 
 ---
 
