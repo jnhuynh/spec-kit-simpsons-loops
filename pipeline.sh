@@ -319,6 +319,12 @@ resolve_feature_dir() {
     branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
     if [[ -z "$branch" || "$branch" == "main" || "$branch" == "HEAD" ]]; then
+        # When bootstrapping (specify step or description provided), allow empty
+        # FEATURE_DIR — the specify step will create the branch and directory.
+        if [[ "$FROM_STEP" == "specify" || -n "$DESCRIPTION" ]]; then
+            echo ""
+            return 0
+        fi
         echo -e "${RED}Error: Cannot auto-detect feature directory. Pass spec-dir as argument.${NC}" >&2
         return 1
     fi
@@ -338,6 +344,14 @@ resolve_feature_dir() {
     if [[ -d "$REPO_ROOT/specs/$branch" ]]; then
         echo "specs/$branch"
         return
+    fi
+
+    # Bootstrap fallback: when starting from specify or a description is provided,
+    # construct a prospective path using the full branch name. The directory does
+    # not need to exist yet — the specify step will create it.
+    if [[ "$FROM_STEP" == "specify" || -n "$DESCRIPTION" ]]; then
+        echo "specs/$branch"
+        return 0
     fi
 
     echo -e "${RED}Error: No spec directory found for branch '$branch'${NC}" >&2
@@ -504,6 +518,30 @@ if ! should_skip_step "specify" && ! past_stop_after "specify"; then
 
     STEP_END=$(date +%s)
     print_step_complete "Specify" "$((STEP_END - STEP_START))"
+
+    # Post-specify re-resolution: the specify step (via create-new-feature.sh)
+    # should have created the feature branch and directory. Re-resolve to get
+    # the now-valid FEATURE_DIR for downstream steps.
+    if [[ -z "$FEATURE_DIR" || ! -d "$REPO_ROOT/$FEATURE_DIR" ]]; then
+        if $DRY_RUN; then
+            echo -e "  ${CYAN}[dry-run] Would re-resolve feature directory after specify step${NC}"
+        else
+            echo -e "  ${DIM}Re-resolving feature directory after specify step...${NC}"
+            # Reset FROM_STEP/DESCRIPTION so resolve_feature_dir uses normal resolution
+            SAVED_FROM_STEP="$FROM_STEP"
+            FROM_STEP=""
+            DESCRIPTION=""
+            FEATURE_DIR=$(resolve_feature_dir) || {
+                echo -e "${RED}Error: Specify step completed but feature directory could not be resolved.${NC}" >&2
+                echo -e "${RED}The specify step may have created an unexpected branch name or failed to create the directory.${NC}" >&2
+                log "ERROR" "Post-specify re-resolution failed"
+                exit 1
+            }
+            FROM_STEP="$SAVED_FROM_STEP"
+            echo -e "  ${GREEN}Resolved feature directory: ${FEATURE_DIR}${NC}"
+            log "INFO" "Post-specify re-resolved feature dir: $FEATURE_DIR"
+        fi
+    fi
 fi
 
 # ─── Step 1: Homer Loop ───────────────────────────────────────────────────
