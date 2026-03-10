@@ -83,7 +83,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T012 [US3] Verify error messages in all 4 command files are actionable — each must explain that `.specify/scripts/bash/check-prerequisites.sh` is missing and instruct the user to run setup; confirm no partial execution occurs after the error (FR-003, SC-004). Files: `.claude/commands/speckit.pipeline.md`, `.claude/commands/speckit.homer.clarify.md`, `.claude/commands/speckit.lisa.analyze.md`, `.claude/commands/speckit.ralph.implement.md`
+- [x] T012 [US3] Verify error messages in all 4 command files are actionable — each must explain that `.specify/scripts/bash/check-prerequisites.sh` is missing and instruct the user to run setup; confirm no partial execution occurs after the error (FR-003, SC-004). Files: `.claude/commands/speckit.pipeline.md`, `.claude/commands/speckit.homer.clarify.md`, `.claude/commands/speckit.lisa.analyze.md`, `.claude/commands/speckit.ralph.implement.md`
 
 **Checkpoint**: Error messages are clear and actionable across all 4 commands.
 
