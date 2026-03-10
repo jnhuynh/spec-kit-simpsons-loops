@@ -42,22 +42,35 @@ Orchestrate the Homer loop directly within this Claude Code session. Each iterat
 
 ## Execution Steps
 
-### Step 1: Resolve Feature Directory
+### Step 1: Parse Arguments
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+- **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+
+**Parsing rules**:
+- A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
+- A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
+- If neither is provided, use defaults for both
+
+### Step 2: Resolve Feature Directory
+
+- If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
 - Otherwise, run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON output for `FEATURE_DIR`
 
-### Step 2: Verify Artifacts
+### Step 3: Verify Artifacts
 
 Confirm `spec.md` exists in `FEATURE_DIR`.
 
 If missing, abort with guidance: "Run /speckit.specify first"
 
-### Step 3: Configuration
+### Step 4: Configuration
 
-- Default max iterations: **10** (4 severity levels + buffer)
+- If `max-iterations` was parsed from `$ARGUMENTS`, use that value
+- Otherwise, default max iterations: **10** (4 severity levels + buffer)
 
-### Step 4: Run Homer Loop
+### Step 5: Run Homer Loop
 
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
@@ -80,9 +93,16 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn 
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
-### Step 5: Report Results
+### Step 6: Report Results
 
 After the loop completes, report:
 - Total iterations run
 - Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
+
+## Examples
+
+- `/speckit.homer.clarify` — Auto-detect spec dir from current branch, use default max iterations (10)
+- `/speckit.homer.clarify specs/003-fix-pipeline-delegation` — Run for specific spec dir
+- `/speckit.homer.clarify 5` — Auto-detect spec dir, limit to 5 iterations
+- `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
