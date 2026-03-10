@@ -37,10 +37,10 @@ No structural changes to subagent spawning are needed — command files already 
 
 **Files**: `speckit-commands/speckit.pipeline.md`, `speckit-commands/speckit.homer.clarify.md`, `speckit-commands/speckit.lisa.analyze.md`, `speckit-commands/speckit.ralph.implement.md`
 
-1. **`speckit.pipeline.md`**: Update Ralph section to remove CLI/env override text, add quality gate file validation instruction, update iteration defaults to 30, stuck detection to 2
-2. **`speckit.homer.clarify.md`**: Update default iterations to 30, stuck detection to 2, use `--json --paths-only` for prereqs
-3. **`speckit.lisa.analyze.md`**: Update default iterations to 30, stuck detection to 2
-4. **`speckit.ralph.implement.md`**: Add quality gate file validation step, update stuck detection to 2
+1. **`speckit.pipeline.md`**: Update Ralph section to remove CLI/env override text, add quality gate file validation instruction, update iteration defaults to 30
+2. **`speckit.homer.clarify.md`**: Update default iterations to 30, use `--json --paths-only` for prereqs
+3. **`speckit.lisa.analyze.md`**: Update default iterations to 30
+4. **`speckit.ralph.implement.md`**: Add quality gate file validation step
 
 ### Phase 4: README Updates
 
