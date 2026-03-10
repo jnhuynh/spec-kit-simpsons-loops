@@ -8,6 +8,28 @@ description: Orchestrate the full SpecKit pipeline (specify, homer, plan, tasks,
 $ARGUMENTS
 ```
 
+## Pre-Flight Check
+
+Before doing anything else, verify that the required utility scripts are installed:
+
+1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
+2. If **MISSING**, display this error and **STOP** — do not proceed with any pipeline execution:
+
+```
+ERROR: Required utility script not found.
+
+Missing: .specify/scripts/bash/check-prerequisites.sh
+
+This script is required for feature directory resolution and prerequisite validation.
+To install it, run the SpecKit setup command:
+
+  /speckit.setup
+
+Or manually install from the openclaw repository.
+```
+
+3. If **EXISTS**, proceed to the Overview section below.
+
 ## Overview
 
 Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. The pipeline can start from a feature description (using the specify step) or from an existing `spec.md`.
