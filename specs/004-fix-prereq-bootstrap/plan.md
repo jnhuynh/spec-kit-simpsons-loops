@@ -73,6 +73,14 @@ speckit.pipeline.md          # Root copy of .claude/commands/speckit.pipeline.md
 
 **Structure Decision**: This is a bug fix on existing infrastructure. No new files are created (aside from plan artifacts). Changes touch the pipeline orchestrator script and the pipeline command file — the two callers that resolve the feature directory before the specify step runs.
 
+## Known Pre-Existing Issues (Recommended Follow-Ups)
+
+These issues are documented in the spec and plan but are explicitly out of scope for this fix. They should be tracked as separate chores:
+
+1. **Prefix regex mismatch**: The constitution defines spec/branch IDs as "4-character alphanumeric" (`^[a-z0-9]{4}-`), but all existing branches use 3-digit numeric prefixes (e.g., `004-`). `pipeline.sh:resolve_feature_dir()` uses the 4-char regex (line 333) while `common.sh:find_feature_dir_by_prefix()` uses `^[0-9]{3}-`. This means the glob loop in `resolve_feature_dir()` is effectively dead code. A follow-up chore should align the regex patterns and/or update the constitution to reflect actual naming practice.
+
+2. **Root-level pipeline.sh wrapper**: The root-level `pipeline.sh` copy has an incorrect `REPO_ROOT` derivation (`SCRIPT_DIR/../../..`) that resolves incorrectly when run from the repo root. A follow-up chore should convert the root-level copy to a thin wrapper that delegates to `.specify/scripts/bash/pipeline.sh`.
+
 ## Complexity Tracking
 
 No constitution violations. No complexity tracking needed.
