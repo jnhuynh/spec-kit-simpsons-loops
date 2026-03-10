@@ -1,0 +1,85 @@
+# Feature Specification: Fix Prerequisite Bootstrap Ordering
+
+**Feature Branch**: `004-fix-prereq-bootstrap`
+**Created**: 2026-03-09
+**Status**: Draft
+**Input**: The speckit pipeline from specify is failing because it runs prerequisite checks that expect a specs directory, feature git branch, and specs file to exist — but those don't exist until `/speckit.specify` completes.
+
+## Clarifications
+
+### Session 2026-03-09
+
+- Q: Does FR-002 require building a new path-resolution mode in check-prerequisites.sh, or fixing callers to use the existing --paths-only flag? → A: Fix callers to use existing --paths-only flag.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Run Full Pipeline from Description (Priority: P1)
+
+A developer wants to start a brand-new feature from scratch by running the SpecKit pipeline with a feature description. They expect the pipeline to create the spec directory, branch, and spec file as part of the `specify` step, then continue through the remaining steps (homer, plan, tasks, lisa, ralph) without errors.
+
+**Why this priority**: This is the core broken workflow. Without this fix, users cannot use the pipeline end-to-end from a fresh feature description — the most common new-feature workflow.
+
+**Independent Test**: Can be fully tested by running the pipeline with `--from specify --description "some feature"` on the `main` branch and verifying it creates the spec structure and proceeds to the next step.
+
+**Acceptance Scenarios**:
+
+1. **Given** the user is on a branch without an existing specs directory for the feature, **When** they run the pipeline with `--from specify --description "Add widget support"`, **Then** the pipeline creates the feature branch, spec directory, and spec.md, and proceeds to the homer step without prerequisite errors.
+2. **Given** the user provides a `--description` but no `--from` flag, **When** they run the pipeline, **Then** the pipeline auto-detects that no spec.md exists, starts from the `specify` step, and completes successfully.
+3. **Given** the specify step has already completed (spec.md exists), **When** the user re-runs the pipeline, **Then** it skips the specify step and begins from homer as before.
+
+---
+
+### User Story 2 - Pipeline Prerequisite Checks Skip Validation for Early Steps (Priority: P2)
+
+The prerequisite checking system currently validates that the feature directory, spec.md, and plan.md all exist before any pipeline step can run. When starting from an early step like `specify`, these validations must be relaxed or deferred so that the step responsible for creating those artifacts can execute.
+
+**Why this priority**: This is the technical root cause. Fixing this unlocks the P1 user story and ensures the check system is stage-aware.
+
+**Independent Test**: Can be tested by invoking the prerequisite check script with a mode that resolves paths without validating file existence, and verifying it returns path information without erroring.
+
+**Acceptance Scenarios**:
+
+1. **Given** the prerequisite check script is invoked during the `specify` step, **When** no spec directory or plan.md exists, **Then** it returns path information without exiting with an error.
+2. **Given** the prerequisite check script is invoked during the `homer` step, **When** spec.md exists but plan.md does not, **Then** it validates spec.md existence but does not require plan.md.
+3. **Given** the prerequisite check script is invoked during the `lisa` or `ralph` step, **When** plan.md and tasks.md are expected, **Then** it validates their existence as it does today.
+
+---
+
+### Edge Cases
+
+- What happens when the user runs `--from specify` without providing `--description`? The pipeline should exit with a clear error requesting a feature description (this already works in pipeline.sh).
+- What happens when the user is on the `main` branch and runs `--from specify --description "..."` without a spec-dir argument? The pipeline needs to handle the fact that no feature branch or spec directory exists yet.
+- What happens when the `create-new-feature.sh` script fails during the specify step (e.g., branch already exists, numbering conflict)? The pipeline should surface the error clearly and stop.
+- What happens when `check-prerequisites.sh` is called with `--paths-only` but the spec directory doesn't exist? It should still return computed paths without validation errors.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: The pipeline MUST be able to start from the `specify` step without requiring a pre-existing spec directory, spec.md, or plan.md.
+- **FR-002**: Pipeline callers MUST use the existing `--paths-only` flag of `check-prerequisites.sh` (rather than `--json` with full validation) when running early pipeline steps that create artifacts, so that path resolution succeeds without requiring those artifacts to already exist.
+- **FR-003**: The pipeline's feature-directory resolution MUST handle the case where no spec directory exists yet when `--from specify` or `--description` is provided.
+- **FR-004**: The pipeline's `specify` step MUST create the feature branch, spec directory, and spec.md before subsequent steps run their prerequisite checks.
+- **FR-005**: Existing prerequisite validation behavior MUST remain unchanged for steps that depend on prior artifacts (homer requires spec.md, plan requires spec.md, lisa/ralph require spec.md + plan.md + tasks.md).
+- **FR-006**: The `speckit.pipeline.md` command file MUST defer prerequisite checks when `--from specify` or `--description` is provided, rather than running `check-prerequisites.sh --json` immediately.
+
+### Key Entities
+
+- **Prerequisite Check Script** (`check-prerequisites.sh`): Resolves feature paths and validates artifact existence. Must support stage-appropriate validation.
+- **Pipeline Orchestrator** (`pipeline.sh` and `speckit.pipeline.md`): Coordinates step execution. Must handle bootstrapping when starting from `specify`.
+- **Feature Directory**: The `specs/###-feature-name/` directory containing all feature artifacts. Does not exist before the `specify` step completes.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: A user can run the pipeline from `specify` with a feature description and reach the `homer` step without any prerequisite-related errors, 100% of the time.
+- **SC-002**: Existing pipeline runs (starting from homer, plan, tasks, lisa, or ralph with pre-existing artifacts) continue to work identically — zero regressions.
+- **SC-003**: The prerequisite check script returns path information without errors when invoked in a path-resolution-only mode, even when the spec directory does not exist.
+- **SC-004**: Error messages for genuinely missing prerequisites (e.g., running homer without spec.md) remain clear and actionable.
+
+## Assumptions
+
+- The `create-new-feature.sh` script reliably creates the branch, directory, and initial spec.md. This fix does not change that script's behavior.
+- The `--paths-only` flag in `check-prerequisites.sh` already provides path resolution without validation, but may not be used correctly by all callers.
+- The `speckit.pipeline.md` command file currently always runs `check-prerequisites.sh --json` for directory resolution, which triggers full validation prematurely.
