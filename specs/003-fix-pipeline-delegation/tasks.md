@@ -127,7 +127,7 @@
 
 **Purpose**: Final validation across all commands
 
-- [ ] T021 Verify unified orchestration pattern (SC-006) — confirm that `/speckit.pipeline` loop phases and standalone loop commands use the identical Agent tool loop pattern and bash utility calls by comparing the orchestration sections across all 4 command files
+- [x] T021 Verify unified orchestration pattern (SC-006) — confirm that `/speckit.pipeline` loop phases and standalone loop commands use the identical Agent tool loop pattern and bash utility calls by comparing the orchestration sections across all 4 command files
 - [ ] T022 Run quickstart.md validation — execute the verification commands from `specs/003-fix-pipeline-delegation/quickstart.md` to confirm sync checks pass and commands are functional
 - [ ] T023 [Edge Case] Verify non-zero bash utility exit handling — confirm all 4 command files propagate errors when `check-prerequisites.sh` exits with non-zero status (e.g., missing feature dir, invalid branch), reporting the failure to the user and stopping iteration rather than continuing silently
 - [ ] T024 [Edge Case] Verify missing agent file handling — confirm that when agent files (e.g., `homer.md`, `lisa.md`, `ralph.md`) are missing, the Agent tool sub-agent failure is detected by the orchestrator and reported as an error to the user
