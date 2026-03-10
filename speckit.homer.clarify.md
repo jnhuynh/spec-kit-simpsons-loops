@@ -10,6 +10,28 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Pre-Flight Check
+
+Before doing anything else, verify that the required utility scripts are installed:
+
+1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
+2. If **MISSING**, display this error and **STOP** — do not proceed with any execution:
+
+```
+ERROR: Required utility script not found.
+
+Missing: .specify/scripts/bash/check-prerequisites.sh
+
+This script is required for feature directory resolution and prerequisite validation.
+To install it, run the SpecKit setup command:
+
+  /speckit.setup
+
+Or manually install from the openclaw repository.
+```
+
+3. If **EXISTS**, proceed to the Goal section below.
+
 ## Goal
 
 Orchestrate the Homer loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
@@ -20,24 +42,39 @@ Orchestrate the Homer loop directly within this Claude Code session. Each iterat
 
 ## Execution Steps
 
-### Step 1: Resolve Feature Directory
+### Step 1: Parse Arguments
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+- **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+
+**Parsing rules**:
+- A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
+- A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
+- If neither is provided, use defaults for both
+
+### Step 2: Resolve Feature Directory
+
+- If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
 - Otherwise, run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON output for `FEATURE_DIR`
 
-### Step 2: Verify Artifacts
+### Step 3: Verify Artifacts
 
 Confirm `spec.md` exists in `FEATURE_DIR`.
 
 If missing, abort with guidance: "Run /speckit.specify first"
 
-### Step 3: Configuration
+### Step 4: Configuration
 
-- Default max iterations: **10** (4 severity levels + buffer)
+- If `max-iterations` was parsed from `$ARGUMENTS`, use that value
+- Otherwise, default max iterations: **10** (4 severity levels + buffer)
 
-### Step 4: Run Homer Loop
+### Step 5: Run Homer Loop
 
-For each iteration (up to max):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
 
 1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
@@ -47,17 +84,25 @@ For each iteration (up to max):
      - Provide: `Feature directory: <FEATURE_DIR>`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
-2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`
-   - If found: report success and stop looping
-   - If not found: continue to next iteration
+**After** each sub agent returns:
+1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, report success and stop looping.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the homer loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
+5. Otherwise, continue to the next iteration.
 
-3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest manual review.
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
-4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
-
-### Step 5: Report Results
+### Step 6: Report Results
 
 After the loop completes, report:
 - Total iterations run
-- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
+
+## Examples
+
+- `/speckit.homer.clarify` — Auto-detect spec dir from current branch, use default max iterations (10)
+- `/speckit.homer.clarify specs/003-fix-pipeline-delegation` — Run for specific spec dir
+- `/speckit.homer.clarify 5` — Auto-detect spec dir, limit to 5 iterations
+- `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
