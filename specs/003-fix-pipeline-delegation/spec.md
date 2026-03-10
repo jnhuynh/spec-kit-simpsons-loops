@@ -138,14 +138,15 @@ After the fix is applied, each command file is identical across all 3 locations 
 ```
 Claude Code session (orchestrator)
   ├─ Bash tool: check-prerequisites.sh --json (feature dir)
-  ├─ Step 1: Loop — Agent tool sub-agent per iteration (homer)
+  ├─ Step 1: Agent sub-agent (specify — single-shot)
+  ├─ Step 2: Loop — Agent tool sub-agent per iteration (homer)
   │   ├─ Sub-agent reads agent file + command file
   │   ├─ Sub-agent does work, commits, exits
   │   └─ Orchestrator checks promise tag + git diff (stuck detection)
-  ├─ Step 2: Agent sub-agent (plan — single-shot)
-  ├─ Step 3: Agent sub-agent (tasks — single-shot)
-  ├─ Step 4: Loop — Agent tool sub-agent per iteration (lisa)
-  ├─ Step 5: Loop — Agent tool sub-agent per iteration (ralph)
+  ├─ Step 3: Agent sub-agent (plan — single-shot)
+  ├─ Step 4: Agent sub-agent (tasks — single-shot)
+  ├─ Step 5: Loop — Agent tool sub-agent per iteration (lisa)
+  ├─ Step 6: Loop — Agent tool sub-agent per iteration (ralph)
   └─ Reports results
 ```
 
