@@ -49,12 +49,15 @@ The pipeline runs these 6 steps in sequence:
 
 ## Instructions
 
-### Step 1: Determine the spec directory
+### Step 1: Parse Arguments and Determine the spec directory
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
-- If `$ARGUMENTS` contains `--from <step>`, note the starting step (specify, homer, plan, tasks, lisa, ralph)
-- If `$ARGUMENTS` contains `--description <text>`, capture the feature description for the specify step
-- Otherwise, auto-detect from the current git branch name (extract the 4-char prefix and find the matching `specs/<prefix>-*` directory)
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`--from <step>`**: Starting step override. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. If provided, the pipeline starts from this step instead of auto-detecting.
+- **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+
+If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically by running `.specify/scripts/bash/check-prerequisites.sh --json` from repo root via Bash tool and parsing the JSON output for `feature_dir`.
 
 ### Step 2: Validate spec exists or can be created
 

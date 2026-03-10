@@ -97,7 +97,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T013 [US4] Verify argument parsing in `.claude/commands/speckit.pipeline.md` — confirm `--from`, `spec-dir`, and `--description` arguments are correctly interpreted from `$ARGUMENTS` and applied to orchestration (FR-004, SC-003)
+- [x] T013 [US4] Verify argument parsing in `.claude/commands/speckit.pipeline.md` — confirm `--from`, `spec-dir`, and `--description` arguments are correctly interpreted from `$ARGUMENTS` and applied to orchestration (FR-004, SC-003)
 - [ ] T014 [P] [US4] Verify argument parsing in `.claude/commands/speckit.homer.clarify.md` — confirm `spec-dir` and `max-iterations` arguments are correctly interpreted from `$ARGUMENTS` (FR-004, SC-003)
 - [ ] T015 [P] [US4] Verify argument parsing in `.claude/commands/speckit.lisa.analyze.md` — confirm `spec-dir` and `max-iterations` arguments are correctly interpreted from `$ARGUMENTS` (FR-004, SC-003)
 - [ ] T016 [P] [US4] Verify argument parsing in `.claude/commands/speckit.ralph.implement.md` — confirm `spec-dir` and `max-iterations` arguments are correctly interpreted from `$ARGUMENTS` (FR-004, SC-003)
