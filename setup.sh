@@ -97,32 +97,77 @@ exit 1'
   mv "$tmp" "$QUALITY_GATE_FILE"
 fi
 
-# ── 1. Copy files ───────────────────────────────────────────────────
+# ── 1. Clean up stale bash scripts ────────────────────────────────
+# Remove previously-installed bash loop scripts and their permissions.
+# Idempotent — safe to run on fresh installations.
 
-mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
+STALE_SCRIPTS=(
+  "pipeline.sh"
+  "homer-loop.sh"
+  "lisa-loop.sh"
+  "ralph-loop.sh"
+)
+
+stale_removed=false
+for script in "${STALE_SCRIPTS[@]}"; do
+  stale_path="$PROJECT_DIR/.specify/scripts/bash/$script"
+  if [[ -f "$stale_path" ]]; then
+    rm "$stale_path"
+    echo "  Removed stale script: .specify/scripts/bash/$script"
+    stale_removed=true
+  fi
+done
+if ! $stale_removed; then
+  echo "  No stale bash scripts to remove"
+fi
+
+# Remove stale Bash(...) permission entries from settings.local.json
+SETTINGS="$PROJECT_DIR/.claude/settings.local.json"
+
+if [[ -f "$SETTINGS" ]] && command -v jq &>/dev/null; then
+  # Check if any stale permission entries exist
+  has_stale_perms=false
+  for script in "${STALE_SCRIPTS[@]}"; do
+    if grep -qF "Bash(.specify/scripts/bash/$script" "$SETTINGS"; then
+      has_stale_perms=true
+      break
+    fi
+  done
+
+  if $has_stale_perms; then
+    tmp=$(mktemp)
+    jq '
+      .permissions.allow = (
+        .permissions.allow // [] |
+        map(select(
+          (test("Bash\\(\\.specify/scripts/bash/pipeline\\.sh") |not) and
+          (test("Bash\\(\\.specify/scripts/bash/homer-loop\\.sh") | not) and
+          (test("Bash\\(\\.specify/scripts/bash/lisa-loop\\.sh") | not) and
+          (test("Bash\\(\\.specify/scripts/bash/ralph-loop\\.sh") | not)
+        ))
+      )
+    ' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+    echo "  Removed stale bash script permissions from .claude/settings.local.json"
+  fi
+fi
+
+# ── 2. Copy files ───────────────────────────────────────────────────
+
 mkdir -p "$PROJECT_DIR/.claude/commands"
 mkdir -p "$PROJECT_DIR/.claude/agents"
 
-cp "$SCRIPT_DIR/ralph-loop.sh"              "$PROJECT_DIR/.specify/scripts/bash/ralph-loop.sh"
-cp "$SCRIPT_DIR/lisa-loop.sh"               "$PROJECT_DIR/.specify/scripts/bash/lisa-loop.sh"
-cp "$SCRIPT_DIR/homer-loop.sh"              "$PROJECT_DIR/.specify/scripts/bash/homer-loop.sh"
-cp "$SCRIPT_DIR/pipeline.sh"                "$PROJECT_DIR/.specify/scripts/bash/pipeline.sh"
-cp "$SCRIPT_DIR/agents/homer.md"            "$PROJECT_DIR/.claude/agents/homer.md"
-cp "$SCRIPT_DIR/agents/lisa.md"             "$PROJECT_DIR/.claude/agents/lisa.md"
-cp "$SCRIPT_DIR/agents/ralph.md"            "$PROJECT_DIR/.claude/agents/ralph.md"
-cp "$SCRIPT_DIR/agents/plan.md"             "$PROJECT_DIR/.claude/agents/plan.md"
-cp "$SCRIPT_DIR/agents/tasks.md"            "$PROJECT_DIR/.claude/agents/tasks.md"
-cp "$SCRIPT_DIR/agents/specify.md"          "$PROJECT_DIR/.claude/agents/specify.md"
-cp "$SCRIPT_DIR/speckit.ralph.implement.md" "$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
-cp "$SCRIPT_DIR/speckit.lisa.analyze.md"    "$PROJECT_DIR/.claude/commands/speckit.lisa.analyze.md"
-cp "$SCRIPT_DIR/speckit.homer.clarify.md"   "$PROJECT_DIR/.claude/commands/speckit.homer.clarify.md"
-cp "$SCRIPT_DIR/speckit.pipeline.md"        "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
+cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.claude/agents/homer.md"
+cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
+cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
+cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
+cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
+cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.ralph.implement.md"    "$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.lisa.analyze.md"       "$PROJECT_DIR/.claude/commands/speckit.lisa.analyze.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.claude/commands/speckit.homer.clarify.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
 
 echo "  Copied files:"
-echo "    .specify/scripts/bash/ralph-loop.sh"
-echo "    .specify/scripts/bash/lisa-loop.sh"
-echo "    .specify/scripts/bash/homer-loop.sh"
-echo "    .specify/scripts/bash/pipeline.sh"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/ralph.md"
@@ -133,15 +178,6 @@ echo "    .claude/commands/speckit.ralph.implement.md"
 echo "    .claude/commands/speckit.lisa.analyze.md"
 echo "    .claude/commands/speckit.homer.clarify.md"
 echo "    .claude/commands/speckit.pipeline.md"
-
-# ── 2. Make scripts executable ──────────────────────────────────────
-
-chmod +x "$PROJECT_DIR/.specify/scripts/bash/ralph-loop.sh"
-chmod +x "$PROJECT_DIR/.specify/scripts/bash/lisa-loop.sh"
-chmod +x "$PROJECT_DIR/.specify/scripts/bash/homer-loop.sh"
-chmod +x "$PROJECT_DIR/.specify/scripts/bash/pipeline.sh"
-
-echo "  Made scripts executable"
 
 # ── 3. Update .gitignore ────────────────────────────────────────────
 
@@ -157,55 +193,6 @@ else
     cat "$SCRIPT_DIR/gitignore"
   } >> "$GITIGNORE"
   echo "  Appended entries to .gitignore"
-fi
-
-# ── 4. Update Claude Code permissions ───────────────────────────────
-
-SETTINGS="$PROJECT_DIR/.claude/settings.local.json"
-RALPH_PERM='Bash(.specify/scripts/bash/ralph-loop.sh*)'
-LISA_PERM='Bash(.specify/scripts/bash/lisa-loop.sh*)'
-HOMER_PERM='Bash(.specify/scripts/bash/homer-loop.sh*)'
-PIPELINE_PERM='Bash(.specify/scripts/bash/pipeline.sh*)'
-
-needs_update=false
-
-if [[ ! -f "$SETTINGS" ]]; then
-  needs_update=true
-elif ! grep -qF "$RALPH_PERM" "$SETTINGS" || ! grep -qF "$LISA_PERM" "$SETTINGS" || ! grep -qF "$HOMER_PERM" "$SETTINGS" || ! grep -qF "$PIPELINE_PERM" "$SETTINGS"; then
-  needs_update=true
-fi
-
-if $needs_update; then
-  if command -v jq &>/dev/null; then
-    if [[ -f "$SETTINGS" ]]; then
-      # Merge into existing file
-      tmp=$(mktemp)
-      jq --arg r "$RALPH_PERM" --arg l "$LISA_PERM" --arg h "$HOMER_PERM" --arg p "$PIPELINE_PERM" '
-        .permissions.allow = ((.permissions.allow // []) + [$r, $l, $h, $p] | unique)
-      ' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
-    else
-      # Create new file
-      jq -n --arg r "$RALPH_PERM" --arg l "$LISA_PERM" --arg h "$HOMER_PERM" --arg p "$PIPELINE_PERM" '
-        { permissions: { allow: [$r, $l, $h, $p] } }
-      ' > "$SETTINGS"
-    fi
-    echo "  Updated .claude/settings.local.json"
-  else
-    echo ""
-    echo "  WARNING: jq not found — could not update .claude/settings.local.json automatically."
-    echo "  Add these entries manually to .claude/settings.local.json:"
-    echo ""
-    echo '    "permissions": {'
-    echo '      "allow": ['
-    echo "        \"$RALPH_PERM\","
-    echo "        \"$LISA_PERM\","
-    echo "        \"$HOMER_PERM\","
-    echo "        \"$PIPELINE_PERM\""
-    echo '      ]'
-    echo '    }'
-  fi
-else
-  echo "  .claude/settings.local.json already has script permissions — skipped"
 fi
 
 echo ""

@@ -29,7 +29,7 @@
 
 - [x] T002 [P] Rename `agents/` directory to `claude-agents/` using `git mv agents claude-agents`
 - [x] T003 [P] Create `speckit-commands/` directory and move root-level command files into it using `git mv`: `speckit.pipeline.md`, `speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md`
-- [ ] T004 Update `setup.sh` — change source directories from `agents/` to `claude-agents/` and from root-level `speckit.*.md` to `speckit-commands/` for `.claude/commands/` installation; add cleanup logic to remove stale bash scripts (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) from `.specify/scripts/bash/` and remove their corresponding `Bash(.specify/scripts/bash/...)` permission entries from `.claude/settings.local.json` using `jq`; stop installing bash loop scripts entirely
+- [x] T004 Update `setup.sh` — change source directories from `agents/` to `claude-agents/` and from root-level `speckit.*.md` to `speckit-commands/` for `.claude/commands/` installation; add cleanup logic to remove stale bash scripts (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) from `.specify/scripts/bash/` and remove their corresponding `Bash(.specify/scripts/bash/...)` permission entries from `.claude/settings.local.json` using `jq`; stop installing bash loop scripts entirely
 
 **Checkpoint**: Directory reorganization complete — command files are at `speckit-commands/speckit.*.md`, agent files are at `claude-agents/*.md`, `setup.sh` installs from new locations
 
