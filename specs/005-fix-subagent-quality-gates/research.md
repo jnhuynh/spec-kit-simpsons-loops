@@ -1,144 +1,104 @@
 # Research: Fix Subagent Delegation and Quality Gate Consolidation
 
-## Decision 1: File Duplication Strategy (Superseded by FR-005/FR-006)
+**Branch**: `005-fix-subagent-quality-gates` | **Date**: 2026-03-10
 
-**Decision**: Bash script fallbacks (`pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`) are deleted from both root level and `.specify/scripts/bash/` per FR-005. Command files are moved from root level into `speckit-commands/` per FR-006. Agent files are moved from `agents/` to `claude-agents/` per FR-006. All edits target source directories; `setup.sh` installs to `.claude/commands/` and `.claude/agents/`.
+## R-001: Subagent Delegation Mechanism
 
-**Rationale**: The bash script invocation path is dead weight — this project uses Claude Code command files exclusively. Eliminating the duplicate bash scripts removes 8 file pairs and maintenance drift risk. Source directory reorganization (`claude-agents/`, `speckit-commands/`) provides clear naming for the remaining file flow.
+**Decision**: Command files already contain correct Agent tool spawning instructions with `subagent_type: general-purpose`, fresh context per iteration, specific agent file references, and feature directory in prompts. No structural changes needed to the spawning mechanism.
 
-**Source → Installed pairs (post-implementation)**:
-| Source location | Installed location |
-|---|---|
-| `speckit-commands/speckit.pipeline.md` | `.claude/commands/speckit.pipeline.md` |
-| `speckit-commands/speckit.homer.clarify.md` | `.claude/commands/speckit.homer.clarify.md` |
-| `speckit-commands/speckit.lisa.analyze.md` | `.claude/commands/speckit.lisa.analyze.md` |
-| `speckit-commands/speckit.ralph.implement.md` | `.claude/commands/speckit.ralph.implement.md` |
-| `claude-agents/homer.md` | `.claude/agents/homer.md` |
-| `claude-agents/lisa.md` | `.claude/agents/lisa.md` |
-| `claude-agents/ralph.md` | `.claude/agents/ralph.md` |
-
-**Deleted pairs (FR-005)**:
-| Root-level (DELETE) | Installed location (DELETE) |
-|---|---|
-| `pipeline.sh` | `.specify/scripts/bash/pipeline.sh` |
-| `ralph-loop.sh` | `.specify/scripts/bash/ralph-loop.sh` |
-| `homer-loop.sh` | `.specify/scripts/bash/homer-loop.sh` |
-| `lisa-loop.sh` | `.specify/scripts/bash/lisa-loop.sh` |
-
-## Decision 2: Command Files Already Describe Agent Tool Spawning
-
-**Decision**: The command files (`speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md`) already contain correct Agent tool spawning instructions. The pipeline command (`speckit.pipeline.md`) also describes Agent tool spawning. No structural changes needed to the spawning mechanism — the instructions are already correct.
-
-**Rationale**: Investigation revealed that all four command files explicitly instruct:
-- `subagent_type: general-purpose`
-- Fresh context per iteration
-- Specific agent file references (`.claude/agents/homer.md`, etc.)
-- Feature directory passed in prompt
-
-The "bug" was not that instructions were missing, but that the pipeline command file's quality gate text still mentions CLI/env overrides (contradicting FR-004/FR-008) and potentially confusing the LLM executing the instructions.
+**Rationale**: All four command files (`speckit.pipeline.md`, `speckit.homer.clarify.md`, `speckit.lisa.analyze.md`, `speckit.ralph.implement.md`) explicitly instruct Agent tool usage. The real issues are: (1) the pipeline mentions CLI/env quality gate overrides that confuse the LLM, (2) iteration defaults are too low, and (3) bash scripts create a competing invocation path.
 
 **Alternatives considered**: Adding more explicit Agent tool invocation syntax — rejected because the current instruction format is what Claude Code interprets.
 
-## Decision 3: Quality Gate Simplification Approach
+## R-002: Quality Gate Simplification
 
-**Decision**: Delete the bash scripts entirely (FR-005) rather than simplifying their `resolve_quality_gates()` functions. Quality gate validation is implemented only in command files (`speckit.pipeline.md` and `speckit.ralph.implement.md`), which instruct the LLM to validate `.specify/quality-gates.sh` as the sole source (FR-004, FR-007, FR-010).
+**Decision**: Strip all CLI argument (`--quality-gates`) and environment variable (`QUALITY_GATES`) override references from command files and README. Use `.specify/quality-gates.sh` as the sole source. Delete bash scripts entirely (FR-005), so their `resolve_quality_gates()` functions cease to exist.
 
-**Rationale**: The spec (FR-004 through FR-008) requires a single source of truth, and FR-005 requires deleting bash scripts entirely. Since bash scripts are deleted, there is no need to simplify their quality gate resolution — the function ceases to exist. Quality gate validation moves entirely to command files.
+**Rationale**: The pipeline command (`speckit.pipeline.md` line 195) mentions CLI/env overrides. Post-change, `.specify/quality-gates.sh` is the single source of truth. The `setup.sh` quality gate creation logic (lines 36-98) remains valid — it creates the file if absent.
 
-**Alternatives considered**:
-- Keep env var as fallback for CI environments: Rejected — spec explicitly removes all override mechanisms (FR-004)
-- Simplify bash `resolve_quality_gates()`: Rejected — bash scripts are deleted per FR-005, making this moot
+**Alternatives considered**: Keeping env var override for CI/CD flexibility — rejected per spec clarification that single-file-only simplifies configuration.
 
-## Decision 4: Pipeline Quality Gate Text Update
+## R-003: Quality Gate Validation (FR-010)
 
-**Decision**: Update `speckit.pipeline.md` Ralph section to remove the text "CLI arguments (`--quality-gates`) and environment variables (`QUALITY_GATES`) override the file when provided." Replace with text stating the file is the sole source.
+**Decision**: Add validation step to `speckit.ralph.implement.md` and pipeline's ralph phase. Use Bash tool check: `test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1`. Abort with clear error if file is missing or contains only comments/whitespace. Homer and lisa skip quality gate validation entirely.
 
-**Rationale**: FR-004 states "All quality gate references MUST be resolved exclusively from `.specify/quality-gates.sh`" and FR-008 states "without any override mechanism." The existing text in the command file directly contradicts these requirements.
+**Rationale**: FR-010 requires command files to validate the quality gates file, catching the empty-file edge case. Since bash scripts are deleted, command files are the only invocation path.
 
-## Decision 5: FR-010 Validation in Command Files
+**Alternatives considered**: Creating a shared validation script — over-engineering for a single check.
 
-**Decision**: Add a validation step to `speckit.pipeline.md` (ralph phase) and `speckit.ralph.implement.md` that instructs the LLM to check `.specify/quality-gates.sh` exists and contains non-empty executable content before proceeding with quality gate execution. Use a Bash tool check: `test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1`.
+## R-004: Bash Script Deletion and Cleanup
 
-**Rationale**: FR-010 requires command files to validate the quality gates file, catching the empty-file edge case. Since bash scripts are deleted (FR-005), command files are the only invocation path and the only place validation is needed. The bash tool approach provides a deterministic check.
+**Decision**: Delete root-level `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`. Update `setup.sh` to: (1) stop installing them to `.specify/scripts/bash/`, (2) actively remove previously-installed copies from `.specify/scripts/bash/`, (3) remove their `Bash(.specify/scripts/bash/...)` permission entries from `.claude/settings.local.json` using `jq`.
 
-**Alternatives considered**:
-- Instruct the LLM to read the file and check manually: Less reliable than a deterministic bash check
-- Create a shared validation script: Over-engineering for a single `test + grep` command
+**Rationale**: 66K+ of bash code that duplicates command file functionality. Creates maintenance drift across 8 file pairs. Cleanup ensures existing installations don't retain orphaned artifacts.
 
-## Decision 6: Iteration Default Standardization
+**Alternatives considered**: Freezing scripts and marking deprecated — rejected per spec clarification.
 
-**Decision**: Standardize loop defaults in command files to 30 iterations for homer and lisa, and `incomplete_tasks + 10` for ralph. Bash scripts are deleted (FR-005), so only command file defaults remain.
+## R-005: Source Directory Reorganization
 
-**Rationale**: Current command file defaults are too low (10 for homer/lisa). The increase to 30 provides headroom for complex features with many findings. Premature termination loses work; extra iteration capacity costs nothing when the loop exits early on completion. Ralph keeps dynamic sizing (`incomplete_tasks + 10`) because task count is a more precise ceiling.
+**Decision**: Rename `agents/` → `claude-agents/`, move root-level `speckit.*.md` → `speckit-commands/`. Update `setup.sh` to install from new locations (`claude-agents/` → `.claude/agents/`, `speckit-commands/` → `.claude/commands/`).
 
-**Alternatives considered**:
-- Keep 20 as standard: Rejected — spec explicitly requires 30 (FR-011)
-- Make ralph commands also use 30: Rejected — dynamic sizing based on task count is more precise (FR-012)
+**Rationale**: Current layout has ambiguous `agents/` naming and `speckit.*.md` scattered at root. New layout explicitly names source directories.
 
-## Decision 7: Stuck Detection Threshold Standardization
+**Note**: Only the 4 loop/pipeline command files move to `speckit-commands/`. The other command files already live in `.claude/commands/` as installed copies from the SpecKit core.
 
-**Decision**: Standardize stuck detection at 2 consecutive iterations in command files (the sole invocation path after bash script deletion per FR-005).
+## R-006: Homer Prerequisite Flow (FR-019)
 
-**Rationale**: Two consecutive identical iterations (no file changes and no completion signal) is sufficient signal that the loop is stuck — a third rarely recovers. The threshold of 2 saves one wasted subagent invocation per stuck event compared to the previous bash script threshold of 3.
+**Decision**: Homer command switches to `check-prerequisites.sh --json --paths-only` and validates `spec.md` existence itself.
 
-**Alternatives considered**:
-- Use 1: Rejected — transient issues can cause false positives
-- Use 3: Rejected — wastes an iteration; 2 is sufficient per FR-013
+**Rationale**: The current `check-prerequisites.sh --json` (without `--paths-only`) validates that `plan.md` exists (line 110-114 of the script). When homer runs right after `/speckit.specify` (no `plan.md` yet), full validation fails. Using `--paths-only` gets the feature directory path without artifact validation.
 
-## Decision 8: README Architecture Updates
+**Alternatives considered**: Modifying `check-prerequisites.sh` to make `plan.md` optional — rejected per spec clarification that the prerequisite script stays unchanged.
 
-**Decision**: Add a new "Architecture" section to README with two mermaid diagrams, update all configuration tables, and remove references to `--quality-gates` and `QUALITY_GATES`.
+## R-007: Iteration Default Standardization
 
-**Rationale**: The README currently documents removed/changed features:
-- References `--quality-gates` CLI flag (being removed)
-- References `QUALITY_GATES` env var (being removed)
-- Shows 20 as default iterations (changing to 30)
-- Shows 3 as stuck detection threshold (changing to 2)
+**Decision**: Homer and Lisa defaults → 30 for both standalone commands and pipeline. Ralph standalone stays `incomplete_tasks + 10`. Pipeline ralph changes from hardcoded 20 to `incomplete_tasks + 10`.
 
-Two mermaid diagrams provide visual architecture documentation:
-1. Pipeline flow: specify → homer loop → plan → tasks → lisa loop → ralph loop, each spawning subagents
-2. Loop lifecycle: orchestrator → spawn subagent → check completion/stuck → next or exit
+**Rationale**: Current defaults are 10 (standalone) / 20 (pipeline) for homer/lisa. The spec requires 30 uniformly. Ralph's dynamic calculation is more useful than a static default.
 
-**Alternatives considered**:
-- ASCII art → Rejected: harder to maintain, renders poorly on GitHub
-- External diagram tool → Rejected: adds binary artifacts
+## R-008: Stuck Detection Threshold
+
+**Decision**: Already at 2 in all command files. Only the README needs correction (currently says "three consecutive iterations").
+
+**Rationale**: Two consecutive iterations with no changes is sufficient stuck signal.
 
 ## Files Requiring Changes
 
-### Must Delete (FR-005)
+### Delete (FR-005)
 
-| File | Action | FR |
+| File | Action |
+|---|---|
+| `pipeline.sh` (root) | Delete source |
+| `homer-loop.sh` (root) | Delete source |
+| `lisa-loop.sh` (root) | Delete source |
+| `ralph-loop.sh` (root) | Delete source |
+
+### Reorganize (FR-006)
+
+| Current | Target |
+|---|---|
+| `agents/` | `claude-agents/` |
+| `speckit.pipeline.md` (root) | `speckit-commands/speckit.pipeline.md` |
+| `speckit.homer.clarify.md` (root) | `speckit-commands/speckit.homer.clarify.md` |
+| `speckit.lisa.analyze.md` (root) | `speckit-commands/speckit.lisa.analyze.md` |
+| `speckit.ralph.implement.md` (root) | `speckit-commands/speckit.ralph.implement.md` |
+
+### Modify
+
+| File (post-reorganization) | Changes | FRs |
 |---|---|---|
-| `pipeline.sh` (root) | Delete | FR-005 |
-| `homer-loop.sh` (root) | Delete | FR-005 |
-| `lisa-loop.sh` (root) | Delete | FR-005 |
-| `ralph-loop.sh` (root) | Delete | FR-005 |
-| `.specify/scripts/bash/pipeline.sh` | Delete (via `setup.sh` cleanup) | FR-005 |
-| `.specify/scripts/bash/homer-loop.sh` | Delete (via `setup.sh` cleanup) | FR-005 |
-| `.specify/scripts/bash/lisa-loop.sh` | Delete (via `setup.sh` cleanup) | FR-005 |
-| `.specify/scripts/bash/ralph-loop.sh` | Delete (via `setup.sh` cleanup) | FR-005 |
+| `speckit-commands/speckit.pipeline.md` | Remove CLI/env override text, add QG validation, update defaults to 30, ralph to `incomplete_tasks + 10` | FR-004, FR-007, FR-010, FR-011, FR-012 |
+| `speckit-commands/speckit.homer.clarify.md` | Update default to 30, use `--json --paths-only`, validate only `spec.md` | FR-011, FR-019, FR-020 |
+| `speckit-commands/speckit.lisa.analyze.md` | Update default to 30 | FR-011 |
+| `speckit-commands/speckit.ralph.implement.md` | Add QG file validation | FR-010 |
+| `setup.sh` | Install from new source dirs, cleanup stale bash scripts and permissions | FR-005, FR-006 |
+| `README.md` | Remove bash/override refs, update defaults, add Architecture section | FR-014–FR-018 |
 
-### Must Modify (implementation required)
-
-| File | Change | FR |
-|---|---|---|
-| `speckit-commands/speckit.pipeline.md` | Remove CLI/env override text, add QG file validation, update iteration defaults to 30, stuck detection to 2 | FR-004, FR-007, FR-010, FR-011, FR-013 |
-| `speckit-commands/speckit.homer.clarify.md` | Update default iterations to 30, stuck detection to 2, use `--json --paths-only` for prereqs | FR-011, FR-013, FR-019 |
-| `speckit-commands/speckit.lisa.analyze.md` | Update default iterations to 30, stuck detection to 2 | FR-011, FR-013 |
-| `speckit-commands/speckit.ralph.implement.md` | Add QG file validation, stuck detection to 2 | FR-010, FR-013 |
-| `setup.sh` | Install from `claude-agents/` and `speckit-commands/`, remove stale bash scripts and permissions, stop installing bash scripts | FR-005, FR-006 |
-| `README.md` | Remove `--quality-gates`/`QUALITY_GATES` refs, remove bash script docs, update defaults to 30, stuck detection to 2, add Architecture section with mermaid diagrams | FR-014–FR-018 |
-
-### Must Reorganize (FR-006)
-
-| Source (current) | Source (target) | Action |
-|---|---|---|
-| `agents/` | `claude-agents/` | Rename directory |
-| Root-level `speckit.*.md` files | `speckit-commands/` | Move into new directory |
-
-### Read-Only (no changes needed)
+### No Changes Needed
 
 | File | Reason |
 |---|---|
-| `claude-agents/homer.md`, `lisa.md`, `ralph.md` | Agent files define single-iteration behavior; no changes needed |
-| `.specify/quality-gates.sh` | Quality gate content unchanged |
+| `claude-agents/*.md` | Agent files define single-iteration behavior; no content changes |
+| `.specify/quality-gates.sh` | Content unchanged |
+| `.specify/scripts/bash/check-prerequisites.sh` | Script stays unchanged per spec |
+| `.specify/scripts/bash/common.sh` | No changes needed |
