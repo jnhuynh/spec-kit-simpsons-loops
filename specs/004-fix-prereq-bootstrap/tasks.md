@@ -38,7 +38,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Add bootstrap fallback to `resolve_feature_dir()` in `.specify/scripts/bash/pipeline.sh` — after the branch auto-detect loop (around line 334), before the final error (line 343), add: if no directory was found but `FROM_STEP=specify` or `DESCRIPTION` is non-empty, construct and return `specs/<branch-name>` without requiring the directory to exist
+- [ ] T003 [US1] Add bootstrap fallback to `resolve_feature_dir()` in `.specify/scripts/bash/pipeline.sh` — after the `for dir in ... done` loop and exact-match check in `resolve_feature_dir()`, before the final error message, add: if no directory was found but `FROM_STEP=specify` or `DESCRIPTION` is non-empty, construct and return `specs/<branch-name>` without requiring the directory to exist. Additionally, when on `main` branch (or `HEAD`) and bootstrapping is active, treat the `resolve_feature_dir()` failure as non-fatal — allow the pipeline to proceed with an empty `FEATURE_DIR` so that the specify step's agent (via `create-new-feature.sh`) can create the branch and directory first, after which `FEATURE_DIR` is resolved
 - [ ] T004 [US1] Copy the updated `.specify/scripts/bash/pipeline.sh` to the root-level `pipeline.sh` to keep them in sync
 - [ ] T005 [US1] Update Step 1 in `.claude/commands/speckit.pipeline.md` (line 89) to use `check-prerequisites.sh --json --paths-only` instead of `check-prerequisites.sh --json` when `--from specify` is set or `--description` is provided and no `spec-dir` argument is given
 - [ ] T006 [US1] Copy the updated `.claude/commands/speckit.pipeline.md` to the root-level `speckit.pipeline.md` to keep them in sync

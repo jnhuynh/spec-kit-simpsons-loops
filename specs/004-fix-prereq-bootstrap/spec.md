@@ -49,7 +49,7 @@ The prerequisite checking system currently validates that the feature directory,
 ### Edge Cases
 
 - What happens when the user runs `--from specify` without providing `--description`? The pipeline should exit with a clear error requesting a feature description (this already works in pipeline.sh).
-- What happens when the user is on the `main` branch and runs `--from specify --description "..."` without a spec-dir argument? The pipeline needs to handle the fact that no feature branch or spec directory exists yet.
+- What happens when the user is on the `main` branch and runs `--from specify --description "..."` without a spec-dir argument? The pipeline's `resolve_feature_dir()` cannot derive a path from the branch name because `main` has no feature prefix. In this case, the pipeline MUST skip directory resolution entirely and allow the `specify` step's agent (via `create-new-feature.sh`) to create the feature branch, directory, and spec.md. The `FEATURE_DIR` will be resolved after the specify step completes, before subsequent steps run. If `resolve_feature_dir()` fails and the pipeline is bootstrapping (`--from specify` or `--description` provided), the failure is non-fatal.
 - What happens when the `create-new-feature.sh` script fails during the specify step (e.g., branch already exists, numbering conflict)? The pipeline should surface the error clearly and stop.
 - What happens when `check-prerequisites.sh` is called with `--paths-only` but the spec directory doesn't exist? It should still return computed paths without validation errors.
 
