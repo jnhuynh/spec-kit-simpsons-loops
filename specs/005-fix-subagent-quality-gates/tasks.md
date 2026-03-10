@@ -89,7 +89,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T010 [US4] Verify bash script removal — confirm `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh` do not exist at root level; confirm `setup.sh` contains no references to installing these scripts; confirm `setup.sh` cleanup logic removes stale copies from `.specify/scripts/bash/` and removes their `Bash(...)` permission entries from `.claude/settings.local.json`; fix any gaps found
+- [x] T010 [US4] Verify bash script removal — confirm `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh` do not exist at root level; confirm `setup.sh` contains no references to installing these scripts; confirm `setup.sh` cleanup logic removes stale copies from `.specify/scripts/bash/` and removes their `Bash(...)` permission entries from `.claude/settings.local.json`; fix any gaps found
 
 **Checkpoint**: Bash script fallbacks fully removed — sole invocation path is Claude Code command files
 
