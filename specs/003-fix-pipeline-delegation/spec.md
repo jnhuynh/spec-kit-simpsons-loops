@@ -41,7 +41,7 @@ A developer invokes `/speckit.pipeline` from a Claude Code session and the pipel
 **Acceptance Scenarios**:
 
 1. **Given** a project with utility scripts installed and a feature branch checked out, **When** the user runs `/speckit.pipeline`, **Then** the Claude Code session orchestrates all 6 phases by spawning one Agent sub-agent per step. Loop steps (homer, lisa, ralph) use Agent tool sub-agents for iteration.
-2. **Given** a project with an existing `spec.md`, **When** the user runs `/speckit.pipeline`, **Then** the orchestrator auto-detects the starting step (skipping specify) and runs the remaining phases.
+2. **Given** a project with an existing `spec.md`, **When** the user runs `/speckit.pipeline`, **Then** the orchestrator auto-detects the starting step based on existing artifacts and runs the remaining phases. Auto-detection logic (checked in order): if `tasks.md` exists with some `- [x]` completed tasks, start at **ralph**; if `tasks.md` exists with no completed tasks, start at **lisa**; if `plan.md` exists but no `tasks.md`, start at **tasks**; if `spec.md` exists but no `plan.md`, start at **homer**; if no `spec.md` but `--description` is provided, start at **specify**.
 3. **Given** a project with utility scripts, **When** the user runs `/speckit.pipeline --from homer`, **Then** the orchestrator starts from the homer phase, resolving the feature directory via `check-prerequisites.sh`.
 
 ---
