@@ -108,11 +108,11 @@ speckit.ralph.implement.md                       # Repo root (upstream)
 
 #### 3. File Sync Strategy
 
-**Decision**: After modifying command files, copy each from `.claude/commands/` (canonical source) to repo root and `~/.openclaw/.claude/commands/`.
+**Decision**: After modifying command files, ensure all 3 locations are byte-identical. The repo root is the upstream source (per spec File Locations). During development, changes may be made to `.claude/commands/` first (since Claude Code resolves commands from there), but the repo root copy must be updated to match. All 3 copies must be byte-identical after sync (FR-006).
 
-**Rationale**: The `.claude/commands/` directory is where Claude Code resolves commands from. Making this the canonical source ensures the working copy is always correct, with copies distributed to the other locations.
+**Rationale**: The spec designates repo root as the "upstream source" (the version tracked in git). The `.claude/commands/` copy is the active working copy that Claude Code reads. The global `~/.openclaw/.claude/commands/` copy is the installed version. Regardless of which copy is edited first during development, all 3 must be identical after sync. The sync direction is an implementation detail — what matters is byte-identical final state.
 
-**Alternatives considered**: Using repo root as canonical source. Either works, but `.claude/commands/` is what Claude Code actually reads.
+**Alternatives considered**: Designating `.claude/commands/` as the single canonical source. Rejected to align with the spec's upstream source terminology for repo root.
 
 #### 4. Utility Script Existence Check
 
@@ -181,10 +181,10 @@ Change stuck detection from "3 consecutive identical outputs" to git diff-based 
 
 #### Area 2: Sync All File Copies (12 files)
 
-After updating the 4 command files in `.claude/commands/`:
-1. Copy each to repo root (strip `.claude/commands/` prefix)
-2. Copy each to `~/.openclaw/.claude/commands/`
-3. Verify with `diff` that all 3 copies are byte-identical
+After updating command files, sync all 3 locations to be byte-identical:
+1. Ensure repo root copies (upstream source) match `.claude/commands/` copies
+2. Ensure global copies (`~/.openclaw/.claude/commands/`) match
+3. Verify with `diff` that all 3 copies of each command file are byte-identical
 
 #### Area 3: Verify Utility Script Check (all 4 commands)
 
