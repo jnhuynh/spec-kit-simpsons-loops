@@ -18,6 +18,7 @@ The SpecKit pipeline fails when starting from the `specify` step because both `s
 **Performance Goals**: N/A (developer tooling, not performance-critical)
 **Constraints**: Must not modify `check-prerequisites.sh` internals or `create-new-feature.sh` behavior (explicitly out of scope per spec)
 **Scale/Scope**: 3 files to modify: `speckit.pipeline.md`, `pipeline.sh`, and their root-level copies
+**Prefix Pattern Note**: `pipeline.sh:resolve_feature_dir()` uses a 4-char alphanumeric regex `^([a-z0-9]{4})-` while `common.sh:find_feature_dir_by_prefix()` (used by `check-prerequisites.sh`) uses a 3-digit numeric regex `^([0-9]{3})-`. Both resolve feature directories but via different patterns. Since `check-prerequisites.sh` is out of scope, only `pipeline.sh` is modified. When constructing a prospective path during bootstrap (no existing directory), the implementation MUST use the full branch name (`specs/$branch`) rather than prefix glob matching, because the directory does not exist yet for glob expansion to find.
 
 ## Constitution Check
 
