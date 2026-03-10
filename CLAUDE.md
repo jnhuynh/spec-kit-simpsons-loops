@@ -59,6 +59,8 @@ All changes must pass before committing:
 - Filesystem only — `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
 - Filesystem only -- `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
 - Bash 4+ (shell scripts), Markdown (Claude Code command files) + Claude CLI (`claude` command), standard Unix utilities (`grep`, `sed`, `test`) (004-fix-prereq-bootstrap)
+- Bash 4+ (shell scripts), Markdown (Claude Code command/agent files) + Claude CLI (`claude` command), Claude Code Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `bash`) (005-fix-subagent-quality-gates)
+- Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)
