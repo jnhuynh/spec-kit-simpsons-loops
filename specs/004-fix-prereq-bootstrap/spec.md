@@ -10,6 +10,7 @@
 ### Session 2026-03-09
 
 - Q: Does FR-002 require building a new path-resolution mode in check-prerequisites.sh, or fixing callers to use the existing --paths-only flag? → A: Fix callers to use existing --paths-only flag.
+- Q: What is explicitly out of scope for this fix? → A: Modifying check-prerequisites.sh internals or create-new-feature.sh behavior.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -62,6 +63,13 @@ The prerequisite checking system currently validates that the feature directory,
 - **FR-004**: The pipeline's `specify` step MUST create the feature branch, spec directory, and spec.md before subsequent steps run their prerequisite checks.
 - **FR-005**: Existing prerequisite validation behavior MUST remain unchanged for steps that depend on prior artifacts (homer requires spec.md, plan requires spec.md, lisa/ralph require spec.md + plan.md + tasks.md).
 - **FR-006**: The `speckit.pipeline.md` command file MUST defer prerequisite checks when `--from specify` or `--description` is provided, rather than running `check-prerequisites.sh --json` immediately.
+
+### Out of Scope
+
+- Modifying the internal logic of `check-prerequisites.sh` (e.g., adding new flags or validation modes). The existing `--paths-only` flag already provides the needed capability.
+- Changing `create-new-feature.sh` behavior. This script is assumed to work correctly and is not part of this fix.
+- Adding new pipeline steps or reordering existing steps beyond what is needed to defer prerequisite checks for the `specify` step.
+- Non-functional improvements (performance, logging enhancements) to the prerequisite or pipeline scripts.
 
 ### Key Entities
 
