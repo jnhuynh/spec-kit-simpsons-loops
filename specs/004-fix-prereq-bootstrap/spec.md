@@ -82,7 +82,7 @@ The prerequisite checking system currently validates that the feature directory,
 
 ### Measurable Outcomes
 
-- **SC-001**: A user can run the pipeline from `specify` with a feature description and reach the `homer` step without any prerequisite-related errors, 100% of the time.
+- **SC-001**: A user can run the pipeline from `specify` with a feature description and reach the `homer` step without any prerequisite-related errors, under normal operating conditions (valid filesystem permissions, available disk space, no concurrent conflicting operations).
 - **SC-002**: Existing pipeline runs (starting from homer, plan, tasks, lisa, or ralph with pre-existing artifacts) continue to work identically — zero regressions.
 - **SC-003**: The prerequisite check script returns path information without errors when invoked in a path-resolution-only mode, even when the spec directory does not exist.
 - **SC-004**: Error messages for genuinely missing prerequisites (e.g., running homer without spec.md) remain clear and actionable.
