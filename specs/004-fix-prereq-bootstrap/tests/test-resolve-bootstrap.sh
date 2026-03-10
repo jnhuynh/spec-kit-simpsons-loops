@@ -105,6 +105,72 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Test 2: On main/HEAD branch with FROM_STEP=specify and DESCRIPTION set,
+# resolve_feature_dir should succeed (exit 0) and return an empty string.
+# This covers spec.md Edge Case 2 and T003b (main branch bootstrap).
+echo "Test 2: Main branch + FROM_STEP=specify + DESCRIPTION set -> should return empty string with exit 0"
+
+TEMP_ROOT=$(mktemp -d)
+mkdir -p "$TEMP_ROOT/specs"
+
+RESULT=$(
+    REPO_ROOT="$TEMP_ROOT"
+    SPEC_DIR_ARG=""
+    FROM_STEP="specify"
+    DESCRIPTION="test feature"
+    RED=""
+    GREEN=""
+    NC=""
+
+    # Override git to simulate being on 'main' branch
+    git() { echo "main"; }
+    export -f git
+
+    eval "$FUNC_BODY"
+    resolve_feature_dir
+) 2>/dev/null
+EXIT_CODE=$?
+
+rm -rf "$TEMP_ROOT"
+
+assert_eq "resolve_feature_dir exits 0 when FROM_STEP=specify on main branch" "0" "$EXIT_CODE"
+
+if [[ -z "$RESULT" ]]; then
+    echo "  PASS: Returns empty string on main branch (non-fatal, specify step will create branch)"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: Expected empty string on main branch, got '$RESULT'"
+    FAIL=$((FAIL + 1))
+fi
+
+# Test 3: On main/HEAD branch WITHOUT bootstrapping flags, resolve_feature_dir
+# should fail (exit non-zero). This ensures the error path is preserved.
+echo "Test 3: Main branch + no FROM_STEP + no DESCRIPTION -> should fail"
+
+TEMP_ROOT=$(mktemp -d)
+mkdir -p "$TEMP_ROOT/specs"
+
+RESULT=$(
+    REPO_ROOT="$TEMP_ROOT"
+    SPEC_DIR_ARG=""
+    FROM_STEP=""
+    DESCRIPTION=""
+    RED=""
+    GREEN=""
+    NC=""
+
+    git() { echo "main"; }
+    export -f git
+
+    eval "$FUNC_BODY"
+    resolve_feature_dir
+) 2>/dev/null
+EXIT_CODE=$?
+
+rm -rf "$TEMP_ROOT"
+
+assert_eq "resolve_feature_dir exits non-zero on main branch without bootstrap flags" "1" "$EXIT_CODE"
+
 # Summary
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
