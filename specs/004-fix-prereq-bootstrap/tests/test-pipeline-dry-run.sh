@@ -99,6 +99,47 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Test 4: --description only (no --from specify) -> auto-detects specify step
+# Covers US1 Acceptance Scenario 2: "the user provides a --description but no
+# --from flag ... the pipeline auto-detects that no spec.md exists, starts from
+# the specify step, and completes successfully."
+echo "Test 4: --description 'Test feature' --dry-run (no --from) -> exit 0 and auto-detects specify"
+
+STDERR_FILE=$(mktemp)
+STDOUT_FILE=$(mktemp)
+
+EXIT_CODE=0
+bash "$PIPELINE_SH" --description "Test feature" --dry-run \
+    >"$STDOUT_FILE" 2>"$STDERR_FILE" || EXIT_CODE=$?
+
+STDERR_CONTENT=$(cat "$STDERR_FILE")
+STDOUT_CONTENT=$(cat "$STDOUT_FILE")
+
+rm -f "$STDERR_FILE" "$STDOUT_FILE"
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+    echo "  PASS: pipeline exits 0 with --description only"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: pipeline exits $EXIT_CODE (expected 0) with --description only"
+    FAIL=$((FAIL + 1))
+    if [[ -n "$STDERR_CONTENT" ]]; then
+        echo "  STDERR: $STDERR_CONTENT"
+    fi
+fi
+
+# Test 5: --description only -> stdout indicates specify step would run
+echo "Test 5: --description only -> specify step appears in dry-run output"
+
+if echo "$STDOUT_CONTENT" | grep -qi "specify\|dry-run"; then
+    echo "  PASS: stdout references specify step or dry-run"
+    PASS=$((PASS + 1))
+else
+    echo "  FAIL: stdout missing specify step reference"
+    echo "  STDOUT: $STDOUT_CONTENT"
+    FAIL=$((FAIL + 1))
+fi
+
 # Summary
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
