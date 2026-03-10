@@ -26,7 +26,7 @@
 
 **Purpose**: Audit current command files to establish baseline for modifications
 
-- [ ] T001 Read all 4 command files in `.claude/commands/` to capture current content and identify stuck detection pattern, script existence check presence, and argument handling: `.claude/commands/speckit.pipeline.md`, `.claude/commands/speckit.homer.clarify.md`, `.claude/commands/speckit.lisa.analyze.md`, `.claude/commands/speckit.ralph.implement.md`
+- [x] T001 Read all 4 command files in `.claude/commands/` to capture current content and identify stuck detection pattern, script existence check presence, and argument handling: `.claude/commands/speckit.pipeline.md`, `.claude/commands/speckit.homer.clarify.md`, `.claude/commands/speckit.lisa.analyze.md`, `.claude/commands/speckit.ralph.implement.md`
 
 ---
 
