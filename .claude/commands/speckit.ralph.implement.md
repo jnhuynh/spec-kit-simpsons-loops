@@ -42,18 +42,30 @@ Orchestrate the Ralph loop directly within this Claude Code session. Each iterat
 
 ## Execution Steps
 
-### Step 1: Resolve Feature Directory
+### Step 1: Parse Arguments
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+- **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+
+**Parsing rules**:
+- A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
+- A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
+- If neither is provided, use defaults for both
+
+### Step 2: Resolve Feature Directory
+
+- If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
 - Otherwise, run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON output for `FEATURE_DIR`
 
-### Step 2: Analyze Tasks
+### Step 3: Analyze Tasks
 
 1. Count incomplete tasks (`- [ ]` lines) in `FEATURE_DIR/tasks.md`
 2. Count completed tasks (`- [x]` lines)
 3. Exit early if nothing to do
 
-### Step 3: Extract Quality Gates
+### Step 4: Extract Quality Gates
 
 Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass.
 
@@ -62,11 +74,12 @@ Quality gates are read from `.specify/quality-gates.sh` in the project root. Edi
 bash .specify/quality-gates.sh
 ```
 
-### Step 4: Configuration
+### Step 5: Configuration
 
-- Calculate max iterations: `incomplete_tasks + 10`
+- If `max-iterations` was parsed from `$ARGUMENTS`, use that value
+- Otherwise, default max iterations: `incomplete_tasks + 10`
 
-### Step 5: Run Ralph Loop
+### Step 6: Run Ralph Loop
 
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
@@ -90,10 +103,17 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn 
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
-### Step 6: Report Results
+### Step 7: Report Results
 
 After the loop completes, report:
 - Total iterations run
 - Tasks completed vs remaining
 - Completion status (one of: **success** — all tasks completed; **max iterations reached** — limit hit with tasks remaining; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
+
+## Examples
+
+- `/speckit.ralph.implement` — Auto-detect spec dir from current branch, use default max iterations (incomplete_tasks + 10)
+- `/speckit.ralph.implement specs/003-fix-pipeline-delegation` — Run for specific spec dir
+- `/speckit.ralph.implement 5` — Auto-detect spec dir, limit to 5 iterations
+- `/speckit.ralph.implement specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
