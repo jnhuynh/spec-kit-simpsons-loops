@@ -131,7 +131,7 @@
 - [x] T022 Run quickstart.md validation — execute the verification commands from `specs/003-fix-pipeline-delegation/quickstart.md` to confirm sync checks pass and commands are functional
 - [x] T023 [Edge Case] Verify non-zero bash utility exit handling — confirm all 4 command files propagate errors when `check-prerequisites.sh` exits with non-zero status (e.g., missing feature dir, invalid branch), reporting the failure to the user and stopping iteration rather than continuing silently
 - [x] T024 [Edge Case] Verify missing agent file handling — confirm that when agent files (e.g., `homer.md`, `lisa.md`, `ralph.md`) are missing, the Agent tool sub-agent failure is detected by the orchestrator and reported as an error to the user
-- [ ] T025 [Edge Case] Verify non-executable utility scripts work — confirm all 4 commands invoke utility scripts via `bash <script>` (not `./<script>`), ensuring execution succeeds even when scripts lack the executable permission bit
+- [x] T025 [Edge Case] Verify non-executable utility scripts work — confirm all 4 commands invoke utility scripts via `bash <script>` (not `./<script>`), ensuring execution succeeds even when scripts lack the executable permission bit
 - [ ] T026 Verify result reporting (FR-005) — confirm all 4 command files report the result of execution (success or failure) back to the user after orchestration completes, including loop completion reason (all findings resolved, all tasks complete, max iterations reached, stuck, or error). Files: `.claude/commands/speckit.pipeline.md`, `.claude/commands/speckit.homer.clarify.md`, `.claude/commands/speckit.lisa.analyze.md`, `.claude/commands/speckit.ralph.implement.md`
 
 ---
