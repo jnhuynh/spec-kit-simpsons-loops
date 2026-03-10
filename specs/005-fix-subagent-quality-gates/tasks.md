@@ -17,7 +17,7 @@
 
 **Purpose**: Delete bash script fallbacks — prerequisite for directory reorganization
 
-- [ ] T001 Delete root-level bash script fallbacks: `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`
+- [x] T001 Delete root-level bash script fallbacks: `pipeline.sh`, `homer-loop.sh`, `lisa-loop.sh`, `ralph-loop.sh`
 
 ---
 
