@@ -58,6 +58,7 @@ All changes must pass before committing:
 - Bash 4+ (shell scripts), Markdown (Claude Code command files) + Claude CLI (`claude` command), Claude Code Agent tool, Bash tool (003-fix-pipeline-delegation)
 - Filesystem only — `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
 - Filesystem only -- `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
+- Bash 4+ (shell scripts), Markdown (Claude Code command files) + Claude CLI (`claude` command), standard Unix utilities (`grep`, `sed`, `test`) (004-fix-prereq-bootstrap)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)
