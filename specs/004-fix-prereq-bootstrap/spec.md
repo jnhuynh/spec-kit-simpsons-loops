@@ -62,7 +62,7 @@ The prerequisite checking system currently validates that the feature directory,
 - **FR-003**: The pipeline's feature-directory resolution MUST handle the case where no spec directory exists yet when `--from specify` or `--description` is provided.
 - **FR-004**: The pipeline's `specify` step MUST create the feature branch, spec directory, and spec.md before subsequent steps run their prerequisite checks.
 - **FR-005**: Existing prerequisite validation behavior MUST remain unchanged for steps that depend on prior artifacts (homer requires spec.md, plan requires spec.md, lisa/ralph require spec.md + plan.md + tasks.md).
-- **FR-006**: The `speckit.pipeline.md` command file MUST defer prerequisite checks when `--from specify` or `--description` is provided, rather than running `check-prerequisites.sh --json` immediately.
+- **FR-006**: The `speckit.pipeline.md` command file MUST defer full prerequisite validation when `--from specify` or `--description` is provided, by using `check-prerequisites.sh --json --paths-only` (path resolution without existence checks) instead of `check-prerequisites.sh --json` (which triggers full validation). If path resolution also fails (e.g., on `main` branch), the failure MUST be treated as non-fatal when bootstrapping.
 
 ### Out of Scope
 
