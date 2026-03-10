@@ -10,6 +10,28 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Pre-Flight Check
+
+Before doing anything else, verify that the required utility scripts are installed:
+
+1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
+2. If **MISSING**, display this error and **STOP** — do not proceed with any execution:
+
+```
+ERROR: Required utility script not found.
+
+Missing: .specify/scripts/bash/check-prerequisites.sh
+
+This script is required for feature directory resolution and prerequisite validation.
+To install it, run the SpecKit setup command:
+
+  /speckit.setup
+
+Or manually install from the openclaw repository.
+```
+
+3. If **EXISTS**, proceed to the Goal section below.
+
 ## Goal
 
 Orchestrate the Ralph loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that implements one task from tasks.md, runs quality gates, commits, and exits. The loop continues until all tasks are complete or max iterations is reached.
@@ -20,18 +42,30 @@ Orchestrate the Ralph loop directly within this Claude Code session. Each iterat
 
 ## Execution Steps
 
-### Step 1: Resolve Feature Directory
+### Step 1: Parse Arguments
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+- **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+
+**Parsing rules**:
+- A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
+- A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
+- If neither is provided, use defaults for both
+
+### Step 2: Resolve Feature Directory
+
+- If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
 - Otherwise, run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON output for `FEATURE_DIR`
 
-### Step 2: Analyze Tasks
+### Step 3: Analyze Tasks
 
 1. Count incomplete tasks (`- [ ]` lines) in `FEATURE_DIR/tasks.md`
 2. Count completed tasks (`- [x]` lines)
 3. Exit early if nothing to do
 
-### Step 3: Extract Quality Gates
+### Step 4: Extract Quality Gates
 
 Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass.
 
@@ -40,13 +74,16 @@ Quality gates are read from `.specify/quality-gates.sh` in the project root. Edi
 bash .specify/quality-gates.sh
 ```
 
-### Step 4: Configuration
+### Step 5: Configuration
 
-- Calculate max iterations: `incomplete_tasks + 10`
+- If `max-iterations` was parsed from `$ARGUMENTS`, use that value
+- Otherwise, default max iterations: `incomplete_tasks + 10`
 
-### Step 5: Run Ralph Loop
+### Step 6: Run Ralph Loop
 
-For each iteration (up to max):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
 
 1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
@@ -56,18 +93,27 @@ For each iteration (up to max):
      - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: <QUALITY_GATES>`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
-2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`
-   - If found: report success and stop looping
-   - If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete
+**After** each sub agent returns:
+1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`. If found, report success and stop looping.
+2. If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete.
+3. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+4. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+5. If `consecutive_stuck_count >= 2`, abort the ralph loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
+6. Otherwise, continue to the next iteration.
 
-3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest reviewing tasks.md.
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
-4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
-
-### Step 6: Report Results
+### Step 7: Report Results
 
 After the loop completes, report:
 - Total iterations run
 - Tasks completed vs remaining
-- Completion status (one of: **success** — all tasks completed; **max iterations reached** — limit hit with tasks remaining; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Completion status (one of: **success** — all tasks completed; **max iterations reached** — limit hit with tasks remaining; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
+
+## Examples
+
+- `/speckit.ralph.implement` — Auto-detect spec dir from current branch, use default max iterations (incomplete_tasks + 10)
+- `/speckit.ralph.implement specs/003-fix-pipeline-delegation` — Run for specific spec dir
+- `/speckit.ralph.implement 5` — Auto-detect spec dir, limit to 5 iterations
+- `/speckit.ralph.implement specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
