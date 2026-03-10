@@ -1,6 +1,7 @@
 # Tasks: Fix Prerequisite Bootstrap Ordering
 
 **Input**: Design documents from `/specs/004-fix-prereq-bootstrap/`
+**Status**: Complete
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, quickstart.md
 
 **Tests**: Test-first tasks (T002a, T002b) write lightweight Bash assertion scripts that capture expected behavior before implementation. These scripts are executed after implementation (T007, T011) to verify correctness. This satisfies the constitution's test-first mandate without requiring an external test framework.
