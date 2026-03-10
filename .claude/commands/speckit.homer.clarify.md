@@ -30,7 +30,29 @@ To install it, run the SpecKit setup command:
 Or manually install from the openclaw repository.
 ```
 
-3. If **EXISTS**, proceed to the Goal section below.
+3. If **EXISTS**, proceed to the agent file check below.
+
+## Agent File Check
+
+Verify that the required agent file exists before starting the loop. Check using the Bash tool:
+
+```bash
+test -f ".claude/agents/homer.md" && echo "homer.md: EXISTS" || echo "homer.md: MISSING"
+```
+
+If **MISSING**, display this error and **STOP** — do not proceed with execution:
+
+```
+ERROR: Required agent file not found.
+
+Missing: .claude/agents/homer.md
+
+This agent file is required for Homer loop sub-agents to execute. It defines
+the behavior of each clarification iteration. Ensure the file is present at:
+  .claude/agents/homer.md
+```
+
+If **EXISTS**, proceed to the Goal section below.
 
 ## Goal
 

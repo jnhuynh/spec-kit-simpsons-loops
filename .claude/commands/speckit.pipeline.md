@@ -28,7 +28,36 @@ To install it, run the SpecKit setup command:
 Or manually install from the openclaw repository.
 ```
 
-3. If **EXISTS**, proceed to the Overview section below.
+3. If **EXISTS**, proceed to the agent file check below.
+
+## Agent File Check
+
+Verify that all required agent files exist before starting the pipeline. Check each of these files using the Bash tool:
+
+```bash
+for f in specify homer plan tasks lisa ralph; do
+  test -f ".claude/agents/${f}.md" && echo "${f}.md: EXISTS" || echo "${f}.md: MISSING"
+done
+```
+
+If **any** agent file is MISSING, display this error and **STOP** — do not proceed with pipeline execution:
+
+```
+ERROR: Required agent file(s) not found.
+
+Missing: .claude/agents/<name>.md
+
+Agent files are required for pipeline sub-agents to execute. These files define
+the behavior of each pipeline phase. Ensure all agent files are present:
+  .claude/agents/specify.md
+  .claude/agents/homer.md
+  .claude/agents/plan.md
+  .claude/agents/tasks.md
+  .claude/agents/lisa.md
+  .claude/agents/ralph.md
+```
+
+If **all** agent files exist, proceed to the Overview section below.
 
 ## Overview
 

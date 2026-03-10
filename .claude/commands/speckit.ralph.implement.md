@@ -30,7 +30,29 @@ To install it, run the SpecKit setup command:
 Or manually install from the openclaw repository.
 ```
 
-3. If **EXISTS**, proceed to the Goal section below.
+3. If **EXISTS**, proceed to the agent file check below.
+
+## Agent File Check
+
+Verify that the required agent file exists before starting the loop. Check using the Bash tool:
+
+```bash
+test -f ".claude/agents/ralph.md" && echo "ralph.md: EXISTS" || echo "ralph.md: MISSING"
+```
+
+If **MISSING**, display this error and **STOP** — do not proceed with execution:
+
+```
+ERROR: Required agent file not found.
+
+Missing: .claude/agents/ralph.md
+
+This agent file is required for Ralph loop sub-agents to execute. It defines
+the behavior of each implementation iteration. Ensure the file is present at:
+  .claude/agents/ralph.md
+```
+
+If **EXISTS**, proceed to the Goal section below.
 
 ## Goal
 
