@@ -17,7 +17,7 @@
 
 **Purpose**: Verify the current state and understand the code that needs modification
 
-- [ ] T001 Read and understand the current `resolve_feature_dir()` function in `.specify/scripts/bash/pipeline.sh` (lines 302-345) and the current Step 1 resolution logic in `.claude/commands/speckit.pipeline.md` (line 89)
+- [x] T001 Read and understand the current `resolve_feature_dir()` function in `.specify/scripts/bash/pipeline.sh` (lines 302-345) and the current Step 1 resolution logic in `.claude/commands/speckit.pipeline.md` (line 89)
 - [ ] T002 Read and understand the `--paths-only` flag behavior in `.specify/scripts/bash/check-prerequisites.sh` (lines 86-101) to confirm it returns paths without validation
 
 ---
