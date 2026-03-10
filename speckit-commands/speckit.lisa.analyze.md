@@ -98,7 +98,7 @@ If any are missing, abort with guidance:
 ### Step 4: Configuration
 
 - If `max-iterations` was parsed from `$ARGUMENTS`, use that value
-- Otherwise, default max iterations: **10** (4 severity levels + buffer)
+- Otherwise, default max iterations: **30**
 
 ### Step 5: Run Lisa Loop
 
@@ -132,7 +132,7 @@ After the loop completes, report:
 
 ## Examples
 
-- `/speckit.lisa.analyze` — Auto-detect spec dir from current branch, use default max iterations (10)
+- `/speckit.lisa.analyze` — Auto-detect spec dir from current branch, use default max iterations (30)
 - `/speckit.lisa.analyze specs/003-fix-pipeline-delegation` — Run for specific spec dir
 - `/speckit.lisa.analyze 5` — Auto-detect spec dir, limit to 5 iterations
 - `/speckit.lisa.analyze specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations

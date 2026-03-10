@@ -117,9 +117,9 @@ Check which artifacts exist to determine where to start:
 
 ### Step 4: Configuration
 
-- Homer max iterations: **20**
-- Lisa max iterations: **20**
-- Ralph max iterations: **incomplete_tasks + 10** (calculated at ralph step)
+- Homer max iterations: **30**
+- Lisa max iterations: **30**
+- Ralph max iterations: **incomplete_tasks + 10** (count `- [ ]` lines in tasks.md at the start of the ralph step, then add 10)
 
 ### Step 5: Execute Pipeline Steps
 
@@ -192,13 +192,33 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), s
 
 #### Ralph (loop step)
 
-> **IMPORTANT**: Before running Ralph, resolve quality gates. Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass. CLI arguments (`--quality-gates`) and environment variables (`QUALITY_GATES`) override the file when provided.
+**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` exists and contains executable content. Run the following via Bash tool:
 
-Quality gates:
 ```bash
-# SPECKIT_DEFAULT_QUALITY_GATE
-bash .specify/quality-gates.sh
+test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
 ```
+
+If the file does not exist or contains only comments/whitespace (the command above produces no output), **STOP** the pipeline with this error:
+
+```
+ERROR: Quality gates file is missing or empty.
+
+Expected: .specify/quality-gates.sh with executable commands.
+
+Create the file with your project's quality gate commands, e.g.:
+  echo 'npm test && npm run lint' > .specify/quality-gates.sh
+
+The ralph phase requires quality gates to validate implementation work.
+```
+
+**Calculate ralph max iterations**: Count incomplete tasks in tasks.md and add 10:
+
+```bash
+incomplete_count=$(grep -c '^\s*- \[ \]' "<FEATURE_DIR>/tasks.md" 2>/dev/null || echo "0")
+echo $((incomplete_count + 10))
+```
+
+Use the resulting number as `ralph_max_iterations`.
 
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
@@ -206,7 +226,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), 
 
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/ralph.md`
-- **prompt** (additional): Include quality gates: `Quality gates: <QUALITY_GATES>`
+- **prompt** (additional): Include quality gates: `Quality gates: bash .specify/quality-gates.sh`
 
 **After** each sub agent returns:
 1. Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly (check if any `- [ ]` tasks remain). If all tasks are complete, ralph is done — proceed to reporting.
