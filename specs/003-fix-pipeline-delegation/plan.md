@@ -171,7 +171,7 @@ This project is an internal CLI tooling system. The commands expose no external 
 
 ### Implementation Approach
 
-The implementation has 3 main work areas:
+The implementation has 4 main work areas:
 
 #### Area 1: Update Stuck Detection (all 4 commands)
 
@@ -195,6 +195,17 @@ After updating command files, sync all 3 locations to be byte-identical:
 #### Area 3: Verify Utility Script Check (all 4 commands)
 
 Confirm each command checks for `check-prerequisites.sh` existence before execution. The current commands call `check-prerequisites.sh` via Bash tool but may not explicitly check existence first. Add explicit existence check with actionable error message per FR-002/FR-003 if missing.
+
+#### Area 4: Verify Pipeline Auto-Detection of Starting Step (pipeline command)
+
+Confirm the pipeline command implements the auto-detection logic from US1 Acceptance Scenario 2 (FR-009, SC-001):
+- If `tasks.md` exists with some `- [x]` completed tasks, start at **ralph**
+- If `tasks.md` exists with no completed tasks, start at **lisa**
+- If `plan.md` exists but no `tasks.md`, start at **tasks**
+- If `spec.md` exists but no `plan.md`, start at **homer**
+- If no `spec.md` but `--description` is provided, start at **specify**
+
+This logic determines which pipeline step to begin from when the user does not provide an explicit `--from` flag. It is covered by task T004b.
 
 ### Re-evaluated Constitution Check (Post-Design)
 
