@@ -82,10 +82,10 @@
 
 **Purpose**: Final validation across all modified files
 
-- [ ] T012 Run shellcheck on `.specify/scripts/bash/pipeline.sh` to verify no new linting errors were introduced
-- [ ] T013 Verify byte-identical sync between `.specify/scripts/bash/pipeline.sh` and root-level `pipeline.sh`
-- [ ] T014 Verify byte-identical sync between `.claude/commands/speckit.pipeline.md` and root-level `speckit.pipeline.md`
-- [ ] T015 Run quickstart.md verification scenarios from `specs/004-fix-prereq-bootstrap/quickstart.md`
+- [x] T012 Run shellcheck on `.specify/scripts/bash/pipeline.sh` to verify no new linting errors were introduced
+- [x] T013 Verify byte-identical sync between `.specify/scripts/bash/pipeline.sh` and root-level `pipeline.sh`
+- [x] T014 Verify byte-identical sync between `.claude/commands/speckit.pipeline.md` and root-level `speckit.pipeline.md`
+- [x] T015 Run quickstart.md verification scenarios from `specs/004-fix-prereq-bootstrap/quickstart.md`
 
 ---
 
