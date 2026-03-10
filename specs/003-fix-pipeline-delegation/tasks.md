@@ -15,8 +15,8 @@
 
 ## Path Conventions
 
-- **Command files (canonical)**: `.claude/commands/speckit.<name>.md`
-- **Command files (repo root)**: `speckit.<name>.md`
+- **Command files (working copy)**: `.claude/commands/speckit.<name>.md`
+- **Command files (upstream source)**: `speckit.<name>.md`
 - **Command files (global)**: `~/.openclaw/.claude/commands/speckit.<name>.md`
 - **Utility scripts (read-only)**: `.specify/scripts/bash/check-prerequisites.sh`
 
