@@ -67,7 +67,9 @@ If any are missing, abort with guidance:
 
 ### Step 4: Run Lisa Loop
 
-For each iteration (up to max):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
 
 1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
@@ -77,17 +79,18 @@ For each iteration (up to max):
      - Provide: `Feature directory: <FEATURE_DIR>`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
-2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`
-   - If found: report success and stop looping
-   - If not found: continue to next iteration
+**After** each sub agent returns:
+1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, report success and stop looping.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the lisa loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
+5. Otherwise, continue to the next iteration.
 
-3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest manual review.
-
-4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
 ### Step 5: Report Results
 
 After the loop completes, report:
 - Total iterations run
-- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
