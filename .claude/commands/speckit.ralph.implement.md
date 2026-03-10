@@ -68,7 +68,9 @@ bash .specify/quality-gates.sh
 
 ### Step 5: Run Ralph Loop
 
-For each iteration (up to max):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
 
 1. Spawn a fresh-context sub agent using the **Agent tool**:
    - **subagent_type**: `general-purpose`
@@ -78,18 +80,20 @@ For each iteration (up to max):
      - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: <QUALITY_GATES>`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
-2. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`
-   - If found: report success and stop looping
-   - If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete
+**After** each sub agent returns:
+1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`. If found, report success and stop looping.
+2. If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete.
+3. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+4. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+5. If `consecutive_stuck_count >= 2`, abort the ralph loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
+6. Otherwise, continue to the next iteration.
 
-3. **Stuck detection**: Track consecutive iterations with identical output. If 3 consecutive iterations produce identical output, abort and suggest reviewing tasks.md.
-
-4. **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
 
 ### Step 6: Report Results
 
 After the loop completes, report:
 - Total iterations run
 - Tasks completed vs remaining
-- Completion status (one of: **success** — all tasks completed; **max iterations reached** — limit hit with tasks remaining; **stuck** — 3 consecutive identical outputs detected; **failure** — sub agent crashed or errored)
+- Completion status (one of: **success** — all tasks completed; **max iterations reached** — limit hit with tasks remaining; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
 - Suggestion to rerun if not fully resolved
