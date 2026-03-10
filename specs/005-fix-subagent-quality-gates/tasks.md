@@ -114,7 +114,7 @@
 **Purpose**: Final validation across all changes
 
 - [x] T012 [P] Run `shellcheck` on `setup.sh` and all scripts in `.specify/scripts/bash/` — fix any errors or warnings
-- [ ] T013 Run quickstart.md verification checklist against the implemented changes in `specs/005-fix-subagent-quality-gates/quickstart.md`
+- [x] T013 Run quickstart.md verification checklist against the implemented changes in `specs/005-fix-subagent-quality-gates/quickstart.md`
 
 ---
 
