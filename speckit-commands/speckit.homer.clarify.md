@@ -79,7 +79,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 ### Step 2: Resolve Feature Directory
 
 - If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
-- Otherwise, run `bash .specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse JSON output for `FEATURE_DIR`. **Error handling**: If the script exits with a non-zero status (e.g., missing feature dir, invalid branch), display the script's stderr/stdout output to the user and **STOP** — do not proceed with execution.
+- Otherwise, run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root and parse JSON output for `FEATURE_DIR`. **Error handling**: If the script exits with a non-zero status (e.g., missing feature dir, invalid branch), display the script's stderr/stdout output to the user and **STOP** — do not proceed with execution.
 
 ### Step 3: Verify Artifacts
 
@@ -90,7 +90,7 @@ If missing, abort with guidance: "Run /speckit.specify first"
 ### Step 4: Configuration
 
 - If `max-iterations` was parsed from `$ARGUMENTS`, use that value
-- Otherwise, default max iterations: **10** (4 severity levels + buffer)
+- Otherwise, default max iterations: **30**
 
 ### Step 5: Run Homer Loop
 
@@ -124,7 +124,7 @@ After the loop completes, report:
 
 ## Examples
 
-- `/speckit.homer.clarify` — Auto-detect spec dir from current branch, use default max iterations (10)
+- `/speckit.homer.clarify` — Auto-detect spec dir from current branch, use default max iterations (30)
 - `/speckit.homer.clarify specs/003-fix-pipeline-delegation` — Run for specific spec dir
 - `/speckit.homer.clarify 5` — Auto-detect spec dir, limit to 5 iterations
 - `/speckit.homer.clarify specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
