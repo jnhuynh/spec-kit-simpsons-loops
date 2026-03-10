@@ -42,10 +42,13 @@ No violations. No complexity tracking needed.
 
 ```text
 specs/003-fix-pipeline-delegation/
+├── spec.md              # Feature specification
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
-└── tasks.md             # Phase 2 output (created by /speckit.tasks)
+├── tasks.md             # Phase 2 output (created by /speckit.tasks)
+├── quickstart.md        # Implementation summary and verification commands
+└── checklists/          # Phase checklists
 ```
 
 ### Source Code (repository root)
