@@ -38,7 +38,9 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Add bootstrap fallback to `resolve_feature_dir()` in `.specify/scripts/bash/pipeline.sh` — after the `for dir in ... done` loop and exact-match check in `resolve_feature_dir()`, before the final error message, add: if no directory was found but `FROM_STEP=specify` or `DESCRIPTION` is non-empty, construct and return `specs/<branch-name>` without requiring the directory to exist. Additionally, when on `main` branch (or `HEAD`) and bootstrapping is active, treat the `resolve_feature_dir()` failure as non-fatal — allow the pipeline to proceed with an empty `FEATURE_DIR` so that the specify step's agent (via `create-new-feature.sh`) can create the branch and directory first. **Post-specify re-resolution**: After the specify step completes and before subsequent steps (homer, plan, etc.) run, the pipeline MUST re-call `resolve_feature_dir()` to obtain the now-valid `FEATURE_DIR` (since `create-new-feature.sh` will have created the branch and directory). This re-resolution ensures downstream steps receive a valid path for their prerequisite checks
+- [ ] T003a [US1] Add bootstrap fallback to `resolve_feature_dir()` in `.specify/scripts/bash/pipeline.sh` — in the `resolve_feature_dir()` function, after the `for dir in ... done` loop and exact-match check, before the final error message: if no directory was found but `FROM_STEP=specify` or `DESCRIPTION` is non-empty AND the current branch is a feature branch (not `main` or `HEAD`), construct and return `specs/<branch-name>` without requiring the directory to exist
+- [ ] T003b [US1] Handle the `main` branch bootstrap case in `resolve_feature_dir()` in `.specify/scripts/bash/pipeline.sh` — when on `main` branch (or `HEAD`) and bootstrapping is active (`FROM_STEP=specify` or `DESCRIPTION` is non-empty), treat the `resolve_feature_dir()` failure as non-fatal by returning an empty string (success exit code). The pipeline proceeds with an empty `FEATURE_DIR` because the specify step's agent (via `create-new-feature.sh`) will create the feature branch and directory. The caller must check for an empty `FEATURE_DIR` and skip directory-dependent logic until after the specify step completes
+- [ ] T003c [US1] Add post-specify re-resolution to `pipeline.sh` — after the specify step completes and before subsequent steps (homer, plan, etc.) execute, the pipeline MUST re-call `resolve_feature_dir()` to obtain the now-valid `FEATURE_DIR` (since `create-new-feature.sh` will have created the branch and directory). This re-resolution ensures downstream steps receive a valid path for their prerequisite checks. This covers FR-004
 - [ ] T004 [US1] Copy the updated `.specify/scripts/bash/pipeline.sh` to the root-level `pipeline.sh` to keep them in sync
 - [ ] T005 [US1] Update Step 1 in `.claude/commands/speckit.pipeline.md` (line 89) to use `check-prerequisites.sh --json --paths-only` instead of `check-prerequisites.sh --json` when `--from specify` is set or `--description` is provided and no `spec-dir` argument is given
 - [ ] T006 [US1] Copy the updated `.claude/commands/speckit.pipeline.md` to the root-level `speckit.pipeline.md` to keep them in sync
@@ -100,7 +102,8 @@
 
 ### Parallel Opportunities
 
-- T003 and T005 can run in parallel [P] — they modify different files (pipeline.sh vs speckit.pipeline.md)
+- T003a, T003b, and T003c are sequential within pipeline.sh (T003a and T003b modify resolve_feature_dir(), T003c adds re-resolution logic after the specify step)
+- T003a/T003b/T003c and T005 can run in parallel [P] — they modify different files (pipeline.sh vs speckit.pipeline.md)
 - T004 and T006 can run in parallel [P] — they sync different files
 - T008, T009, T010 can all run in parallel [P] — they are read-only verification tasks on different files
 - T012, T013, T014 can all run in parallel [P] — they are independent validation checks
@@ -111,8 +114,8 @@
 
 ```bash
 # Launch pipeline.sh and speckit.pipeline.md changes together:
-Task: "Add bootstrap fallback to resolve_feature_dir() in .specify/scripts/bash/pipeline.sh"
-Task: "Update Step 1 in .claude/commands/speckit.pipeline.md to use --paths-only for bootstrap"
+Task: "Add bootstrap fallback + main-branch handling + post-specify re-resolution in pipeline.sh (T003a, T003b, T003c)"
+Task: "Update Step 1 in .claude/commands/speckit.pipeline.md to use --paths-only for bootstrap (T005)"
 
 # Launch root-level syncs together (after source changes):
 Task: "Copy updated pipeline.sh to root-level pipeline.sh"
