@@ -73,7 +73,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T009 [US3] Audit and clean all files in `speckit-commands/` — search for and remove any remaining references to `--quality-gates` CLI flag, `QUALITY_GATES` environment variable, or `resolve_quality_gates` function; verify `speckit-commands/speckit.homer.clarify.md` and `speckit-commands/speckit.lisa.analyze.md` contain zero quality gate references; verify `speckit-commands/speckit.ralph.implement.md` and `speckit-commands/speckit.pipeline.md` reference only `.specify/quality-gates.sh` as sole source
+- [x] T009 [US3] Audit and clean all files in `speckit-commands/` — search for and remove any remaining references to `--quality-gates` CLI flag, `QUALITY_GATES` environment variable, or `resolve_quality_gates` function; verify `speckit-commands/speckit.homer.clarify.md` and `speckit-commands/speckit.lisa.analyze.md` contain zero quality gate references; verify `speckit-commands/speckit.ralph.implement.md` and `speckit-commands/speckit.pipeline.md` reference only `.specify/quality-gates.sh` as sole source
 
 **Checkpoint**: Quality gate consolidation verified — single source of truth confirmed across all command files
 

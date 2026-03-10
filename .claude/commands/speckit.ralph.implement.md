@@ -112,7 +112,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn 
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `.claude/agents/ralph.md`
      - When those instructions reference a slash command (e.g., `/speckit.implement`), read the corresponding file from `.claude/commands/` and follow its instructions directly
-     - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: <QUALITY_GATES>`
+     - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: bash .specify/quality-gates.sh`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
 **After** each sub agent returns:

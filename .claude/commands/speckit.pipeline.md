@@ -192,12 +192,23 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), s
 
 #### Ralph (loop step)
 
-> **IMPORTANT**: Before running Ralph, resolve quality gates. Quality gates are read from `.specify/quality-gates.sh` in the project root. Edit that file with your project's quality gate commands (e.g., `npm test && npm run lint`). The file must exit 0 for quality gates to pass. CLI arguments (`--quality-gates`) and environment variables (`QUALITY_GATES`) override the file when provided.
+**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` exists and contains executable content. Run the following via Bash tool:
 
-Quality gates:
 ```bash
-# SPECKIT_DEFAULT_QUALITY_GATE
-bash .specify/quality-gates.sh
+test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
+```
+
+If the file does not exist or contains only comments/whitespace (the command above produces no output), **STOP** the pipeline with this error:
+
+```
+ERROR: Quality gates file is missing or empty.
+
+Expected: .specify/quality-gates.sh with executable commands.
+
+Create the file with your project's quality gate commands, e.g.:
+  echo 'npm test && npm run lint' > .specify/quality-gates.sh
+
+The ralph phase requires quality gates to validate implementation work.
 ```
 
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
@@ -206,7 +217,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), 
 
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/ralph.md`
-- **prompt** (additional): Include quality gates: `Quality gates: <QUALITY_GATES>`
+- **prompt** (additional): Include quality gates: `Quality gates: bash .specify/quality-gates.sh`
 
 **After** each sub agent returns:
 1. Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly (check if any `- [ ]` tasks remain). If all tasks are complete, ralph is done — proceed to reporting.
