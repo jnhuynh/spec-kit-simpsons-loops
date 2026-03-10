@@ -40,9 +40,9 @@ The prerequisite checking system currently validates that the feature directory,
 
 **Acceptance Scenarios**:
 
-1. **Given** the prerequisite check script is invoked during the `specify` step, **When** no spec directory or plan.md exists, **Then** it returns path information without exiting with an error.
-2. **Given** the prerequisite check script is invoked during the `homer` step, **When** spec.md exists but plan.md does not, **Then** it validates spec.md existence but does not require plan.md.
-3. **Given** the prerequisite check script is invoked during the `lisa` or `ralph` step, **When** plan.md and tasks.md are expected, **Then** it validates their existence as it does today.
+1. **Given** the prerequisite check script is invoked with `--paths-only` during the `specify` step, **When** no spec directory or plan.md exists, **Then** it returns path information without exiting with an error (no validation is performed in `--paths-only` mode).
+2. **Given** the prerequisite check script is invoked with `--paths-only` during the `homer` step (which runs before plan.md exists), **When** spec.md exists but plan.md does not, **Then** it returns path information without error because `--paths-only` skips all existence validation. The homer step's internal command (`speckit.clarify`) also uses `--paths-only` and validates spec.md existence separately.
+3. **Given** the prerequisite check script is invoked with full validation (without `--paths-only`) during the `lisa` or `ralph` step, **When** plan.md and tasks.md are expected, **Then** it validates their existence as it does today.
 
 ---
 
