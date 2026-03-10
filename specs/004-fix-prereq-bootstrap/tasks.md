@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/004-fix-prereq-bootstrap/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, quickstart.md
 
-**Tests**: No test tasks generated — the spec uses manual pipeline execution tests and shellcheck for validation, not a unit test framework.
+**Tests**: Test-first tasks (T002a, T002b) write lightweight Bash assertion scripts that capture expected behavior before implementation. These scripts are executed after implementation (T007, T011) to verify correctness. This satisfies the constitution's test-first mandate without requiring an external test framework.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -30,6 +30,17 @@
 
 ---
 
+## Phase 2b: Test-First — Write Assertion Scripts Before Implementation
+
+**Purpose**: Satisfy the constitution's test-first development mandate (Section: Test-First Development). Write lightweight Bash assertion scripts that define expected behavior for the bootstrap fix. These scripts MUST be written and verified to FAIL against the current (unfixed) code before any implementation begins.
+
+- [ ] T002a Write a test script `specs/004-fix-prereq-bootstrap/tests/test-resolve-bootstrap.sh` that asserts `resolve_feature_dir()` returns a valid path (exit 0) when `FROM_STEP=specify` and no spec directory exists. The script sources `pipeline.sh` functions and invokes `resolve_feature_dir()` in a subshell with `FROM_STEP=specify DESCRIPTION="test"` set. Verify this test FAILS against the current unfixed code (exit code != 0), confirming the bug exists.
+- [ ] T002b Write a test script `specs/004-fix-prereq-bootstrap/tests/test-pipeline-dry-run.sh` that asserts `pipeline.sh --from specify --description "Test feature" --dry-run` exits 0 and does not emit prerequisite errors to stderr. Verify this test FAILS against the current unfixed code, confirming the end-to-end bug exists.
+
+**Checkpoint**: Test scripts exist and fail against the current code, proving the bug. Implementation may now begin.
+
+---
+
 ## Phase 3: User Story 1 — Run Full Pipeline from Description (Priority: P1)
 
 **Goal**: Enable the pipeline to start from the `specify` step without requiring a pre-existing spec directory, spec.md, or plan.md. This is the core broken workflow.
@@ -44,7 +55,7 @@
 - [ ] T004 [US1] Copy the updated `.specify/scripts/bash/pipeline.sh` to the root-level `pipeline.sh` to keep them in sync
 - [ ] T005 [US1] Update Step 1 in `.claude/commands/speckit.pipeline.md` (line 89) to use `check-prerequisites.sh --json --paths-only` instead of `check-prerequisites.sh --json` when `--from specify` is set or `--description` is provided and no `spec-dir` argument is given. Additionally: (a) if `--json --paths-only` returns an empty or invalid `FEATURE_DIR` (e.g., on `main` branch where `find_feature_dir_by_prefix` yields nothing), treat this as non-fatal when bootstrapping and allow the specify step to proceed with an unresolved `FEATURE_DIR`; (b) after the specify step completes in Step 5, re-run `check-prerequisites.sh --json` to obtain the now-valid `FEATURE_DIR` before passing it to subsequent steps (homer, plan, etc.) — this mirrors the post-specify re-resolution in T003c for pipeline.sh
 - [ ] T006 [US1] Copy the updated `.claude/commands/speckit.pipeline.md` to the root-level `speckit.pipeline.md` to keep them in sync
-- [ ] T007 [US1] Verify the fix by running `bash .specify/scripts/bash/pipeline.sh --from specify --description "Test feature" --dry-run` and confirming it resolves the feature directory without errors
+- [ ] T007 [US1] Verify the fix by running the test scripts from T002a and T002b (`bash specs/004-fix-prereq-bootstrap/tests/test-resolve-bootstrap.sh` and `bash specs/004-fix-prereq-bootstrap/tests/test-pipeline-dry-run.sh`) and confirming both now PASS (exit 0). Additionally run `bash .specify/scripts/bash/pipeline.sh --from specify --description "Test feature" --dry-run` and confirm it resolves the feature directory without errors
 
 **Checkpoint**: At this point, the pipeline can start from `specify` with a description and resolve the feature directory without prerequisite errors
 
@@ -84,13 +95,14 @@
 
 - **Setup (Phase 1)**: No dependencies — can start immediately
 - **Foundational (Phase 2)**: N/A — no foundational tasks
-- **User Story 1 (Phase 3)**: Depends on Setup (Phase 1) — implements the core fix
+- **Test-First (Phase 2b)**: Depends on Setup (Phase 1) — writes assertion scripts that MUST fail before implementation
+- **User Story 1 (Phase 3)**: Depends on Test-First (Phase 2b) — implements the core fix
 - **User Story 2 (Phase 4)**: Depends on User Story 1 (Phase 3) — verifies the fix works correctly for stage-aware validation
 - **Polish (Phase 5)**: Depends on both user stories being complete
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Can start after Setup — core implementation changes
+- **User Story 1 (P1)**: Can start after Test-First (Phase 2b) — core implementation changes
 - **User Story 2 (P2)**: Depends on US1 completion — verification that changes work correctly across all pipeline stages
 
 ### Within Each User Story
@@ -129,16 +141,18 @@ Task: "Copy updated speckit.pipeline.md to root-level speckit.pipeline.md"
 ### MVP First (User Story 1 Only)
 
 1. Complete Phase 1: Setup (understand existing code)
-2. Complete Phase 3: User Story 1 (core fix)
-3. **STOP and VALIDATE**: Run dry-run pipeline test
-4. Deploy/demo if ready
+2. Complete Phase 2b: Test-First (write assertion scripts, verify they fail)
+3. Complete Phase 3: User Story 1 (core fix)
+4. **STOP and VALIDATE**: Run test scripts + dry-run pipeline test
+5. Deploy/demo if ready
 
 ### Incremental Delivery
 
 1. Complete Setup → Understand current codebase
-2. Add User Story 1 → Fix bootstrap ordering → Verify dry-run (MVP!)
-3. Add User Story 2 → Verify stage-aware validation → Confirm no regressions
-4. Polish → shellcheck, sync validation, quickstart verification
+2. Write test scripts → Verify they fail against unfixed code (test-first)
+3. Add User Story 1 → Fix bootstrap ordering → Verify tests pass + dry-run (MVP!)
+4. Add User Story 2 → Verify stage-aware validation → Confirm no regressions
+5. Polish → shellcheck, sync validation, quickstart verification
 
 ---
 

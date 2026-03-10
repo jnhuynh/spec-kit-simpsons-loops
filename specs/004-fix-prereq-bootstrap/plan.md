@@ -30,7 +30,7 @@ The SpecKit pipeline fails when starting from the `specify` step because both `s
 | III. Maintainability Over Cleverness | PASS | Using existing `--paths-only` flag rather than inventing new mechanisms |
 | IV. Best Practices | PASS | Following existing codebase patterns for flag usage and error handling |
 | V. Simplicity (KISS & YAGNI) | PASS | Fixing callers to use existing capability; no new abstractions |
-| Test-First Development | DEVIATION — justified | Constitution MUST requires test-first for bug fixes. However, no unit test framework (e.g., bats-core) is present in this project, and changes are control-flow adjustments to existing shell scripts rather than new business logic functions. Validation is performed via manual pipeline execution dry-runs (T007, T011) and shellcheck static analysis (T012). This is a known deviation from the constitution's test-first mandate, justified by the absence of a shell testing framework and the nature of the changes (conditional branches, not testable pure functions). |
+| Test-First Development | PASS | Lightweight Bash assertion scripts (T002a, T002b) are written before implementation to define expected behavior and verify they FAIL against unfixed code. After implementation, T007 re-runs these scripts to confirm they PASS. No external test framework is required — plain Bash scripts with assertions suffice for the constitution's test-first mandate. |
 | Spec & Branch Naming | PASS | Branch `004-fix-prereq-bootstrap` follows `XXXX-type-description` pattern |
 
 ## Project Structure
