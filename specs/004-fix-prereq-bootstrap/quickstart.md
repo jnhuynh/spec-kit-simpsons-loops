@@ -17,7 +17,7 @@ Two files need modifications (plus their root-level copies kept in sync):
 
 **Key constraint**: The `FROM_STEP` and `DESCRIPTION` variables are set before `resolve_feature_dir()` is called (argument parsing happens first), so they are available for the bootstrap check.
 
-**Location in code**: After the branch auto-detect loop (around line 335), before the final error message (line 343). Add a check: if no directory was found but bootstrapping is active, construct and return the path.
+**Location in code**: After the branch auto-detect loop (around line 341) and exact-match check (line 344), the bootstrap fallback is at lines 349-355. The final error message is at lines 357-358.
 
 ## Change 2: `speckit.pipeline.md` — Step 1 feature dir resolution
 
