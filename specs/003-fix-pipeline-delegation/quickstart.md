@@ -24,7 +24,7 @@ Each command follows the same hybrid orchestration pattern:
 3. **Error message**: If missing, display actionable remediation instructions and exit
 4. **Feature dir resolution**: Run `check-prerequisites.sh --json` via Bash tool to resolve the feature directory
 5. **Loop orchestration**: Spawn Agent tool sub-agents (one per iteration), each reading the agent file, doing work, committing, and exiting
-6. **Stuck detection**: After each sub-agent returns, check `git diff HEAD~1 --stat` for file changes and check output for completion promise tag. Abort after 2 consecutive stuck iterations (no git diff AND no promise tag)
+6. **Stuck detection**: Before each sub-agent, record `PRE_ITERATION_SHA=$(git rev-parse HEAD)`. After each sub-agent returns, check `git diff $PRE_ITERATION_SHA --stat` for file changes and check output for completion promise tag. Abort after 2 consecutive stuck iterations (no git diff AND no promise tag)
 7. **Result reporting**: Report success, completion, or failure to the user
 
 ## Verification
