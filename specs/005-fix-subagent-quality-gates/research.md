@@ -87,7 +87,7 @@
 
 | File (post-reorganization) | Changes | FRs |
 |---|---|---|
-| `speckit-commands/speckit.pipeline.md` | Remove CLI/env override text, add QG validation, update defaults to 30, ralph to `incomplete_tasks + 10` | FR-004, FR-007, FR-010, FR-011, FR-012 |
+| `speckit-commands/speckit.pipeline.md` | Remove CLI/env override text, add QG validation, update defaults to 30, ralph to `incomplete_tasks + 10`, verify subagent spawning with Agent tool, verify sequential execution, verify feature dir in prompts, verify stuck detection threshold is 2 | FR-001, FR-003, FR-004, FR-007, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013 |
 | `speckit-commands/speckit.homer.clarify.md` | Update default to 30, use `--json --paths-only`, validate only `spec.md` | FR-011, FR-019, FR-020 |
 | `speckit-commands/speckit.lisa.analyze.md` | Update default to 30 | FR-011 |
 | `speckit-commands/speckit.ralph.implement.md` | Add QG file validation | FR-010 |
