@@ -8,6 +8,28 @@ description: Orchestrate the full SpecKit pipeline (specify, homer, plan, tasks,
 $ARGUMENTS
 ```
 
+## Pre-Flight Check
+
+Before doing anything else, verify that the required utility scripts are installed:
+
+1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
+2. If **MISSING**, display this error and **STOP** — do not proceed with any pipeline execution:
+
+```
+ERROR: Required utility script not found.
+
+Missing: .specify/scripts/bash/check-prerequisites.sh
+
+This script is required for feature directory resolution and prerequisite validation.
+To install it, run the SpecKit setup command:
+
+  /speckit.setup
+
+Or manually install from the openclaw repository.
+```
+
+3. If **EXISTS**, proceed to the Overview section below.
+
 ## Overview
 
 Orchestrate the full SpecKit pipeline directly within this Claude Code session. Each step spawns fresh sub agents (via the Agent tool) with isolated context windows. The pipeline can start from a feature description (using the specify step) or from an existing `spec.md`.
@@ -27,12 +49,15 @@ The pipeline runs these 6 steps in sequence:
 
 ## Instructions
 
-### Step 1: Determine the spec directory
+### Step 1: Parse Arguments and Determine the spec directory
 
-- If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR`
-- If `$ARGUMENTS` contains `--from <step>`, note the starting step (specify, homer, plan, tasks, lisa, ralph)
-- If `$ARGUMENTS` contains `--description <text>`, capture the feature description for the specify step
-- Otherwise, auto-detect from the current git branch name (extract the 4-char prefix and find the matching `specs/<prefix>-*` directory)
+Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+
+- **`--from <step>`**: Starting step override. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. If provided, the pipeline starts from this step instead of auto-detecting.
+- **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
+- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
+
+If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically by running `.specify/scripts/bash/check-prerequisites.sh --json` from repo root via Bash tool and parsing the JSON output for `feature_dir`.
 
 ### Step 2: Validate spec exists or can be created
 
@@ -77,11 +102,19 @@ Skip if `spec.md` already exists. Otherwise, spawn a sub agent:
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (specify) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Print: "Specify step failed. Fix the issue and re-invoke with --from specify". Suggest manual review and resuming with `--from specify`.
 
 #### Homer (loop step)
-For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/homer.md`
 
-Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, homer is complete — proceed to the next pipeline step.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the homer loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from homer`.
 
@@ -100,11 +133,19 @@ Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (tasks) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from tasks`.
 
 #### Lisa (loop step)
-For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/lisa.md`
 
-Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, lisa is complete — proceed to the next pipeline step.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the lisa loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from lisa`.
 
@@ -118,12 +159,20 @@ Quality gates:
 bash .specify/quality-gates.sh
 ```
 
-For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/ralph.md`
 - **prompt** (additional): Include quality gates: `Quality gates: <QUALITY_GATES>`
 
-Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly (check if any `- [ ]` tasks remain). If all tasks are complete, ralph is done — proceed to reporting.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the ralph loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
 
@@ -132,7 +181,7 @@ Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md d
 After all steps complete, report:
 - Steps executed
 - Total iterations per loop step
-- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 3 consecutive identical outputs detected in a loop step; **failure** — a sub agent crashed or errored)
+- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — a sub agent crashed or errored)
 - Suggestion to resume with `--from <step>` if not fully resolved
 
 ## Examples

@@ -114,7 +114,7 @@
 
 ### Implementation for User Story 5
 
-- [ ] T017 [P] [US5] Sync `speckit.pipeline.md` across all 3 locations (repo root `speckit.pipeline.md`, `.claude/commands/speckit.pipeline.md`, global `~/.openclaw/.claude/commands/speckit.pipeline.md`); verify all 3 copies are byte-identical with `diff` (FR-006, SC-005)
+- [x] T017 [P] [US5] Sync `speckit.pipeline.md` across all 3 locations (repo root `speckit.pipeline.md`, `.claude/commands/speckit.pipeline.md`, global `~/.openclaw/.claude/commands/speckit.pipeline.md`); verify all 3 copies are byte-identical with `diff` (FR-006, SC-005)
 - [ ] T018 [P] [US5] Sync `speckit.homer.clarify.md` across all 3 locations (repo root `speckit.homer.clarify.md`, `.claude/commands/speckit.homer.clarify.md`, global `~/.openclaw/.claude/commands/speckit.homer.clarify.md`); verify all 3 copies are byte-identical with `diff` (FR-006, SC-005)
 - [ ] T019 [P] [US5] Sync `speckit.lisa.analyze.md` across all 3 locations (repo root `speckit.lisa.analyze.md`, `.claude/commands/speckit.lisa.analyze.md`, global `~/.openclaw/.claude/commands/speckit.lisa.analyze.md`); verify all 3 copies are byte-identical with `diff` (FR-006, SC-005)
 - [ ] T020 [P] [US5] Sync `speckit.ralph.implement.md` across all 3 locations (repo root `speckit.ralph.implement.md`, `.claude/commands/speckit.ralph.implement.md`, global `~/.openclaw/.claude/commands/speckit.ralph.implement.md`); verify all 3 copies are byte-identical with `diff` (FR-006, SC-005)
