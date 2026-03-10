@@ -99,11 +99,19 @@ Skip if `spec.md` already exists. Otherwise, spawn a sub agent:
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (specify) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Print: "Specify step failed. Fix the issue and re-invoke with --from specify". Suggest manual review and resuming with `--from specify`.
 
 #### Homer (loop step)
-For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/homer.md`
 
-Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, homer is complete — proceed to the next pipeline step.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the homer loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from homer`.
 
@@ -122,11 +130,19 @@ Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (tasks) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from tasks`.
 
 #### Lisa (loop step)
-For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/lisa.md`
 
-Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. Continue looping if not found. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, lisa is complete — proceed to the next pipeline step.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the lisa loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from lisa`.
 
@@ -140,12 +156,20 @@ Quality gates:
 bash .specify/quality-gates.sh
 ```
 
-For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/ralph.md`
 - **prompt** (additional): Include quality gates: `Quality gates: <QUALITY_GATES>`
 
-Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly. Apply stuck detection (3 identical outputs = abort).
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly (check if any `- [ ]` tasks remain). If all tasks are complete, ralph is done — proceed to reporting.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the ralph loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
 
@@ -154,7 +178,7 @@ Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md d
 After all steps complete, report:
 - Steps executed
 - Total iterations per loop step
-- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 3 consecutive identical outputs detected in a loop step; **failure** — a sub agent crashed or errored)
+- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — a sub agent crashed or errored)
 - Suggestion to resume with `--from <step>` if not fully resolved
 
 ## Examples
