@@ -173,11 +173,14 @@ The implementation has 3 main work areas:
 #### Area 1: Update Stuck Detection (all 4 commands)
 
 Change stuck detection from "3 consecutive identical outputs" to git diff-based detection per FR-007:
-- After each Agent tool sub-agent returns, run `git diff HEAD~1 --stat` to check if files changed
+- Before spawning each Agent tool sub-agent, record the current commit SHA: `PRE_ITERATION_SHA=$(git rev-parse HEAD)`
+- After each Agent tool sub-agent returns, run `git diff $PRE_ITERATION_SHA --stat` to check if files changed since the iteration started
 - Check sub-agent output for the completion promise tag
 - If no files changed AND no promise tag: increment consecutive_stuck_count
 - If files changed OR promise tag found: reset consecutive_stuck_count to 0
 - If consecutive_stuck_count reaches 2: abort loop
+
+Note: Using a saved SHA instead of `HEAD~1` is essential because `HEAD~1` would compare against the parent of whatever HEAD is now, which may not be the pre-iteration state if no commits were made (stuck case) or if multiple commits were made.
 
 #### Area 2: Sync All File Copies (12 files)
 
