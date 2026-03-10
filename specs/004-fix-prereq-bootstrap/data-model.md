@@ -23,6 +23,7 @@ The process of converting startup arguments into a `FEATURE_DIR` path.
 | Explicit directory | `spec-dir` argument provided | Directory must exist | CLI argument |
 | Branch auto-detect (existing) | No `spec-dir`, on feature branch, spec dir exists | Directory must exist | `git branch` + filesystem scan |
 | Branch auto-detect (bootstrap) | No `spec-dir`, on feature branch, no spec dir, bootstrapping | No existence check | `git branch` name only |
+| Main branch bootstrap | No `spec-dir`, on `main`/`HEAD`, bootstrapping | None — returns empty string (non-fatal) | Non-fatal fallback; specify step creates branch and dir via `create-new-feature.sh` |
 | `check-prerequisites.sh --json` | `speckit.pipeline.md` without bootstrap flags | Full validation (dir + plan.md) | Script output |
 | `check-prerequisites.sh --paths-only` | `speckit.pipeline.md` with bootstrap flags | No validation | Script output |
 
@@ -33,8 +34,10 @@ Pipeline Start
   │
   ├── is_bootstrapping=true
   │     │
-  │     ├── resolve FEATURE_DIR (no existence check)
+  │     ├── on feature branch → resolve FEATURE_DIR from branch name (no existence check)
+  │     ├── on main/HEAD → FEATURE_DIR is empty (non-fatal; specify step will create branch + dir)
   │     ├── run specify step (creates branch, dir, spec.md)
+  │     ├── re-resolve FEATURE_DIR (now valid)
   │     ├── run homer step (spec.md now exists, validated)
   │     └── continue normally...
   │
@@ -64,7 +67,8 @@ pipeline.sh
   ├── resolve_feature_dir()
   │     ├── explicit dir (exists check)
   │     ├── branch auto-detect (exists check)
-  │     └── branch auto-detect (bootstrap, NO exists check) ← NEW
+  │     ├── branch auto-detect (bootstrap, NO exists check) ← NEW
+  │     └── main/HEAD bootstrap (returns empty, non-fatal) ← NEW
   │
   └── specify step → create-new-feature.sh → creates artifacts
 ```
