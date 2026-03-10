@@ -26,7 +26,7 @@ The SpecKit pipeline fails when starting from the `specify` step because both `s
 | Principle | Status | Notes |
 |-----------|--------|-------|
 | I. Readability First | PASS | Changes are minimal, clear variable names, well-commented |
-| II. Functional Design | PASS | `resolve_feature_dir()` remains a pure function with deterministic outputs |
+| II. Functional Design | PASS | `resolve_feature_dir()` already depends on global variables (`SPEC_DIR_ARG`, `REPO_ROOT`) and filesystem state (pre-existing pattern). The bootstrap fallback adds `FROM_STEP` and `DESCRIPTION` as additional inputs — consistent with the existing pattern, not a new violation. The function remains deterministic given the same global state and filesystem. |
 | III. Maintainability Over Cleverness | PASS | Using existing `--paths-only` flag rather than inventing new mechanisms |
 | IV. Best Practices | PASS | Following existing codebase patterns for flag usage and error handling |
 | V. Simplicity (KISS & YAGNI) | PASS | Fixing callers to use existing capability; no new abstractions |
