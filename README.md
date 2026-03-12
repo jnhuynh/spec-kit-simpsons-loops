@@ -1,6 +1,6 @@
-# Simpsons Loops for Speckit + Claude Code
+# Simpsons Loops for Speckit
 
-Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
+Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using the Claude CLI.
 
 Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
@@ -79,7 +79,7 @@ unset ANTHROPIC_API_KEY
 ## Prerequisites
 
 - A project already set up with Speckit (`.specify/` directory exists)
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed
+- [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
 - Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
 
 ## Setup
@@ -162,7 +162,7 @@ The file must exit 0 for quality gates to pass. This file is required for the Ra
 
 ## Usage
 
-Each loop has a corresponding Claude Code slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your Claude Code session. Each iteration gets a fresh context window.
+Each loop has a corresponding slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your session. Each iteration gets a fresh context window.
 
 ### Homer (clarification)
 

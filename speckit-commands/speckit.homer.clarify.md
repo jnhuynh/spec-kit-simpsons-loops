@@ -55,7 +55,7 @@ If **EXISTS**, proceed to the Goal section below.
 
 ## Goal
 
-Orchestrate the Homer loop directly within this Claude Code session. Each iteration spawns a fresh sub agent (via the Agent tool) that clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
+Orchestrate the Homer loop directly within this session. Each iteration spawns a fresh sub agent (via the Agent tool) that clarifies spec artifacts, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
 

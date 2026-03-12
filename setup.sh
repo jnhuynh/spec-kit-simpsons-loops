@@ -13,7 +13,7 @@ PROJECT_DIR="$(pwd)"
 
 if [[ ! -d "$PROJECT_DIR/.claude" ]]; then
   echo "ERROR: .claude/ directory not found in $PROJECT_DIR"
-  echo "       Run this script from the root of a Claude Code-enabled project."
+  echo "       Run this script from the root of a project with a .claude/ directory."
   exit 1
 fi
 
@@ -32,6 +32,9 @@ fi
 
 echo "Installing Simpsons Loops into: $PROJECT_DIR"
 echo ""
+
+# ── 0b. Deploy CLAUDE.md and constitution.md ─────────────────────────
+"$SCRIPT_DIR/templates/setup.sh" init "$PROJECT_DIR"
 
 # ── 0. Quality gate file (never overwrite) ──────────────────────────
 # MUST run before file copies so we can inspect the target's existing

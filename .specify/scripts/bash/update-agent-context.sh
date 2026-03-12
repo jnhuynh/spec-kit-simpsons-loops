@@ -613,7 +613,7 @@ update_specific_agent() {
     
     case "$agent_type" in
         claude)
-            update_agent_file "$CLAUDE_FILE" "Claude Code"
+            update_agent_file "$CLAUDE_FILE" "Claude"
             ;;
         gemini)
             update_agent_file "$GEMINI_FILE" "Gemini CLI"
@@ -688,7 +688,7 @@ update_all_existing_agents() {
     
     # Check each possible agent file and update if it exists
     if [[ -f "$CLAUDE_FILE" ]]; then
-        update_agent_file "$CLAUDE_FILE" "Claude Code"
+        update_agent_file "$CLAUDE_FILE" "Claude"
         found_agent=true
     fi
     
@@ -779,7 +779,7 @@ update_all_existing_agents() {
     # If no agent files exist, create a default Claude file
     if [[ "$found_agent" == false ]]; then
         log_info "No existing agent files found, creating default Claude file..."
-        update_agent_file "$CLAUDE_FILE" "Claude Code"
+        update_agent_file "$CLAUDE_FILE" "Claude"
     fi
 }
 print_summary() {
