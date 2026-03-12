@@ -25,7 +25,6 @@ To install it, run the SpecKit setup command:
 
   /speckit.setup
 
-Or manually install from the openclaw repository.
 ```
 
 3. If **EXISTS**, proceed to the agent file check below.
