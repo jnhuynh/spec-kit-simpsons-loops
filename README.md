@@ -1,15 +1,18 @@
 # Simpsons Loops for Speckit
 
-Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using the Claude CLI.
+> ⚠️ _Alpha — Experimental Project_
+> This project is in early alpha and under active, rapid development. Expect frequent breaking changes, shifting APIs, and structural overhauls. Things will change often and without notice. Use at your own risk.
+
+Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
 
 Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
-| Loop | What it does |
-| --- | --- |
-| Homer | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain. |
-| Lisa | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain. |
-| Ralph | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done. |
-| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph. Auto-detects where to start based on existing artifacts. |
+| Loop     | What it does                                                                                                                                                                             |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Homer    | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                            |
+| Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain. |
+| Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.              |
+| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph. Auto-detects where to start based on existing artifacts.                                                               |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
@@ -253,6 +256,7 @@ Pick a letter and press Enter (or just Enter for the full pipeline). This works 
 Quality gates are defined in a single file: `.specify/quality-gates.sh`. This is the sole source of quality gate configuration — there are no CLI arguments or environment variable overrides.
 
 Ralph validates this file before starting:
+
 - The file must exist at `.specify/quality-gates.sh`
 - The file must contain at least one non-comment, non-whitespace line
 - The file must exit 0 for quality gates to pass
@@ -275,11 +279,11 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 
 ### Max iterations
 
-| Loop  | Default                     |
-| ----- | --------------------------- |
-| Homer | 30                          |
-| Lisa  | 30                          |
-| Ralph | incomplete tasks + 10       |
+| Loop  | Default               |
+| ----- | --------------------- |
+| Homer | 30                    |
+| Lisa  | 30                    |
+| Ralph | incomplete tasks + 10 |
 
 All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
 
