@@ -57,7 +57,7 @@
 ### Implementation for User Story 2
 
 - [x] T009 [US2] Verify combined `--from` and `--stop-after` range execution in `.claude/commands/speckit.pipeline.md` — ensure that when both flags are provided, only steps in the inclusive range [from..stop-after] execute; verify the execution plan announcement correctly reflects the range; verify the completion report shows steps before `--from` as `skipped` and steps after `--stop-after` as `stopped-by-param` (FR-003)
-- [ ] T010 [US2] Verify single-step execution when `--from` equals `--stop-after` in `.claude/commands/speckit.pipeline.md` — ensure that `--from homer --stop-after homer` executes only the homer step (FR-004)
+- [x] T010 [US2] Verify single-step execution when `--from` equals `--stop-after` in `.claude/commands/speckit.pipeline.md` — ensure that `--from homer --stop-after homer` executes only the homer step (FR-004)
 
 **Checkpoint**: Range-based execution works. Users can define precise step windows.
 
