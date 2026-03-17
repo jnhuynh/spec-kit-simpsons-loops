@@ -130,6 +130,18 @@ Assign a numeric index to each pipeline step for use in validation and execution
 
 Resolve the index for the starting step (from `--from` or auto-detected) into `start_index`. If `STOP_AFTER_STEP` is set, resolve its index into `stop_after_index`. These indices are used in subsequent validation and execution plan steps.
 
+### Step 3c: Validate --stop-after
+
+If `STOP_AFTER_STEP` is set, perform the following validations **before any pipeline steps execute**:
+
+1. **Value validation (FR-006)**: Verify that `STOP_AFTER_STEP` is one of the six valid step names: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. If the value is not in this list, display the following error and **STOP** — do not execute any pipeline steps:
+
+```
+Invalid --stop-after value '<value>'. Valid steps: specify, homer, plan, tasks, lisa, ralph.
+```
+
+(Replace `<value>` with the actual invalid value the user provided.)
+
 ### Step 4: Configuration
 
 - Homer max iterations: **30**
