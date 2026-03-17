@@ -71,7 +71,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T011 [US3] Verify error message for invalid step name in `.claude/commands/speckit.pipeline.md` — confirm that `--stop-after invalidstep` produces a clear error listing valid step names (specify, homer, plan, tasks, lisa, ralph) and does not execute any steps (FR-006)
+- [x] T011 [US3] Verify error message for invalid step name in `.claude/commands/speckit.pipeline.md` — confirm that `--stop-after invalidstep` produces a clear error listing valid step names (specify, homer, plan, tasks, lisa, ralph) and does not execute any steps (FR-006)
 - [ ] T012 [US3] Verify error message for impossible range in `.claude/commands/speckit.pipeline.md` — confirm that `--from tasks --stop-after plan` produces a clear error explaining that stop-after must not precede the from step, including the pipeline sequence, and does not execute any steps (FR-005)
 - [ ] T013 [US3] Verify error message for missing value in `.claude/commands/speckit.pipeline.md` — confirm that `--stop-after` without a following step name produces an error indicating a step name is required (edge case from spec)
 
