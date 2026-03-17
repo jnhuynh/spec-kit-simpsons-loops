@@ -48,6 +48,15 @@ All changes must pass before committing:
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - Exit after each iteration — restart with fresh context
 
+### Source vs Installed Files
+
+The **source of truth** for SpecKit command and agent files lives in the repo root:
+
+- `speckit-commands/*.md` → installed to `.claude/commands/` by `setup.sh`
+- `claude-agents/*.md` → installed to `.claude/agents/` by `setup.sh`
+
+**Always edit the source files** (`speckit-commands/`, `claude-agents/`), never the installed copies (`.claude/commands/`, `.claude/agents/`). The installed copies are overwritten by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh` or manually copy to `.claude/` to update the installed versions.
+
 <!-- ====== PROJECT SPECIFIC ====== -->
 
 <!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
