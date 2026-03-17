@@ -1,6 +1,6 @@
 # Feature Specification: Stop-After Pipeline Parameter
 
-**Feature Branch**: `006-feat-stop-after-param`
+**Feature Branch**: `006-stop-after-param`
 **Created**: 2026-03-16
 **Status**: Draft
 **Input**: User description: "I want stop-after to be a param that is passed just like --from."
@@ -105,3 +105,4 @@ As a user, I want clear error messages when I provide an invalid `--stop-after` 
 - The six pipeline steps and their ordering (specify → homer → plan → tasks → lisa → ralph) remain unchanged.
 - `--stop-after` follows the same parsing conventions as `--from` (a flag followed by a step name, position-independent in the argument list).
 - When `--stop-after` causes early termination, all artifacts produced by completed steps are committed normally — no special cleanup or rollback is needed.
+- The branch name `006-stop-after-param` omits the `feat` type segment from the constitution naming convention (`XXXX-type-description`). This is a known pre-existing deviation; all spec artifacts reference the actual branch/directory name. Renaming the branch is outside the scope of this feature.
