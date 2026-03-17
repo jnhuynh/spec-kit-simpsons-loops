@@ -20,16 +20,16 @@
 
 ## R-003: Validation Strategy for --stop-after
 
-**Decision**: Validation happens in two phases, both during Step 1 (argument parsing) of the pipeline:
+**Decision**: Validation happens in two phases after Step 3 (auto-detect starting step), once both the starting step and `--stop-after` step are known:
 
 1. **Value validation**: Check that `--stop-after` is one of the six valid step names. If not, display an error listing valid options and exit before any steps run.
 2. **Range validation**: Check that `--stop-after` does not come before the starting step (whether set via `--from` or auto-detected). If `--stop-after` precedes the starting step in the sequence, display an error and exit before any steps run.
 
-Both validations must complete before Step 5 (Execute Pipeline Steps) begins, satisfying FR-005 and FR-006.
+Both validations must complete before Step 5 (Execute Pipeline Steps) begins, satisfying FR-005 and FR-006. Validation is placed after Step 3 (not during Step 1) because range validation requires the starting step to be resolved, which depends on auto-detection logic in Step 3.
 
-**Rationale**: Validating early (before any steps execute) prevents wasted work and provides immediate feedback. This matches how `--from` validation works -- invalid values are caught before execution.
+**Rationale**: Validating early (before any steps execute) prevents wasted work and provides immediate feedback. This matches how `--from` validation works -- invalid values are caught before execution. Placing validation after Step 3 ensures the starting step is known for range comparison.
 
-**Alternatives considered**: Lazy validation (check at each step) -- rejected because it could allow partial execution before discovering an invalid range, violating FR-005's requirement that "no steps execute."
+**Alternatives considered**: Lazy validation (check at each step) -- rejected because it could allow partial execution before discovering an invalid range, violating FR-005's requirement that "no steps execute." Validation during Step 1 -- rejected because the starting step may not be known until Step 3 (auto-detection), making range validation impossible at parse time.
 
 ## R-004: Step Ordering and Index Comparison
 
