@@ -83,7 +83,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
+- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
 
 ## Setup
 
@@ -95,7 +95,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
+This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
 ### Option B: Manual
 
@@ -215,26 +215,35 @@ Or resume from a specific step:
 /speckit.pipeline --from ralph specs/a1b2-feat-user-auth
 ```
 
-**Stop-after menu:** When running interactively, the pipeline presents a menu asking how far to run:
+Or stop the pipeline after a specific step completes:
 
 ```
-How far should the pipeline run?
-  a) All the way through (homer -> plan -> tasks -> lisa -> ralph)
-  b) Stop after homer loop
-  c) Stop after plan
-  d) Stop after tasks
-  e) Stop after lisa loop
-  (default: a)
+/speckit.pipeline --stop-after plan
 ```
 
-Pick a letter and press Enter (or just Enter for the full pipeline). This works alongside `--from` — you can start from any step and stop at any later step.
+Or bootstrap end-to-end from a feature description:
+
+```
+/speckit.pipeline --from specify --description "Add user authentication with OAuth2"
+```
+
+`--from`, `--stop-after`, and `--description` can be combined. For example, run homer through tasks only:
+
+```
+/speckit.pipeline --from homer --stop-after tasks specs/a1b2-feat-user-auth
+```
 
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
-- `tasks.md` with some tasks completed -> **ralph**
-- `tasks.md` with no tasks started -> **lisa**
-- `plan.md` exists -> **tasks**
+- No `spec.md` but `--description` provided -> **specify**
 - `spec.md` exists -> **homer**
+- `plan.md` exists -> **tasks**
+- `tasks.md` with no tasks started -> **lisa**
+- `tasks.md` with some tasks completed -> **ralph**
+
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. The step must come at or after the starting step in the pipeline sequence.
+
+**`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
 
 **Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
 
