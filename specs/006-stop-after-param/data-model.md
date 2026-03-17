@@ -9,7 +9,7 @@
 | Name | Enum | One of: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph` |
 | Index | Integer (0-5) | Position in the fixed pipeline sequence |
 | Type | Enum | `single-shot` (specify, plan, tasks) or `loop` (homer, lisa, ralph) |
-| Status | Enum | `executed`, `skipped`, `stopped-by-param` |
+| Status | Enum | `executed`, `skipped` (not executed — artifact already exists or step falls before `--from`), `stopped-by-param` |
 
 **Validation rules**:
 - Step names are case-sensitive and must exactly match the six valid values
@@ -18,7 +18,8 @@
 
 **State transitions**:
 - Before execution: no status assigned
-- During execution: step is `executed` or `skipped` (artifact exists)
+- Steps before the `--from` start step: `skipped` (outside execution range)
+- During execution: step is `executed` or `skipped` (artifact already exists)
 - After `--stop-after` triggers: all remaining steps become `stopped-by-param`
 
 ### Pipeline Arguments
@@ -61,7 +62,8 @@
 
 **Validation rules**:
 - All six steps must be listed regardless of whether they were in the execution range
-- Steps before the start step are listed as `skipped`
+- Steps before the start step are listed as `skipped` (not executed because they fall outside the execution range)
+- Steps whose artifacts already exist are also listed as `skipped`
 - Steps after the stop step are listed as `stopped-by-param`
 
 ## Relationships

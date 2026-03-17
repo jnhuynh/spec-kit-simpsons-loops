@@ -99,7 +99,7 @@ Before Step 5 begins, the pipeline outputs a single line listing the planned ste
 
 ### D-006: Enhanced Completion Report
 
-Step 6 is expanded from listing "steps executed" to listing all six steps with per-step status (`executed`, `skipped`, `stopped-by-param`). Steps before `--from` are shown as `skipped`. Steps after `--stop-after` are shown as `stopped-by-param`. This satisfies FR-008.
+Step 6 is expanded from listing "steps executed" to listing all six steps with per-step status (`executed`, `skipped`, `stopped-by-param`). Steps before `--from` are shown as `skipped` (they were not executed because they fall outside the execution range). Steps whose artifacts already exist are also shown as `skipped`. Steps after `--stop-after` are shown as `stopped-by-param`. This satisfies FR-008.
 
 ### D-007: No New Files
 

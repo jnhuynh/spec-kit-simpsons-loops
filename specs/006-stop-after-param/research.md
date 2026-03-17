@@ -63,14 +63,14 @@ When `--stop-after` is provided, convert both the starting step and stop-after s
 **Decision**: The Step 6 report is expanded to list all six pipeline steps with per-step status. Each step gets one of three statuses:
 
 - `executed` -- step ran to completion
-- `skipped` -- step was skipped because its artifact already existed (e.g., plan.md present so plan step skipped)
+- `skipped` -- step was not executed, either because its artifact already existed (e.g., plan.md present so plan step skipped) or because the step falls before the `--from` starting step
 - `stopped-by-param` -- step was not executed because `--stop-after` halted the pipeline before reaching it
 
 When `--stop-after` caused early termination, the report explicitly states the last executed step and lists remaining steps as `stopped-by-param`.
 
 **Rationale**: FR-008 requires per-step status reporting. Three statuses cover all possible step outcomes. This extends the existing Step 6 report (which currently only lists executed steps and total iterations).
 
-**Alternatives considered**: Adding a fourth status "not-reached" for steps before `--from` -- rejected because those are already implicitly not shown (the pipeline only tracks steps from the start point). All six steps should be listed regardless.
+**Alternatives considered**: Adding a fourth status "not-reached" for steps before `--from` -- rejected because `skipped` already covers both "artifact exists" and "outside execution range" cases. Adding a fourth status increases complexity without meaningful user value. All six steps should be listed regardless.
 
 ## R-007: Stop Message Format (FR-010)
 
