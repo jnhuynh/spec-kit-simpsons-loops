@@ -35,9 +35,13 @@ All changes must pass before committing:
 
 ## Process Hygiene
 
-- Before starting a dev server: check if one is already running. Reuse it — do NOT start a duplicate.
+Cleanup is mandatory. Every process started during a session must be stopped before the session ends. A session that completes but leaves orphaned processes is **incomplete**.
+
+- **Dev servers**: before starting one, check if one is already running (`pgrep -f "vite\|webpack-dev-server\|next dev\|rails s"`). Reuse it — never start a duplicate.
+- **Docker**: any container started during this session MUST be stopped and removed before finishing. Use `docker stop <id> && docker rm <id>`, or `docker compose down`. Never leave containers running.
+- **Watchers, file observers, background build processes**: stop all of them when done.
+- **Verification step**: before marking work complete, run `ps aux | grep <project-pattern>` to confirm nothing from this session is still running.
 - Verify UI and integration work against the running application. Unit tests alone are insufficient.
-- Stop any dev servers, watchers, or child processes when implementation is complete. No straggling processes.
 
 ## Speckit
 
@@ -48,7 +52,11 @@ All changes must pass before committing:
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - Exit after each iteration — restart with fresh context
 
-### Source vs Installed Files
+<!-- ====== PROJECT SPECIFIC ====== -->
+
+<!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
+
+## Source vs Installed Files
 
 The **source of truth** for SpecKit command and agent files lives in the repo root:
 
@@ -56,10 +64,6 @@ The **source of truth** for SpecKit command and agent files lives in the repo ro
 - `claude-agents/*.md` → installed to `.claude/agents/` by `setup.sh`
 
 **Always edit the source files** (`speckit-commands/`, `claude-agents/`), never the installed copies (`.claude/commands/`, `.claude/agents/`). The installed copies are overwritten by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh` or manually copy to `.claude/` to update the installed versions.
-
-<!-- ====== PROJECT SPECIFIC ====== -->
-
-<!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
 
 ## Active Technologies
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`) (002-rerun-setup-pipeline)
