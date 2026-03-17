@@ -1,7 +1,7 @@
 # Implementation Plan: Stop-After Pipeline Parameter
 
-**Branch**: `006-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/006-stop-after-param/spec.md`
+**Branch**: `006-feat-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/006-feat-stop-after-param/spec.md`
 
 ## Summary
 
@@ -30,7 +30,7 @@ Add a `--stop-after <step>` parameter to the SpecKit pipeline command that halts
 | III. Maintainability | **PASS** | Single-file change; follows the exact same patterns already used for `--from` |
 | IV. Best Practices | **PASS** | Reuses the position-independent argument parsing pattern; same validation approach as `--from` |
 | V. Simplicity (KISS & YAGNI) | **PASS** | Only adds what's needed: one new flag, validation, stop check, and enhanced report. No new files, scripts, or abstractions. |
-| Test-First Development | **PASS (alternative)** | Formal unit tests are not applicable to markdown command files interpreted by Claude CLI. Verification is achieved through: (1) the quickstart.md verification checklist (`specs/006-stop-after-param/quickstart.md`), which defines 13 concrete acceptance checks covering argument parsing, validation, execution, reporting, and default behavior; (2) manual integration test invocations documented in Phase 3-5 independent test descriptions in tasks.md; (3) T015 explicitly runs the full verification checklist against the implementation. These serve as the test-first equivalent for this medium. |
+| Test-First Development | **PASS (alternative)** | Formal unit tests are not applicable to markdown command files interpreted by Claude CLI. Verification is achieved through: (1) the quickstart.md verification checklist (`specs/006-feat-stop-after-param/quickstart.md`), which defines 13 concrete acceptance checks covering argument parsing, validation, execution, reporting, and default behavior; (2) manual integration test invocations documented in Phase 3-5 independent test descriptions in tasks.md; (3) T015 explicitly runs the full verification checklist against the implementation. These serve as the test-first equivalent for this medium. |
 | Dev Server Verification | **N/A** | No web UI or API |
 | Process Cleanup | **N/A** | No long-running processes involved |
 
@@ -41,7 +41,7 @@ Add a `--stop-after <step>` parameter to the SpecKit pipeline command that halts
 ### Documentation (this feature)
 
 ```text
-specs/006-stop-after-param/
+specs/006-feat-stop-after-param/
 ├── spec.md              # Feature specification
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output -- all decisions documented

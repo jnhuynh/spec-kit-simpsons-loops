@@ -1,6 +1,6 @@
 # Research: Stop-After Pipeline Parameter
 
-**Branch**: `006-stop-after-param` | **Date**: 2026-03-16
+**Branch**: `006-feat-stop-after-param` | **Date**: 2026-03-16
 
 ## R-001: Argument Parsing Pattern for --stop-after
 
