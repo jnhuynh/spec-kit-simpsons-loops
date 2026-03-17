@@ -348,3 +348,6 @@ If the pipeline did not complete all six steps (whether due to `--stop-after`, f
 - `/speckit.pipeline --from ralph specs/a1b2-feat-user-auth` — Resume ralph for specific spec
 - `/speckit.pipeline --description "Add user auth" specs/a1b2-feat-user-auth` — End-to-end from description
 - `/speckit.pipeline --from specify --description "Add user auth"` — Explicit specify step start
+- `/speckit.pipeline --stop-after plan` — Run through plan step only
+- `/speckit.pipeline --from homer --stop-after tasks` — Run homer through tasks
+- `/speckit.pipeline --stop-after homer --from specify --description "Add feature X"` — Specify and homer only
