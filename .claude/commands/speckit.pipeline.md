@@ -156,6 +156,17 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 - Lisa max iterations: **30**
 - Ralph max iterations: **incomplete_tasks + 10** (count `- [ ]` lines in tasks.md at the start of the ralph step, then add 10)
 
+### Step 4b: Execution Plan Announcement
+
+Before executing any steps, output an execution plan announcement listing the steps that will run. Build the list of planned steps from the starting step through either the `STOP_AFTER_STEP` (if set) or `ralph` (if not set), using the step index mapping from Step 3b.
+
+**Format**:
+
+- **When `--stop-after` is provided**: `Execution plan: specify -> homer -> plan. Stopping after: plan.`
+- **When `--stop-after` is NOT provided**: `Execution plan: homer -> plan -> tasks -> lisa -> ralph.`
+
+The step names in the plan are joined with ` -> `. Only include steps from the starting step through the stop step (inclusive). When `--stop-after` is provided, append ` Stopping after: <step>.` to the announcement. When `--stop-after` is not provided, omit the "Stopping after" clause entirely.
+
 ### Step 5: Execute Pipeline Steps
 
 **CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Agent tool call MUST return before the next one is spawned. Never use parallel Agent calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
