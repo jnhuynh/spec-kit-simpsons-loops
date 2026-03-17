@@ -84,7 +84,7 @@
 **Purpose**: Documentation updates and final verification across all stories.
 
 - [x] T014 Add `--stop-after` examples to the Examples section at the bottom of `.claude/commands/speckit.pipeline.md` — include examples from quickstart.md: `--stop-after plan`, `--from homer --stop-after tasks`, `--stop-after homer --from specify --description "Add feature X"`
-- [ ] T015 Run quickstart.md verification checklist against the final implementation in `.claude/commands/speckit.pipeline.md` — verify all items in the Verification Checklist section of `specs/006-stop-after-param/quickstart.md` are satisfied
+- [x] T015 Run quickstart.md verification checklist against the final implementation in `.claude/commands/speckit.pipeline.md` — verify all items in the Verification Checklist section of `specs/006-stop-after-param/quickstart.md` are satisfied
 
 ---
 
