@@ -297,11 +297,48 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), 
 
 ### Step 6: Report Results
 
-After all steps complete, report:
-- Steps executed
-- Total iterations per loop step
-- Completion status (one of: **success** — all steps completed successfully; **max iterations reached** — a loop step hit its iteration limit; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — a sub agent crashed or errored)
-- Suggestion to resume with `--from <step>` if not fully resolved
+After all steps complete (or after a `--stop-after` early termination), produce a completion report that includes the following sections:
+
+#### 6a: Per-Step Status Table
+
+List **all six pipeline steps** in order, each with a status. Determine the status for each step as follows:
+
+- **`executed`**: The step ran during this pipeline invocation (either a sub-agent was spawned or, for loop steps, iterations were performed).
+- **`skipped`**: The step was NOT executed. This applies when:
+  - The step falls before the `--from` starting step (outside the execution range), OR
+  - The step's artifact already existed so the step was skipped (e.g., `spec.md` already existed so specify was skipped, `plan.md` already existed so plan was skipped).
+- **`stopped-by-param`**: The step was NOT executed because it falls after the `STOP_AFTER_STEP`. This status applies to all steps whose index is greater than the `stop_after_index`. When `--stop-after` is not provided, no step receives this status.
+
+**Format** — output a table like:
+
+```
+Pipeline Step Status:
+  specify .... executed
+  homer ..... executed
+  plan ...... executed
+  tasks ..... stopped-by-param
+  lisa ...... stopped-by-param
+  ralph ..... stopped-by-param
+```
+
+When the pipeline was stopped early by `--stop-after`, add a line after the table: `Last executed step: <step>` indicating which step was the final one to complete (whether it was actually executed or skipped-because-artifact-existed).
+
+#### 6b: Iteration Counts
+
+For loop steps (homer, lisa, ralph) that were executed, report the total number of iterations run.
+
+#### 6c: Completion Status
+
+Report one of:
+- **success** — all steps in the execution range completed successfully
+- **max iterations reached** — a loop step hit its iteration limit
+- **stuck** — 2 consecutive iterations with no file changes and no completion signal
+- **failure** — a sub agent crashed or errored
+- **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before ralph due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
+
+#### 6d: Resume Suggestion
+
+If the pipeline did not complete all six steps (whether due to `--stop-after`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`.
 
 ## Examples
 
