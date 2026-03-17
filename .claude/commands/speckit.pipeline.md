@@ -82,6 +82,7 @@ The pipeline runs these 6 steps in sequence:
 Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
 
 - **`--from <step>`**: Starting step override. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. If provided, the pipeline starts from this step instead of auto-detecting.
+- **`--stop-after <step>`**: Stop-after step. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: specify, homer, plan, tasks, lisa, ralph." and **STOP**.
 - **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 
