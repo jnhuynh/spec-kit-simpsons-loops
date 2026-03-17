@@ -115,6 +115,21 @@ Check which artifacts exist to determine where to start:
 - `spec.md` exists → start at **homer**
 - No `spec.md` but `--description` provided → start at **specify**
 
+### Step 3b: Step Index Mapping
+
+Assign a numeric index to each pipeline step for use in validation and execution plan computation:
+
+| Step | Index |
+|------|-------|
+| specify | 0 |
+| homer | 1 |
+| plan | 2 |
+| tasks | 3 |
+| lisa | 4 |
+| ralph | 5 |
+
+Resolve the index for the starting step (from `--from` or auto-detected) into `start_index`. If `STOP_AFTER_STEP` is set, resolve its index into `stop_after_index`. These indices are used in subsequent validation and execution plan steps.
+
 ### Step 4: Configuration
 
 - Homer max iterations: **30**

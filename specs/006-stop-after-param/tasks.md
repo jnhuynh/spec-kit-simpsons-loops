@@ -16,7 +16,7 @@
 **Purpose**: No new files or project initialization needed. This feature modifies a single existing file: `.claude/commands/speckit.pipeline.md`. Setup phase establishes the foundational argument parsing and step index mapping that all user stories depend on.
 
 - [x] T001 Add `--stop-after <step>` argument parsing to Step 1 in `.claude/commands/speckit.pipeline.md` — parse alongside existing `--from`, `--description`, and `spec-dir` arguments; store value in `STOP_AFTER_STEP` variable; handle missing value error case (FR-001, FR-009)
-- [ ] T002 Add step index mapping (specify=0, homer=1, plan=2, tasks=3, lisa=4, ralph=5) after Step 3 in `.claude/commands/speckit.pipeline.md` for use in validation and execution plan computation (D-003)
+- [x] T002 Add step index mapping (specify=0, homer=1, plan=2, tasks=3, lisa=4, ralph=5) after Step 3 in `.claude/commands/speckit.pipeline.md` for use in validation and execution plan computation (D-003)
 
 ---
 
