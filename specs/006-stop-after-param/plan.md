@@ -25,7 +25,7 @@ Add a `--stop-after <step>` parameter to the SpecKit pipeline command that halts
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Readability First | **PASS** | New argument and validation logic follows existing patterns; clear variable names (`stop_after_step`, `stop_after_index`) |
+| I. Readability First | **PASS** | New argument and validation logic follows existing patterns; clear variable names (`STOP_AFTER_STEP`, `stop_after_index`) |
 | II. Functional Design | **PASS** | Stop logic is a deterministic check after each step: if current step matches stop-after, halt. No side effects. |
 | III. Maintainability | **PASS** | Single-file change; follows the exact same patterns already used for `--from` |
 | IV. Best Practices | **PASS** | Reuses the position-independent argument parsing pattern; same validation approach as `--from` |
