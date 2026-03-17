@@ -45,7 +45,7 @@ Stop message format: `Pipeline stopped after <step> per --stop-after parameter. 
 
 Expand the completion report to list all six pipeline steps with per-step status:
 - `executed` -- step ran
-- `skipped` -- step was skipped because artifact already existed
+- `skipped` -- step was not executed (either because its artifact already existed or because it falls before the `--from` starting step)
 - `stopped-by-param` -- step was not reached due to `--stop-after`
 
 ### Phase 6: Default Behavior Preservation (FR-007)
