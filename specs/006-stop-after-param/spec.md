@@ -1,6 +1,6 @@
 # Feature Specification: Stop-After Pipeline Parameter
 
-**Feature Branch**: `006-feat-stop-after-param`
+**Feature Branch**: `006-stop-after-param`
 **Created**: 2026-03-16
 **Status**: Draft
 **Input**: User description: "I want stop-after to be a param that is passed just like --from."

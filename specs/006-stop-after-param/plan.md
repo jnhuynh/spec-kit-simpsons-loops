@@ -1,7 +1,7 @@
 # Implementation Plan: Stop-After Pipeline Parameter
 
-**Branch**: `006-feat-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/006-feat-stop-after-param/spec.md`
+**Branch**: `006-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/006-stop-after-param/spec.md`
 
 ## Summary
 
@@ -41,7 +41,7 @@ Add a `--stop-after <step>` parameter to the SpecKit pipeline command that halts
 ### Documentation (this feature)
 
 ```text
-specs/006-feat-stop-after-param/
+specs/006-stop-after-param/
 ├── spec.md              # Feature specification
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output -- all decisions documented

@@ -1,6 +1,6 @@
 # Tasks: Stop-After Pipeline Parameter
 
-**Input**: Design documents from `/specs/006-feat-stop-after-param/`
+**Input**: Design documents from `/specs/006-stop-after-param/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, quickstart.md
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
@@ -84,7 +84,7 @@
 **Purpose**: Documentation updates and final verification across all stories.
 
 - [ ] T014 Add `--stop-after` examples to the Examples section at the bottom of `.claude/commands/speckit.pipeline.md` — include examples from quickstart.md: `--stop-after plan`, `--from homer --stop-after tasks`, `--stop-after homer --from specify --description "Add feature X"`
-- [ ] T015 Run quickstart.md verification checklist against the final implementation in `.claude/commands/speckit.pipeline.md` — verify all items in the Verification Checklist section of `specs/006-feat-stop-after-param/quickstart.md` are satisfied
+- [ ] T015 Run quickstart.md verification checklist against the final implementation in `.claude/commands/speckit.pipeline.md` — verify all items in the Verification Checklist section of `specs/006-stop-after-param/quickstart.md` are satisfied
 
 ---
 
