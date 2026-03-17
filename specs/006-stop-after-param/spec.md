@@ -57,7 +57,7 @@ As a user, I want clear error messages when I provide an invalid `--stop-after` 
 
 - What happens when `--stop-after` is the same step as `--from`? The pipeline executes that single step only.
 - What happens when `--stop-after` is passed without a value? The pipeline displays an error indicating that a step name is required.
-- What happens when `--stop-after specify` is used but specify is skipped because spec.md already exists? The pipeline stops after the specify step check (effectively doing nothing for that step) and reports accordingly.
+- What happens when `--stop-after specify` is used but specify is skipped because spec.md already exists? The pipeline still stops after the specify step (it does not continue to homer). The specify step status is `skipped` (artifact already existed) and all subsequent steps are `stopped-by-param`. The pipeline reports that it stopped after the specify step.
 
 ## Out of Scope
 

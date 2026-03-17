@@ -91,6 +91,7 @@ Add these examples to the command file:
 - [ ] `--stop-after ralph` behaves same as no `--stop-after`
 - [ ] Stop message is output when stopping early
 - [ ] No sub-agents spawn after the stop-after step
+- [ ] `--stop-after specify` when spec.md already exists: specify is `skipped`, pipeline stops (does not continue to homer), remaining steps are `stopped-by-param`
 
 ### Reporting (FR-008, FR-011)
 
