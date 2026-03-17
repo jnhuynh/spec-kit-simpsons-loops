@@ -48,6 +48,15 @@ All changes must pass before committing:
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - Exit after each iteration — restart with fresh context
 
+### Source vs Installed Files
+
+The **source of truth** for SpecKit command and agent files lives in the repo root:
+
+- `speckit-commands/*.md` → installed to `.claude/commands/` by `setup.sh`
+- `claude-agents/*.md` → installed to `.claude/agents/` by `setup.sh`
+
+**Always edit the source files** (`speckit-commands/`, `claude-agents/`), never the installed copies (`.claude/commands/`, `.claude/agents/`). The installed copies are overwritten by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh` or manually copy to `.claude/` to update the installed versions.
+
 <!-- ====== PROJECT SPECIFIC ====== -->
 
 <!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
@@ -62,6 +71,7 @@ All changes must pass before committing:
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `bash`) (005-fix-subagent-quality-gates)
 - Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `jq`) (005-fix-subagent-quality-gates)
+- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`) (006-stop-after-param)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)
