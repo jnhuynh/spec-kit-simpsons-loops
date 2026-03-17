@@ -25,7 +25,7 @@
 **Purpose**: Validation logic that MUST be in place before any execution-related user stories can be implemented safely.
 
 - [x] T003 Add value validation after Step 3 in `.claude/commands/speckit.pipeline.md` — if `STOP_AFTER_STEP` is provided, verify it is one of the six valid step names; if invalid, display error listing valid options and stop before any steps execute (FR-006)
-- [ ] T004 Add range validation after Step 3 in `.claude/commands/speckit.pipeline.md` — if `STOP_AFTER_STEP` index is less than the starting step index, display error explaining that stop-after must not precede the from step and stop before any steps execute (FR-005)
+- [x] T004 Add range validation after Step 3 in `.claude/commands/speckit.pipeline.md` — if `STOP_AFTER_STEP` index is less than the starting step index, display error explaining that stop-after must not precede the from step and stop before any steps execute (FR-005)
 
 **Checkpoint**: Argument parsing and validation are complete. Execution-related stories can now be implemented.
 

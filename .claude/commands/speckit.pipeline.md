@@ -142,6 +142,14 @@ Invalid --stop-after value '<value>'. Valid steps: specify, homer, plan, tasks, 
 
 (Replace `<value>` with the actual invalid value the user provided.)
 
+2. **Range validation (FR-005)**: If `STOP_AFTER_STEP` is set and its `stop_after_index` is less than the `start_index` (the starting step, whether set via `--from` or auto-detected), display the following error and **STOP** — do not execute any pipeline steps:
+
+```
+Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the pipeline sequence (specify -> homer -> plan -> tasks -> lisa -> ralph).
+```
+
+(Replace `<stop>` with the actual `STOP_AFTER_STEP` value and `<start>` with the actual starting step name.)
+
 ### Step 4: Configuration
 
 - Homer max iterations: **30**
