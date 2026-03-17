@@ -42,10 +42,13 @@ Add a `--stop-after <step>` parameter to the SpecKit pipeline command that halts
 
 ```text
 specs/006-stop-after-param/
+├── checklists/
+│   └── requirements.md  # Specification quality checklist
 ├── spec.md              # Feature specification
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output -- all decisions documented
 ├── data-model.md        # Phase 1 output -- entity definitions
+├── quickstart.md        # Implementation quickstart and verification checklist
 └── tasks.md             # Phase 2 output (created by /speckit.tasks)
 ```
 
