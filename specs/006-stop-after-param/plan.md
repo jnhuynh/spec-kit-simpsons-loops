@@ -1,6 +1,6 @@
 # Implementation Plan: Stop-After Pipeline Parameter
 
-**Branch**: `006-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
+**Branch**: `006-feat-stop-after-param` | **Date**: 2026-03-16 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-stop-after-param/spec.md`
 
 ## Summary
