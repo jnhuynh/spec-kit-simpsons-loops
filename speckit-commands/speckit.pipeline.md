@@ -77,6 +77,13 @@ The pipeline runs these 7 steps in sequence:
 5. **ralph** — Task-by-task implementation with quality gates
 6. **marge** — Iterative code review of the implementation
 
+Between ralph and marge, two **optional polish phases** run automatically **if and only if the corresponding skill is installed** in the environment:
+
+- **simplify** — invokes the `/simplify` skill for reuse/quality/efficiency fixes
+- **security-review** — invokes the `/security-review` skill for a security audit
+
+If either skill is absent, that phase is silently skipped. These phases are **not** part of the `--from` / `--stop-after` step mapping; they always run between ralph and marge when present, and are skipped when `--stop-after ralph` halts the pipeline.
+
 ## Instructions
 
 ### Step 1: Parse Arguments and Determine the spec directory
@@ -301,6 +308,44 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
 
 **Post-step stop check**: After the ralph step completes, check if `STOP_AFTER_STEP` is set and equals `ralph`. If it does, output: `Pipeline stopped after ralph per --stop-after parameter. Skipping: marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+
+#### Simplify (optional single-shot step — skip if skill absent)
+
+Detect whether the `/simplify` skill is installed. Run via Bash tool:
+
+```bash
+if test -d "$HOME/.claude/skills/simplify" || test -f "$HOME/.claude/commands/simplify.md" || test -f ".claude/commands/simplify.md"; then echo "PRESENT"; else echo "ABSENT"; fi
+```
+
+If **ABSENT**, log `simplify skill not installed — skipping post-ralph simplify pass` and proceed to the security-review phase. Do NOT spawn a sub agent.
+
+If **PRESENT**, spawn a sub agent:
+
+- **subagent_type**: `general-purpose`
+- **prompt**: `Invoke the /simplify skill via the Skill tool. It will review the current diff for reuse, quality, and efficiency issues and apply fixes. When it finishes, stage and commit any resulting changes with: git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "chore($scope): [$ticket] post-ralph simplify pass". If the skill made no changes, exit without committing. Report "no changes" or a one-line summary of what was fixed.`
+
+**Failure handling**: If the sub agent fails (crash, timeout, or error), log `simplify phase failed — continuing pipeline` and proceed to security-review. Do NOT abort — simplify is optional polish.
+
+This phase is not an independent step in the `--stop-after` mapping; it runs implicitly between ralph and marge when its skill is present.
+
+#### Security Review (optional single-shot step — skip if skill absent)
+
+Detect whether the `/security-review` skill is installed. Run via Bash tool:
+
+```bash
+if test -d "$HOME/.claude/skills/security-review" || test -f "$HOME/.claude/commands/security-review.md" || test -f ".claude/commands/security-review.md"; then echo "PRESENT"; else echo "ABSENT"; fi
+```
+
+If **ABSENT**, log `security-review skill not installed — skipping pre-marge security pass` and proceed to marge. Do NOT spawn a sub agent.
+
+If **PRESENT**, spawn a sub agent:
+
+- **subagent_type**: `general-purpose`
+- **prompt**: `Invoke the /security-review skill via the Skill tool. It will perform a security review of the pending changes on the current branch. Apply any straightforward fixes it recommends. When finished, stage and commit any resulting changes with: git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "chore($scope): [$ticket] pre-marge security review pass". If no changes were needed, exit without committing. Report "no changes" or a one-line summary of what was fixed; any residual findings will be picked up by marge.`
+
+**Failure handling**: If the sub agent fails (crash, timeout, or error), log `security-review phase failed — continuing pipeline` and proceed to marge. Do NOT abort — security-review is optional polish.
+
+This phase is not an independent step in the `--stop-after` mapping; it runs implicitly between ralph and marge when its skill is present.
 
 #### Marge (loop step)
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), spawn ONE sub agent at a time (wait for it to return before spawning the next):

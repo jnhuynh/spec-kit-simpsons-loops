@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(chmod:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(rm -rf ~/.claude/skills/reset.review)",
+      "Read(//Users/jnhuynh/.claude/skills/**)"
     ]
   }
 }
