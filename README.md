@@ -7,12 +7,13 @@ Automated iteration loops and pipeline orchestration for [Speckit](https://githu
 
 Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
 
-| Loop     | What it does                                                                                                                                                                             |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Homer    | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                            |
-| Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain. |
-| Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.              |
-| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph. Auto-detects where to start based on existing artifacts.                                                               |
+| Loop     | What it does                                                                                                                                                                                        |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Homer    | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                                       |
+| Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
+| Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
+| Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
+| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                                 |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
@@ -41,12 +42,16 @@ flowchart TD
     H --> H1["Iteration 1\n(sub agent)"]
     H1 --> H2["Iteration 2\n(sub agent)"]
     H2 --> H3["... until all tasks\ncomplete or max iterations"]
-    H3 --> I["Report Results"]
+    H3 --> M["Marge Loop"]
+    M --> M1["Iteration 1\n(sub agent)"]
+    M1 --> M2["Iteration 2\n(sub agent)"]
+    M2 --> M3["... until zero findings\nor max iterations"]
+    M3 --> I["Report Results"]
 ```
 
 ### Standalone loop iteration lifecycle
 
-Each standalone loop command (`/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`) follows the same iteration lifecycle.
+Each standalone loop command (`/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`, `/speckit.marge.review`) follows the same iteration lifecycle.
 
 ```mermaid
 flowchart TD
@@ -83,7 +88,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`)
+- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, which is installed by `setup.sh`.
 
 ## Setup
 
@@ -95,7 +100,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
+This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, seeds Marge's baseline review packs into `.specify/marge/checks/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
 ### Option B: Manual
 
@@ -110,6 +115,7 @@ From the root of your project:
 # Agent definitions -> .claude/agents/
 cp <path-to-simpsons-loops>/claude-agents/homer.md  .claude/agents/homer.md
 cp <path-to-simpsons-loops>/claude-agents/lisa.md   .claude/agents/lisa.md
+cp <path-to-simpsons-loops>/claude-agents/marge.md  .claude/agents/marge.md
 cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
@@ -119,7 +125,13 @@ cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.marge.review.md      .claude/commands/speckit.marge.review.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claude/commands/speckit.review.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
+
+# Marge review packs -> .specify/marge/checks/
+mkdir -p .specify/marge/checks
+cp -n <path-to-simpsons-loops>/.specify/marge/checks/*.md .specify/marge/checks/
 ```
 
 #### 2. Update `.gitignore`
@@ -140,6 +152,11 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claud
 *.homer-prompt.md*
 *.homer-prev-output*
 *.homer-state*
+
+# Marge loop temp files
+*.marge-prompt.md*
+*.marge-prev-output*
+*.marge-state*
 
 .specify/logs/          # All log files
 ```
@@ -195,6 +212,18 @@ Once you have `tasks.md` from `/speckit.tasks`:
 
 Ralph validates that `.specify/quality-gates.sh` exists and contains executable content before starting. If the file is missing or empty, Ralph aborts with a clear error.
 
+### Marge (code review)
+
+After Ralph has implemented the feature:
+
+```
+/speckit.marge.review
+```
+
+Marge reviews the feature branch's diff against baseline and project-specific review packs in `.specify/marge/checks/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
+
+For a single-pass report (no auto-fix), run `/speckit.review` instead.
+
 ### Pipeline (end-to-end)
 
 After creating a spec with `/speckit.specify`, run the full pipeline:
@@ -240,8 +269,9 @@ Or bootstrap end-to-end from a feature description:
 - `plan.md` exists -> **tasks**
 - `tasks.md` with no tasks started -> **lisa**
 - `tasks.md` with some tasks completed -> **ralph**
+- `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
 
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`. The step must come at or after the starting step in the pipeline sequence.
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
 
@@ -251,7 +281,7 @@ Or bootstrap end-to-end from a feature description:
 
 **Completion detection** — Each loop looks for promise tags in the output:
 
-- Homer / Lisa: `<promise>ALL_FINDINGS_RESOLVED</promise>`
+- Homer / Lisa / Marge: `<promise>ALL_FINDINGS_RESOLVED</promise>`
 - Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
 
 **Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling.
@@ -293,8 +323,20 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 | Homer | 30                    |
 | Lisa  | 30                    |
 | Ralph | incomplete tasks + 10 |
+| Marge | 30                    |
 
 All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
+
+### Marge review packs
+
+Marge's review rules live in `.specify/marge/checks/` as plain markdown files. `setup.sh` seeds four baseline packs:
+
+- `generic-bugs.md` — null handling, off-by-one, race conditions, wrong-argument-order, swallowed exceptions
+- `security.md` — OWASP essentials: secrets, SQLi, command injection, authz, crypto misuse, PII in logs
+- `testing.md` — test-first discipline, coverage for new public functions, fixture hygiene, flaky patterns
+- `architecture.md` — scope creep, duplicated helpers, dead code, layer violations, broken invariants
+
+Add project-specific packs by dropping additional `*.md` files into the same directory. Marge auto-discovers every `*.md`; the filename is the pack name. Baseline files are preserved on re-install — existing pack files are never overwritten.
 
 ## References
 
