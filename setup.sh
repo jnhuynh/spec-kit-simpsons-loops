@@ -161,6 +161,7 @@ mkdir -p "$PROJECT_DIR/.claude/agents"
 
 cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.claude/agents/homer.md"
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
+cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
 cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
 cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
@@ -168,11 +169,14 @@ cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/speckit-commands/speckit.ralph.implement.md"    "$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.lisa.analyze.md"       "$PROJECT_DIR/.claude/commands/speckit.lisa.analyze.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.claude/commands/speckit.homer.clarify.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.claude/commands/speckit.marge.review.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
+echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
 echo "    .claude/agents/plan.md"
 echo "    .claude/agents/tasks.md"
@@ -180,7 +184,37 @@ echo "    .claude/agents/specify.md"
 echo "    .claude/commands/speckit.ralph.implement.md"
 echo "    .claude/commands/speckit.lisa.analyze.md"
 echo "    .claude/commands/speckit.homer.clarify.md"
+echo "    .claude/commands/speckit.marge.review.md"
+echo "    .claude/commands/speckit.review.md"
 echo "    .claude/commands/speckit.pipeline.md"
+
+# ── 2b. Seed Marge review packs ─────────────────────────────────────
+# Baseline packs ship with the template. Copy each baseline file to
+# .specify/marge/checks/ only if it does not already exist — this
+# preserves any consumer customizations while still bootstrapping
+# fresh installs. Consumer-added packs (files with different names)
+# are never touched.
+
+MARGE_CHECKS_DIR="$PROJECT_DIR/.specify/marge/checks"
+mkdir -p "$MARGE_CHECKS_DIR"
+
+marge_seeded=false
+for pack in "$SCRIPT_DIR/.specify/marge/checks/"*.md; do
+  [[ -f "$pack" ]] || continue
+  pack_name=$(basename "$pack")
+  target="$MARGE_CHECKS_DIR/$pack_name"
+  if [[ -f "$target" ]]; then
+    echo "  .specify/marge/checks/$pack_name already exists — skipped"
+  else
+    cp "$pack" "$target"
+    echo "  Seeded .specify/marge/checks/$pack_name"
+    marge_seeded=true
+  fi
+done
+
+if ! $marge_seeded; then
+  echo "  All Marge review packs already present"
+fi
 
 # ── 3. Update .gitignore ────────────────────────────────────────────
 
@@ -200,4 +234,4 @@ fi
 
 echo ""
 echo "Done! Run /speckit.pipeline for the full end-to-end workflow, or use individual loops:"
-echo "  /speckit.ralph.implement  /speckit.lisa.analyze  /speckit.homer.clarify"
+echo "  /speckit.ralph.implement  /speckit.lisa.analyze  /speckit.homer.clarify  /speckit.marge.review"

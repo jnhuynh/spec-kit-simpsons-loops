@@ -50,6 +50,7 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
+- **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
 - Exit after each iteration — restart with fresh context
 
 <!-- ====== PROJECT SPECIFIC ====== -->
@@ -62,8 +63,9 @@ The **source of truth** for SpecKit command and agent files lives in the repo ro
 
 - `speckit-commands/*.md` → installed to `.claude/commands/` by `setup.sh`
 - `claude-agents/*.md` → installed to `.claude/agents/` by `setup.sh`
+- `.specify/marge/checks/*.md` → seeded into consumer `.specify/marge/checks/` by `setup.sh` (idempotent — existing files preserved)
 
-**Always edit the source files** (`speckit-commands/`, `claude-agents/`), never the installed copies (`.claude/commands/`, `.claude/agents/`). The installed copies are overwritten by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh` or manually copy to `.claude/` to update the installed versions.
+**Always edit the source files** (`speckit-commands/`, `claude-agents/`, `.specify/marge/checks/`), never the installed copies (`.claude/commands/`, `.claude/agents/`). The installed copies are overwritten by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh` or manually copy to `.claude/` to update the installed versions.
 
 ## Active Technologies
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`) (002-rerun-setup-pipeline)
