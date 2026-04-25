@@ -1,0 +1,119 @@
+# JSON Schema (YAML-encoded) for <FEATURE_DIR>/phase-manifest.yaml
+# Implements FR-020, FR-021, FR-035, FR-038. Stable key ordering enforced by manifest_writer.rb.
+
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://speckit.simpsons.local/schemas/phase-manifest.schema.yaml
+title: PhaseManifest
+description: Output artifact of the phaser engine. One file per feature at <FEATURE_DIR>/phase-manifest.yaml.
+type: object
+additionalProperties: false
+required:
+  - flavor_name
+  - flavor_version
+  - feature_branch
+  - generated_at
+  - phases
+
+properties:
+  flavor_name:
+    type: string
+    description: The active flavor's name (FR-021).
+    pattern: ^[a-z][a-z0-9-]*$
+
+  flavor_version:
+    type: string
+    description: The active flavor's version, pinned by this manifest (FR-021, FR-035).
+    pattern: ^[0-9]+\.[0-9]+\.[0-9]+$
+
+  feature_branch:
+    type: string
+    description: Git branch name the phaser ran against (FR-021).
+    minLength: 1
+
+  generated_at:
+    type: string
+    description: ISO-8601 UTC timestamp with millisecond precision (FR-021).
+    format: date-time
+
+  phases:
+    type: array
+    description: Ordered phases (FR-021). Phase numbers MUST be 1..N with no gaps.
+    minItems: 1
+    items:
+      $ref: '#/definitions/Phase'
+
+definitions:
+  Phase:
+    type: object
+    additionalProperties: false
+    required:
+      - number
+      - name
+      - branch_name
+      - base_branch
+      - tasks
+      - ci_gates
+      - rollback_note
+    properties:
+      number:
+        type: integer
+        minimum: 1
+        description: 1-indexed position in the manifest.
+      name:
+        type: string
+        description: Sentence-case human-readable phase name.
+        minLength: 1
+      branch_name:
+        type: string
+        description: Stacked-PR branch name (<feature>-phase-<N>) per FR-026.
+        pattern: ^.+-phase-[0-9]+$
+      base_branch:
+        type: string
+        description: For phase 1, the project's default integration branch. For phases 2..N, the previous phase's branch_name. (FR-026)
+        minLength: 1
+      tasks:
+        type: array
+        description: Ordered classified commits in this phase.
+        minItems: 1
+        items:
+          $ref: '#/definitions/Task'
+      ci_gates:
+        type: array
+        description: CI gate names applicable to this phase, copied from the flavor catalog.
+        items:
+          type: string
+      rollback_note:
+        type: string
+        description: Operator-facing rollback guidance derived from assigned task types.
+
+  Task:
+    type: object
+    additionalProperties: false
+    required:
+      - id
+      - task_type
+      - commit_hash
+      - commit_subject
+    properties:
+      id:
+        type: string
+        description: Stable identifier (phase-<N>-task-<M>) for cross-referencing.
+        pattern: ^phase-[0-9]+-task-[0-9]+$
+      task_type:
+        type: string
+        description: The assigned type name from the flavor's task_types catalog.
+        minLength: 1
+      commit_hash:
+        type: string
+        description: Full Git SHA (40-char hex).
+        pattern: ^[0-9a-f]{40}$
+      commit_subject:
+        type: string
+        description: Mirror of the source commit's subject line for reviewer convenience.
+        minLength: 1
+
+# Notes on byte-identical determinism (FR-002, SC-002):
+# - Keys at every level are emitted in the order declared above.
+# - generated_at is pulled from a single injectable clock so tests can pin it.
+# - Hashes are never iterated in Ruby's default order; manifest_writer.rb builds an
+#   explicitly ordered Hash before passing to Psych.

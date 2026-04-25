@@ -1,0 +1,75 @@
+# JSON Schema (YAML-encoded) for <FEATURE_DIR>/phase-creation-status.yaml
+# Reused across phaser-engine and stacked-pr-creation failures (D-012). Implements FR-039, FR-042, FR-046, FR-048.
+
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://speckit.simpsons.local/schemas/phase-creation-status.schema.yaml
+title: PhaseCreationStatus
+description: Status file written on any non-zero exit of the phaser engine or stacked-PR creator. Deleted by the failing stage on full success of a re-run (FR-040).
+type: object
+additionalProperties: false
+required:
+  - stage
+  - timestamp
+  - failure_class
+
+properties:
+  stage:
+    type: string
+    enum: [phaser-engine, stacked-pr-creation]
+    description: Which subsystem failed.
+
+  timestamp:
+    type: string
+    format: date-time
+    description: ISO-8601 UTC timestamp of when the failure was recorded.
+
+  failure_class:
+    type: string
+    enum: [validation, auth-missing, auth-insufficient-scope, rate-limit, network, other]
+    description: |
+      Failure category (FR-046). `validation` is reserved for stage=phaser-engine.
+      Auth and network classes are reserved for stage=stacked-pr-creation.
+      `other` is the catch-all for unclassified failures from gh subprocess (derived from the host CLI's exit code, never guessed).
+
+  first_uncreated_phase:
+    type: integer
+    minimum: 1
+    description: Required when stage=stacked-pr-creation. The phase number at which a re-run should resume (FR-039, FR-040).
+
+  commit_hash:
+    type: string
+    pattern: ^[0-9a-f]{40}$
+    description: Set when stage=phaser-engine and the failure is commit-attributable.
+
+  failing_rule:
+    type: string
+    description: Set when stage=phaser-engine; the name of the rule (precedent, forbidden-operation, backfill-safety, feature-too-large, etc.) that rejected the commit or the feature.
+
+  missing_precedent:
+    type: string
+    description: Set on precedent failures; the predecessor type that was missing.
+
+  forbidden_operation:
+    type: string
+    description: Set on forbidden-operation failures; the detector identifier.
+
+  decomposition_message:
+    type: string
+    description: Set on forbidden-operation or feature-too-large failures; the canonical operator-facing message.
+
+  commit_count:
+    type: integer
+    minimum: 0
+    description: Set on feature-too-large failures (FR-048).
+
+  phase_count:
+    type: integer
+    minimum: 0
+    description: Set on feature-too-large failures (FR-048).
+
+# Cross-field rules enforced by status_writer.rb:
+# - When stage=stacked-pr-creation: failure_class MUST NOT be 'validation'; first_uncreated_phase MUST be present.
+# - When stage=phaser-engine: failure_class MUST be 'validation'; first_uncreated_phase MUST NOT be present.
+# - On feature-too-large: commit_count and phase_count MUST both be present.
+# - On forbidden-operation: forbidden_operation and decomposition_message MUST both be present.
+# - No field value MAY contain credential material (FR-047, SC-013) — enforced by the credential-scan regression test.
