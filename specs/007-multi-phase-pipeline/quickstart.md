@@ -199,7 +199,7 @@ This checklist enumerates the acceptance evidence required before declaring the 
 
 ### Pipeline Integration (User Story 3, P3)
 
-- [ ] With `.specify/flavor.yaml` present, the pipeline runs the phaser step between ralph and the existing simplify/security-review polish phases.
+- [ ] With `.specify/flavor.yaml` present, the pipeline runs the phaser step after the existing simplify/security-review polish phases and immediately before marge (order: `ralph → simplify → security-review → phaser → marge`), so any commits created by the polish phases are classified into the manifest.
 - [ ] With a manifest of N phases, the pipeline invokes marge N+1 times: once per phase with `--phase N`, then once holistically.
 - [ ] The holistic marge pass runs after all per-phase passes complete.
 - [ ] When the phaser stage fails, the pipeline halts and does NOT invoke marge.
