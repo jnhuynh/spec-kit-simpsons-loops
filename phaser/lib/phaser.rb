@@ -30,3 +30,8 @@ require 'phaser/phase_manifest'
 # Observability surface (T013 — JSON-line stderr logger used by the
 # engine and the stacked-PR creator).
 require 'phaser/observability'
+
+# Manifest writer (T015 — stable-key-order YAML emitter that
+# serializes a Phaser::PhaseManifest deterministically; FR-002, FR-038,
+# SC-002).
+require 'phaser/manifest_writer'
