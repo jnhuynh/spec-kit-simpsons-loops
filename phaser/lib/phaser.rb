@@ -40,3 +40,14 @@ require 'phaser/manifest_writer'
 # `<FEATURE_DIR>/phase-creation-status.yaml` on engine or stacked-PR
 # creator failure; FR-039, FR-040, FR-042, FR-046, FR-047, SC-013).
 require 'phaser/status_writer'
+
+# Flavor value object and schema-validated loader (T019 — single
+# ingress for shipped flavor catalogs at phaser/flavors/<name>/flavor.yaml;
+# data-model.md "Flavor", contracts/flavor.schema.yaml, plan.md
+# "Pattern: Flavor Loader" / D-002). The validator lives in its own
+# file so each surface (filesystem IO + value-object build vs. schema
+# enforcement) stays small and testable in isolation.
+require 'phaser/flavor'
+require 'phaser/precedent_rule_graph'
+require 'phaser/flavor_catalog_validator'
+require 'phaser/flavor_loader'
