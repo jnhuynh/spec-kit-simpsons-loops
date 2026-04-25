@@ -11,6 +11,7 @@
 
 - Q: What concrete file name and serialization format must the phase manifest use (FR-020 says "fixed file name", FR-038 says "human-readable and reviewable")? → A: `phase-manifest.yaml` (YAML format) at the root of the feature's spec directory.
 - Q: What concrete path and filename must the flavor configuration file use (FR-031 through FR-034 reference "the project's SpecKit configuration directory" without naming it)? → A: `.specify/flavor.yaml` at the repository root (single project-wide file, sibling to `.specify/memory/`).
+- Q: What must happen when stacked-PR creation partially fails (e.g., 2 of 5 PRs created before a transient GitHub error)? → A: Halt immediately, preserve already-created branches and PRs untouched, record the failure point, and require an explicit re-run; the re-run must be idempotent — detect existing branches/PRs by name, skip them, and resume from the first uncreated phase.
 
 ## Overview
 
@@ -119,6 +120,7 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 - The flavor configuration file exists but references a flavor name that is not shipped with the installed phaser. The pipeline halts with an error that names the unknown flavor and lists the shipped flavors.
 - A phase contains only one task. The phaser still emits a phase entry for it; the stacked-PR creator still creates a single-task branch and pull request for it.
 - A long-running backfill (multi-hour) blocks the next phase's pull request from opening. This version does not orchestrate that wait; the operator must merge the backfill phase manually when ready. A follow-up specification will address long-running backfill orchestration.
+- Stacked-branch or stacked-pull-request creation fails partway through (for example, transient network error or Git-host rate limit after some phases have already been created). The system halts immediately, leaves the already-created branches and pull requests intact, records the first uncreated phase and the underlying error in `<FEATURE_DIR>/phase-creation-status.yaml`, and exits with a non-zero status. The operator re-runs the stacked-creation step once the upstream condition is resolved; the re-run detects the existing branches and pull requests by name, skips them, and resumes from the first uncreated phase. The status file is deleted on full success.
 
 ## Requirements *(mandatory)*
 
@@ -165,6 +167,8 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 - **FR-028**: Each phase branch MUST trigger its own continuous-integration pipeline independently of the other phase branches.
 - **FR-029**: This version MUST advance to opening phase N+1's pull request as soon as phase N is merged into the integration branch (deploy confirmation is not required to unblock N+1).
 - **FR-030**: This version MUST NOT auto-rebase later phase branches when an upstream phase changes; rebasing remains a manual operator step.
+- **FR-039**: When stacked-branch or stacked-pull-request creation fails partway through (for example, network error, authentication failure, or rate limit from the Git host) the system MUST halt immediately on the failing phase, MUST NOT delete or modify any branches or pull requests already created in this run, MUST record the index of the first uncreated phase and the underlying error in a status file at `<FEATURE_DIR>/phase-creation-status.yaml`, and MUST exit with a non-zero status.
+- **FR-040**: A re-run of the stacked-branch or stacked-pull-request creation step MUST be idempotent: the system MUST detect each phase's branch by its declared name (`<feature>-phase-N`) and each phase's pull request by its head-branch reference, MUST skip phases whose branch and pull request already exist and match the current manifest, and MUST resume creation starting at the first phase recorded as uncreated in `phase-creation-status.yaml` (or, in the absence of that file, the first phase whose branch does not yet exist). On successful completion of all phases, the system MUST delete `phase-creation-status.yaml`.
 
 #### Flavor Initialization Command (User Story 5)
 
@@ -205,6 +209,7 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 - **SC-007**: A maintainer can opt a Rails+Postgres+strong_migrations project into phasing with a single command invocation followed by one confirmation prompt, with no manual file authoring required.
 - **SC-008**: When the phaser stage fails on a precedent or forbidden-operation violation, the resulting error message names the offending commit and the violated rule precisely enough that the maintainer can correct the issue without reading the phaser engine source.
 - **SC-009**: When a phase manifest is committed to the spec directory, a reviewer can determine, by reading the manifest alone, the exact list of branches and pull requests that will be created and the exact order in which they must be merged and deployed.
+- **SC-010**: When stacked-branch or stacked-pull-request creation is interrupted partway through (verified by a regression test that injects a failure between phase K and phase K+1 of an N-phase manifest, with K < N), the system leaves phases 1..K's branches and pull requests intact, writes a status file recording phase K+1 as the resume point, exits non-zero, and on re-run completes phases K+1..N without recreating or modifying phases 1..K. The status file is removed after the successful re-run.
 
 ## Assumptions
 
