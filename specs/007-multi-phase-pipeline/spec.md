@@ -10,6 +10,7 @@
 ### Session 2026-04-25
 
 - Q: What concrete file name and serialization format must the phase manifest use (FR-020 says "fixed file name", FR-038 says "human-readable and reviewable")? → A: `phase-manifest.yaml` (YAML format) at the root of the feature's spec directory.
+- Q: What concrete path and filename must the flavor configuration file use (FR-031 through FR-034 reference "the project's SpecKit configuration directory" without naming it)? → A: `.specify/flavor.yaml` at the repository root (single project-wide file, sibling to `.specify/memory/`).
 
 ## Overview
 
@@ -98,7 +99,7 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 
 **Acceptance Scenarios**:
 
-1. **Given** a Rails project whose dependency manifest declares Postgres and the strong_migrations gem, **When** the flavor initialization command runs, **Then** the command suggests the rails-postgres-strong-migrations flavor, asks for confirmation, and on confirmation writes the flavor configuration to the project's SpecKit configuration directory.
+1. **Given** a Rails project whose dependency manifest declares Postgres and the strong_migrations gem, **When** the flavor initialization command runs, **Then** the command suggests the rails-postgres-strong-migrations flavor, asks for confirmation, and on confirmation writes the flavor configuration to `.specify/flavor.yaml` at the repository root.
 2. **Given** a project whose stack matches no shipped flavor, **When** the command runs, **Then** it reports "no flavor matched" and exits without writing any file.
 3. **Given** a project that already has a flavor configuration file, **When** the command runs without the force option, **Then** it refuses to overwrite and exits with a non-zero status.
 4. **Given** the same project, **When** the command runs with the force option, **Then** the existing flavor configuration is overwritten with the newly suggested one.
@@ -149,13 +150,13 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 
 #### Pipeline Integration (User Story 3)
 
-- **FR-019**: The pipeline MUST invoke the phaser stage after the implementation step and before the review step when a flavor configuration is present in the project.
+- **FR-019**: The pipeline MUST invoke the phaser stage after the implementation step and before the review step when a flavor configuration file exists at `.specify/flavor.yaml` in the repository root.
 - **FR-020**: The pipeline MUST commit the phase manifest to the feature's spec directory as a file named `phase-manifest.yaml` (located at `<FEATURE_DIR>/phase-manifest.yaml`) and include it in the feature branch.
 - **FR-021**: The phase manifest MUST record the flavor name, the flavor version, the generation timestamp, the feature branch name, and for each phase: the phase number, a human-readable name, the branch name to use, the base branch, the ordered list of tasks (each with its identifier, classified type, and source commit hash), the continuous-integration gates applicable to that phase, and a rollback note.
 - **FR-022**: The review step MUST accept a directive to scope its review to the diff range between two specified phase boundaries.
 - **FR-023**: The pipeline MUST run the review step once per phase (each scoped to that phase's diff range) and then once more holistically across the whole feature; the holistic pass MUST run after all per-phase passes have completed.
 - **FR-024**: The pipeline MUST halt with a clear error when the phaser stage fails, MUST NOT invoke the review step in that case, and the error MUST name the offending commit and the failing rule.
-- **FR-025**: The pipeline MUST behave exactly as it did before this feature when no flavor configuration is present in the project: no phaser stage, no per-phase review, no stacked-PR creation, no phase manifest, single pull request.
+- **FR-025**: The pipeline MUST behave exactly as it did before this feature when no flavor configuration file exists at `.specify/flavor.yaml`: no phaser stage, no per-phase review, no stacked-PR creation, no phase manifest, single pull request.
 
 #### Stacked Branches and Pull Requests (User Story 4)
 
@@ -168,9 +169,9 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 #### Flavor Initialization Command (User Story 5)
 
 - **FR-031**: The flavor-initialization command MUST detect the project's stack by inspecting the project's dependency manifest and other well-known signals declared by each shipped flavor.
-- **FR-032**: When exactly one shipped flavor matches, the command MUST suggest that flavor, ask for confirmation, and on confirmation write the flavor configuration file to the project's SpecKit configuration directory.
+- **FR-032**: When exactly one shipped flavor matches, the command MUST suggest that flavor, ask for confirmation, and on confirmation write the flavor configuration file to `.specify/flavor.yaml` at the repository root.
 - **FR-033**: When no shipped flavor matches, the command MUST report "no flavor matched" and exit with a non-zero status without writing any file.
-- **FR-034**: When the flavor configuration file already exists, the command MUST refuse to overwrite it by default and exit with a non-zero status; a force option MUST be available to override this refusal.
+- **FR-034**: When the flavor configuration file (`.specify/flavor.yaml`) already exists, the command MUST refuse to overwrite it by default and exit with a non-zero status; a force option MUST be available to override this refusal.
 
 #### Cross-Cutting
 
@@ -188,7 +189,7 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 - **Precedent Rule**: A flavor-declared statement that a task of type X must be placed in a strictly later phase than at least one task of type Y from the same feature.
 - **Isolation Rule**: A flavor-declared statement that a task of type X must occupy its own phase (alone) or may share a phase with other groups-isolation tasks (groups).
 - **Forbidden Operation**: A flavor-declared category of work that has no valid task type because it is unsafe for production deploys. It is paired with a canonical decomposition message that lists the safe sequence of replacement tasks.
-- **Flavor Configuration File**: The project-level file that selects which shipped flavor a project uses; its presence opts the project into phasing, its absence opts the project out.
+- **Flavor Configuration File**: The project-level file at `.specify/flavor.yaml` (repository root) that selects which shipped flavor a project uses; its presence opts the project into phasing, its absence opts the project out.
 - **Stacked Pull Request**: A pull request opened against the previous phase's branch (rather than the project's default integration branch), used to review and deploy a single phase in isolation while keeping the dependency chain explicit.
 
 ## Success Criteria *(mandatory)*
