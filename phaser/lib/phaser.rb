@@ -26,3 +26,7 @@ require 'phaser/classification_result'
 require 'phaser/task'
 require 'phaser/phase'
 require 'phaser/phase_manifest'
+
+# Observability surface (T013 — JSON-line stderr logger used by the
+# engine and the stacked-PR creator).
+require 'phaser/observability'
