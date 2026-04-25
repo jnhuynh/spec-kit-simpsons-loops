@@ -1,0 +1,64 @@
+# RuboCop configuration for the Phaser engine and reference flavor.
+#
+# Adopts the community-default cops shipped with RuboCop and the
+# rubocop-rspec extension declared in the Gemfile. Project-specific
+# adjustments are kept to the minimum required to fit the codebase
+# layout described in plan.md "Project Structure":
+#
+#   * Ruby 3.2+ is the floor (Gemfile pins `ruby ">= 3.2"`).
+#   * Executables live under `bin/` (no `.rb` extension).
+#   * Specs live under `spec/`; fixture repositories and synthetic
+#     commit payloads under `spec/fixtures/` are intentionally excluded
+#     from style checks because their contents are diagnostic data, not
+#     production code.
+#   * Generated artifacts under `vendor/` and `tmp/` are excluded.
+
+require:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - "bin/**/*"
+    - "spec/fixtures/**/*"
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "Gemfile.lock"
+
+# The phaser engine and flavor catalogs are documentation-heavy by
+# design; the value-object and validator files frequently exceed the
+# default 100-line/15-line limits because their public API is a single
+# coherent unit. The community defaults still apply, but with headroom
+# that matches the size of the modules described in data-model.md.
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
+    - "Rakefile"
+
+# RSpec files use `describe` blocks that often run long; the community
+# default is fine for production code but causes noise in test files
+# whose structure mirrors the module under test.
+RSpec/ExampleLength:
+  Max: 15
+
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/NestedGroups:
+  Max: 4
+
+# The Phaser module namespace mirrors the file layout one-to-one
+# (`lib/phaser/<thing>.rb` defines `Phaser::Thing`); the default
+# Style/Documentation cop requires a top-of-file comment on every
+# class/module, which is excessive for value objects whose names are
+# self-documenting.
+Style/Documentation:
+  Enabled: false
