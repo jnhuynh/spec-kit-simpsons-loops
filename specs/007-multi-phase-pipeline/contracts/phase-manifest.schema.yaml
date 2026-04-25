@@ -111,6 +111,17 @@ definitions:
         type: string
         description: Mirror of the source commit's subject line for reviewer convenience.
         minLength: 1
+      safety_assertion_precedents:
+        type: array
+        description: |
+          Optional. Set by reference-flavor validators (FR-018, plan.md D-017) when the
+          source commit performs an irreversible schema operation. Lists the precedent
+          commit SHAs cited in the commit's safety-assertion block so audit reviewers
+          can trace the precedent chain from the manifest alone. Absent for commits
+          whose task type is not declared irreversible by the active flavor.
+        items:
+          type: string
+          pattern: ^[0-9a-f]{40}$
 
 # Notes on byte-identical determinism (FR-002, SC-002):
 # - Keys at every level are emitted in the order declared above.

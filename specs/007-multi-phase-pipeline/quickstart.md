@@ -44,7 +44,9 @@ The work is organized into five phases. Each phase corresponds to a Priority lev
 - `phaser/flavors/rails-postgres-strong-migrations/forbidden_operations.rb` — detector methods for direct-rename, direct-type-change, non-concurrent index, etc.
 - `phaser/flavors/rails-postgres-strong-migrations/backfill_validator.rb` — rejects backfill commits lacking batching/throttling/transaction-safety (FR-013).
 - `phaser/flavors/rails-postgres-strong-migrations/precedent_validator.rb` — rejects column-drop without prior ignore + reference-removal (FR-014).
+- `phaser/flavors/rails-postgres-strong-migrations/safety_assertion_validator.rb` — enforces the `Safety-Assertion:` trailer on irreversible schema operations and records the cited SHAs on the manifest's task entry for audit (FR-018, plan.md D-017).
 - `phaser/spec/flavors/rails_postgres_strong_migrations_spec.rb` — exercises every catalog entry, every forbidden operation, the backfill validator, the precedent validator, and the column-rename worked example (FR-017).
+- `phaser/spec/flavors/rails_postgres_strong_migrations/safety_assertion_validator_spec.rb` — pairs every irreversible task type with missing-block, mismatched-precedent, and correctly-cited fixture commits (FR-018).
 - `phaser/spec/fixtures/repos/users-email-rename/` — the seven-commit fixture for FR-017 / SC-001.
 - `phaser/spec/fixtures/classification/` — per-type fixture commits for FR-012.
 
@@ -196,6 +198,7 @@ This checklist enumerates the acceptance evidence required before declaring the 
 - [ ] A commit performing a forbidden operation BUT carrying an operator-supplied valid-type tag is still rejected by the pre-classification gate (SC-015) — verified for every entry in the registry.
 - [ ] A backfill commit lacking batching is rejected with an error naming the missing safeguard (FR-013).
 - [ ] A column-drop commit without prior ignore + reference-removal is rejected with an error naming the missing precedents (FR-014).
+- [ ] An irreversible-schema-operation commit (column drop, table drop, concurrent index drop, remove ignored-columns directive) is rejected by the safety-assertion-block validator when the commit message lacks a `Safety-Assertion:` trailer or fenced safety-assertion block, or when the cited SHA is not a valid precedent for the subject type; on success, the cited SHA is recorded on the manifest's task entry for audit (FR-018).
 
 ### Pipeline Integration (User Story 3, P3)
 

@@ -139,7 +139,8 @@ phaser/                                              # NEW — Ruby phaser engin
 │       ├── inference.rb
 │       ├── forbidden_operations.rb
 │       ├── backfill_validator.rb
-│       └── precedent_validator.rb
+│       ├── precedent_validator.rb
+│       └── safety_assertion_validator.rb             # FR-018 — irreversible-ops safety-assertion-block validator
 ├── spec/
 │   ├── engine_spec.rb                               # Determinism, isolation, precedent, default-type tests
 │   ├── classifier_spec.rb
@@ -149,7 +150,8 @@ phaser/                                              # NEW — Ruby phaser engin
 │   ├── observability_spec.rb                        # SC-011, SC-013
 │   ├── flavors/
 │   │   ├── example_minimal_spec.rb
-│   │   └── rails_postgres_strong_migrations_spec.rb # FR-017 worked example, FR-013/014 validators
+│   │   ├── rails_postgres_strong_migrations_spec.rb # FR-017 worked example, FR-013/014 validators
+│   │   └── rails_postgres_strong_migrations/safety_assertion_validator_spec.rb # FR-018
 │   ├── stacked_prs/
 │   │   ├── creator_spec.rb                          # SC-010 idempotent resume
 │   │   ├── auth_probe_spec.rb                       # SC-012 auth-missing fail-fast
@@ -260,6 +262,19 @@ Each shipped flavor's `flavor.yaml` declares its own stack-detection signals (e.
 ### D-016: Engine Exposes No Bypass Mechanism for the Forbidden-Operations Gate
 
 Per FR-049's explicit prohibition, the engine code MUST NOT contain any flag, environment variable, commit-message trailer, or configuration option that lets an operator suppress the forbidden-operations gate. This is enforced by both code review and a regression test that greps the engine source for credential-style bypass patterns and asserts the bypass surface is empty. The only way to add a forbidden operation back as a permitted task is to remove it from the flavor's registry — a deliberate flavor-edit action that goes through normal review.
+
+### D-017: Reference-Flavor Safety-Assertion-Block Validator (FR-018)
+
+Per FR-018, any commit in the reference flavor that performs an irreversible schema operation (column drop, table drop, concurrent index drop, remove ignored-columns directive) MUST reference its precedent commit hash in a safety-assertion block embedded in the commit message, so that audit reviewers can trace the precedent chain without rerunning the engine. The reference flavor ships a `safety_assertion_validator.rb` module that:
+
+1. Identifies commits classified as one of the irreversible task types (the set is declared in `flavor.yaml` under `irreversible_task_types`).
+2. Parses the commit message for a `Safety-Assertion:` trailer (or a fenced ` ```safety-assertion ` block) listing one or more 40-char Git SHAs.
+3. For each cited SHA, verifies the SHA appears earlier in the feature branch's commit list and that its classified type matches one of the precedent types declared by the flavor's precedent rules for the subject type.
+4. Rejects the commit with a `validation-failed` ERROR (`failing_rule: safety-assertion-missing` or `safety-assertion-precedent-mismatch`, payload includes the offending commit hash and the missing precedent SHAs) when the assertion is missing, malformed, or names a SHA that is not a valid precedent.
+
+This is a reference-flavor concern only; the engine knows nothing about safety-assertion blocks. The validator is wired through the same `validators` list in `flavor.yaml` that connects `backfill_validator.rb` and `precedent_validator.rb` (see D-002 and `flavor_loader.rb`'s validator dispatch). The validator runs after classification and before manifest emission, alongside the existing per-flavor validators.
+
+**Verification**: A regression test pairs every irreversible task type with (a) a fixture commit that omits the safety-assertion block (asserts rejection), (b) a fixture commit whose assertion cites a SHA that is not a valid precedent (asserts rejection), and (c) a fixture commit whose assertion correctly cites the precedent commit (asserts acceptance and that the cited SHA is recorded in the manifest's task entry for audit).
 
 ## Complexity Tracking
 

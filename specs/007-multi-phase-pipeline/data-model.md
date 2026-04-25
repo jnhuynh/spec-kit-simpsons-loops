@@ -184,6 +184,7 @@ A single classified commit's representation inside a Phase entry of the manifest
 | `task_type` | string | The assigned type name. |
 | `commit_hash` | string | Source commit SHA. |
 | `commit_subject` | string | Mirror of the commit subject for reviewer convenience. |
+| `safety_assertion_precedents` | list of string (optional) | Set by reference-flavor validators (FR-018; plan.md D-017) when the source commit performs an irreversible schema operation; lists the precedent commit SHAs cited in the commit's safety-assertion block so audit reviewers can trace the precedent chain from the manifest alone. Absent for commits whose task type is not declared irreversible by the active flavor. |
 
 ### PhaseManifest
 
