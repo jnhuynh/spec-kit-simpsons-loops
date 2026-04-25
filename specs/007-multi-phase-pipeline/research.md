@@ -245,7 +245,9 @@ stdout is reserved for the manifest path on success (`/path/to/phase-manifest.ya
 ```yaml
 stage: phaser-engine | stacked-pr-creation
 timestamp: <ISO-8601-UTC>
-failure_class: validation | auth-missing | auth-insufficient-scope | rate-limit | network | other
+failure_class: auth-missing | auth-insufficient-scope | rate-limit | network | other
+                                     # required when stage=stacked-pr-creation; MUST NOT be present
+                                     # when stage=phaser-engine (FR-046 enumerates only these five values)
 first_uncreated_phase: <integer>     # only when stage=stacked-pr-creation
 commit_hash: <hex>                   # only when stage=phaser-engine and applicable
 failing_rule: <string>               # only when stage=phaser-engine

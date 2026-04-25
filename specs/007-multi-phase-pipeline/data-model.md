@@ -219,7 +219,7 @@ The status file written when either the phaser engine (FR-042) or the stacked-PR
 |---|---|---|
 | `stage` | enum: `phaser-engine` \| `stacked-pr-creation` | Which subsystem failed. |
 | `timestamp` | ISO-8601 UTC string | When the failure was recorded. |
-| `failure_class` | enum: `validation` \| `auth-missing` \| `auth-insufficient-scope` \| `rate-limit` \| `network` \| `other` | Failure category (FR-046). `validation` is reserved for `stage: phaser-engine`. |
+| `failure_class` | enum: `auth-missing` \| `auth-insufficient-scope` \| `rate-limit` \| `network` \| `other` | Failure category for stacked-PR creation failures (FR-046). Required when `stage = stacked-pr-creation`; MUST NOT be present when `stage = phaser-engine` (phaser-engine failures are described by `failing_rule` and the rule-specific payload fields). |
 | `first_uncreated_phase` | integer (optional) | Set when `stage = stacked-pr-creation`; first phase needing creation on re-run (FR-039, FR-040). |
 | `commit_hash` | string (optional) | Set when `stage = phaser-engine` and the failure is commit-attributable. |
 | `failing_rule` | string (optional) | Set when `stage = phaser-engine`; the name of the rule that rejected the commit. |
