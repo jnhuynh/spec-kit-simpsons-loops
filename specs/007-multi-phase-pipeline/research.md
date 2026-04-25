@@ -384,7 +384,7 @@ The existing gates remain unchanged. The Ruby gates run only when `phaser/` is p
 
 | File | Changes | FRs |
 |---|---|---|
-| `speckit-commands/speckit.pipeline.md` | Insert phaser step between ralph and simplify; gate on `.specify/flavor.yaml` existence; invoke marge per-phase plus holistic; preserve no-flavor zero-regression behavior | FR-019, FR-023, FR-024, FR-025 |
+| `speckit-commands/speckit.pipeline.md` | Insert phaser step after the existing simplify/security-review polish phases and before marge (so the order becomes `ralph → simplify → security-review → phaser → marge`, per R-011 and plan.md D-008); gate on `.specify/flavor.yaml` existence; invoke marge per-phase plus holistic; preserve no-flavor zero-regression behavior | FR-019, FR-023, FR-024, FR-025 |
 | `speckit-commands/speckit.marge.review.md` | Accept `--phase <N>` to scope review to that phase's diff range | FR-022 |
 | `setup.sh` | Install new commands, agents, and `phaser/bin/` entry points | — |
 | `.specify/quality-gates.sh` | Add `bundle exec rspec` and `bundle exec rubocop` runs gated on `phaser/` presence | — |
