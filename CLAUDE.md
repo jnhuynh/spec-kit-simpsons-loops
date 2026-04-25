@@ -50,7 +50,6 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
-- **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
 - Exit after each iteration — restart with fresh context
 
 <!-- ====== PROJECT SPECIFIC ====== -->
