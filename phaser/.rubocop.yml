@@ -13,7 +13,7 @@
 #     production code.
 #   * Generated artifacts under `vendor/` and `tmp/` are excluded.
 
-require:
+plugins:
   - rubocop-rspec
 
 AllCops:

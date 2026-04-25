@@ -34,7 +34,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 - [x] T002 Create `phaser/Gemfile` declaring Ruby 3.2+ and dev dependencies (`rspec`, `rubocop`, `psych`) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/Gemfile`
 - [x] T003 [P] Create `phaser/Rakefile` with `rake test` (runs `bundle exec rspec`) and `rake lint` (runs `bundle exec rubocop`) tasks at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/Rakefile`
 - [x] T004 [P] Create `phaser/.rubocop.yml` adopting community defaults at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/.rubocop.yml`
-- [ ] T005 [P] Create `phaser/spec/spec_helper.rb` and `phaser/spec/support/git_fixture_helper.rb` (loads `Phaser::`, configures RSpec, exposes `make_fixture_repo` helper) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/spec_helper.rb` and `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/support/git_fixture_helper.rb`
+- [x] T005 [P] Create `phaser/spec/spec_helper.rb` and `phaser/spec/support/git_fixture_helper.rb` (loads `Phaser::`, configures RSpec, exposes `make_fixture_repo` helper) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/spec_helper.rb` and `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/support/git_fixture_helper.rb`
 - [ ] T006 Run `bundle install` inside `/home/jama/Projects/spec-kit-simpsons-loops/phaser/` to generate `phaser/Gemfile.lock`
 - [ ] T007 [P] Create `phaser/lib/phaser/version.rb` defining `Phaser::VERSION = '0.1.0'` at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/lib/phaser/version.rb`
 

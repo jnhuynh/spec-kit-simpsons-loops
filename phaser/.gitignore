@@ -1,0 +1,7 @@
+# Test-runtime artifacts created by spec_helper.rb
+# (RSpec example-status persistence file at spec/../tmp/rspec-status.txt)
+tmp/
+
+# Bundler caches and per-developer config
+.bundle/
+vendor/bundle/
