@@ -35,3 +35,8 @@ require 'phaser/observability'
 # serializes a Phaser::PhaseManifest deterministically; FR-002, FR-038,
 # SC-002).
 require 'phaser/manifest_writer'
+
+# Status writer (T017 — stable-key-order YAML emitter that persists
+# `<FEATURE_DIR>/phase-creation-status.yaml` on engine or stacked-PR
+# creator failure; FR-039, FR-040, FR-042, FR-046, FR-047, SC-013).
+require 'phaser/status_writer'
