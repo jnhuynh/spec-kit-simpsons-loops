@@ -5,6 +5,12 @@
 **Status**: Draft
 **Input**: User description: "Multi-Phase Pipeline for SpecKit Simpsons - phaser stage between Ralph and Marge for stacked PRs in zero-downtime deploys"
 
+## Clarifications
+
+### Session 2026-04-25
+
+- Q: What concrete file name and serialization format must the phase manifest use (FR-020 says "fixed file name", FR-038 says "human-readable and reviewable")? → A: `phase-manifest.yaml` (YAML format) at the root of the feature's spec directory.
+
 ## Overview
 
 SpecKit Simpsons currently ships every feature as a single branch with a single pull request. This works for code-only changes but produces unsafe deploys when a feature touches production schemas, data, or infrastructure where zero-downtime correctness requires deploying in stages (for example, schema migration, then backfill, then code switch, then cleanup). This feature adds a **phaser stage** to the pipeline that sits between the implementation step and the review step, classifies each implemented task by its deploy-safety category, validates that risky operations are accompanied by their required predecessor tasks, and computes a deterministic phase split that drives stacked branches and stacked pull requests. The phasing capability is **opt-in**: a project that does not select a "flavor" (a project-specific catalog of task types and rules) sees no behavior change.
@@ -144,7 +150,7 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 #### Pipeline Integration (User Story 3)
 
 - **FR-019**: The pipeline MUST invoke the phaser stage after the implementation step and before the review step when a flavor configuration is present in the project.
-- **FR-020**: The pipeline MUST commit the phase manifest to the feature's spec directory under a fixed file name and include it in the feature branch.
+- **FR-020**: The pipeline MUST commit the phase manifest to the feature's spec directory as a file named `phase-manifest.yaml` (located at `<FEATURE_DIR>/phase-manifest.yaml`) and include it in the feature branch.
 - **FR-021**: The phase manifest MUST record the flavor name, the flavor version, the generation timestamp, the feature branch name, and for each phase: the phase number, a human-readable name, the branch name to use, the base branch, the ordered list of tasks (each with its identifier, classified type, and source commit hash), the continuous-integration gates applicable to that phase, and a rollback note.
 - **FR-022**: The review step MUST accept a directive to scope its review to the diff range between two specified phase boundaries.
 - **FR-023**: The pipeline MUST run the review step once per phase (each scoped to that phase's diff range) and then once more holistically across the whole feature; the holistic pass MUST run after all per-phase passes have completed.
@@ -171,14 +177,14 @@ A maintainer who wants to opt a project into phasing should be able to run a sin
 - **FR-035**: The phase manifest MUST pin the flavor version that produced it; re-running the phaser on an in-flight feature MUST NOT re-classify previously classified commits unless the operator explicitly opts in.
 - **FR-036**: The phaser MUST treat a commit that matches multiple inference rules as belonging to the rule with the highest declared precedence in the flavor; ties MUST be broken alphabetically by rule name to preserve determinism.
 - **FR-037**: When a feature contains multiple backfill tasks, the phaser MUST place them in sequential phases by default; a flavor-level override MAY permit parallel placement.
-- **FR-038**: The phase manifest file format MUST be human-readable and reviewable in a code-review tool.
+- **FR-038**: The phase manifest file format MUST be YAML (UTF-8 encoded, with a stable key ordering across runs) so the file is human-readable, supports inline comments for reviewer context, and produces line-oriented diffs in standard code-review tools.
 
 ### Key Entities
 
 - **Flavor**: A project-specific catalog that names task types, declares each type's isolation rule (alone or groups), declares precedent rules between types, declares inference rules that map file patterns or content patterns to types, declares the default type for unmatched commits, declares the registry of forbidden operations and their canonical decomposition messages, and carries a version number that is pinned by every manifest it produces.
 - **Task Type**: A named category of work (for example, "schema add-nullable-column" or "code dual-write") that carries an isolation rule and may participate in precedent rules.
 - **Phase**: An ordered group of one or more classified commits from a feature branch that can safely be deployed together as a single unit before the next phase begins. A phase has a number, a human-readable name, a branch name, a base branch, an ordered task list, applicable continuous-integration gates, and a rollback note.
-- **Phase Manifest**: The artifact produced by the phaser for one feature, listing the active flavor and version, the generation timestamp, the feature branch name, and the ordered phases.
+- **Phase Manifest**: The artifact produced by the phaser for one feature, serialized as YAML and stored at `<FEATURE_DIR>/phase-manifest.yaml`. It lists the active flavor and version, the generation timestamp, the feature branch name, and the ordered phases.
 - **Precedent Rule**: A flavor-declared statement that a task of type X must be placed in a strictly later phase than at least one task of type Y from the same feature.
 - **Isolation Rule**: A flavor-declared statement that a task of type X must occupy its own phase (alone) or may share a phase with other groups-isolation tasks (groups).
 - **Forbidden Operation**: A flavor-declared category of work that has no valid task type because it is unsafe for production deploys. It is paired with a canonical decomposition message that lists the safe sequence of replacement tasks.
