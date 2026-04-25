@@ -20,3 +20,9 @@ require 'phaser/version'
 require 'phaser/file_change'
 require 'phaser/diff'
 require 'phaser/commit'
+
+# Manifest-side value objects (T011 — feeds the engine's output layer).
+require 'phaser/classification_result'
+require 'phaser/task'
+require 'phaser/phase'
+require 'phaser/phase_manifest'
