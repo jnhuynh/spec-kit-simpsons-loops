@@ -107,7 +107,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 
 ### Tests for User Story 2
 
-- [ ] T040 [P] [US2] Write RSpec test for the reference flavor's catalog completeness (asserts every task type listed in FR-010 is present in `flavor.yaml` with the isolation declared in FR-011) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavors/rails_postgres_strong_migrations/catalog_spec.rb`
+- [x] T040 [P] [US2] Write RSpec test for the reference flavor's catalog completeness (asserts every task type listed in FR-010 is present in `flavor.yaml` with the isolation declared in FR-011) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavors/rails_postgres_strong_migrations/catalog_spec.rb`
 - [ ] T041 [P] [US2] Write RSpec test for the reference flavor's file-pattern inference layer (≥90% of fixture commits classified correctly without operator tags per SC-004; FR-012) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavors/rails_postgres_strong_migrations/inference_spec.rb`
 - [ ] T042 [P] [US2] Write RSpec test for the reference flavor's backfill-safety validator (FR-013; rejects commits lacking batching, throttling, or `disable_ddl_transaction!`; error names the missing safeguard) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavors/rails_postgres_strong_migrations/backfill_validator_spec.rb`
 - [ ] T043 [P] [US2] Write RSpec test for the reference flavor's column-drop precedent validator (FR-014; rejects column-drop without prior `ignore` directive AND prior reference-removal; error names both missing precedents) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavors/rails_postgres_strong_migrations/precedent_validator_spec.rb`
