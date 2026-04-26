@@ -16,15 +16,15 @@
 # developer can verify the full local quality gate with a single command
 # from `phaser/`.
 
-desc "Run the full RSpec suite via Bundler"
+desc 'Run the full RSpec suite via Bundler'
 task :test do
-  sh "bundle exec rspec"
+  sh 'bundle exec rspec'
 end
 
-desc "Run RuboCop against the entire phaser tree"
+desc 'Run RuboCop against the entire phaser tree'
 task :lint do
-  sh "bundle exec rubocop"
+  sh 'bundle exec rubocop'
 end
 
-desc "Run tests, then lint (the local quality gate)"
+desc 'Run tests, then lint (the local quality gate)'
 task default: %i[test lint]

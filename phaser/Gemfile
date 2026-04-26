@@ -7,26 +7,26 @@
 # YAML serialization. Development dependencies cover the test runner and
 # linter required by the project's quality gates.
 
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
 # Ruby 3.2+ is required for `Data.define` (used by all Phaser value objects)
 # and the structured pattern-matching syntax used by the classifier and
 # precedent validator. See plan.md "Technical Context".
-ruby ">= 3.2"
+ruby '>= 3.2'
 
 # Psych ships with Ruby itself; pinning it explicitly here documents that
 # Phaser::ManifestWriter and Phaser::StatusWriter depend on Psych's stable
 # emitter to satisfy FR-038 (stable key ordering) and FR-002 / SC-002
 # (byte-identical YAML across 100 consecutive runs).
-gem "psych", ">= 5.0"
+gem 'psych', '>= 5.0'
 
 group :development, :test do
   # RSpec is the test runner mandated by plan.md "Primary Dependencies".
   # Cucumber is intentionally rejected per research.md R-002.
-  gem "rspec", "~> 3.13"
+  gem 'rspec', '~> 3.13'
 
   # RuboCop enforces community Ruby style as part of the project's quality
   # gates (`bundle exec rubocop`). Default community rules per plan.md.
-  gem "rubocop", "~> 1.71"
-  gem "rubocop-rspec", "~> 3.3"
+  gem 'rubocop', '~> 1.71'
+  gem 'rubocop-rspec', '~> 3.3'
 end

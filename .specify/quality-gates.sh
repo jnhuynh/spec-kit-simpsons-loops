@@ -11,7 +11,14 @@ done
 
 if [ ${#files[@]} -eq 0 ]; then
   echo "No shell files found to check"
-  exit 0
+else
+  shellcheck "${files[@]}"
 fi
 
-shellcheck "${files[@]}"
+# Ruby quality gates for the phaser engine (R-018).
+# Gated on phaser/ directory existence so existing repositories without the
+# phaser feature are unaffected.
+if [ -d phaser ]; then
+  ( cd phaser && bundle exec rspec )
+  ( cd phaser && bundle exec rubocop )
+fi
