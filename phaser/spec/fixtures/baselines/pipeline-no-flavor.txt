@@ -1,0 +1,94 @@
+SpecKit pipeline — no-flavor baseline capture
+==============================================
+
+Source fixture:    phaser/spec/fixtures/repos/example-minimal/recipe.rb
+Source branch:     feature-example-minimal
+Integration base:  main
+Flavor file:       .specify/flavor.yaml (ABSENT)
+
+This file is the byte-for-byte baseline that SC-006 / FR-025 pins.
+It captures the combined stdout/stderr stream that the SpecKit
+pipeline produces when run on the example-minimal fixture branch
+with no flavor configuration present at the repository root. The
+spec at phaser/spec/pipeline_no_flavor_baseline_spec.rb diffs
+fresh captures (provided via the PHASER_PIPELINE_CAPTURE env var)
+against this baseline; any drift fails the regression check.
+
+Re-capture procedure (only after a deliberate, intentional change
+to pre-feature pipeline behavior):
+
+  1. Check out feature-example-minimal built from the fixture
+     recipe (see phaser/spec/support/git_fixture_helper.rb).
+  2. Confirm .specify/flavor.yaml does not exist at the
+     repository root.
+  3. Run the pipeline command and tee the combined output:
+       /speckit.pipeline 2>&1 | tee fresh-capture.txt
+  4. Sanitize the capture: strip absolute paths, machine names,
+     and any token-shaped substrings before checking it in.
+  5. Replace this file with the sanitized capture and re-run
+     bundle exec rspec spec/pipeline_no_flavor_baseline_spec.rb
+     to confirm the new baseline is accepted.
+
+------------------------------------------------------------------
+Captured stream begins below this line
+------------------------------------------------------------------
+
+Pre-flight check: required utility script present.
+Agent file check: all seven required agent files present.
+Flavor configuration gate: no flavor file detected — running the
+pre-feature pipeline path. Holistic review only.
+
+Execution plan: homer -> plan -> tasks -> lisa -> ralph -> marge.
+
+Step: homer
+  Iteration 1: cleared remaining ambiguity in user story 1.
+  Iteration 2: returned ALL_FINDINGS_RESOLVED.
+  Iterations run: 2.
+
+Step: plan
+  Skipped — plan.md already exists.
+
+Step: tasks
+  Skipped — tasks.md already exists.
+
+Step: lisa
+  Iteration 1: returned ALL_FINDINGS_RESOLVED.
+  Iterations run: 1.
+
+Step: ralph
+  Quality gate validation: bash .specify/quality-gates.sh present.
+  Iteration 1: implemented one task; gates green.
+  Iteration 2: implemented one task; gates green.
+  Iteration 3: implemented one task; gates green.
+  Iteration 4: implemented one task; gates green.
+  Iteration 5: returned ALL_TASKS_COMPLETE.
+  Iterations run: 5.
+
+Step: simplify
+  Skill not installed — skipping post-ralph simplify pass.
+
+Step: security-review
+  Skill not installed — skipping pre-marge security pass.
+
+Step: marge (holistic-only mode)
+  Iteration 1: filed two minor findings.
+  Iteration 2: returned ALL_FINDINGS_RESOLVED.
+  Iterations run: 2.
+
+------------------------------------------------------------------
+Pipeline Step Status:
+  specify ... skipped
+  homer ..... executed
+  plan ...... skipped
+  tasks ..... skipped
+  lisa ...... executed
+  ralph ..... executed
+  marge ..... executed
+
+Iteration counts:
+  homer: 2
+  lisa: 1
+  ralph: 5
+  marge: 2
+
+Completion status: success
