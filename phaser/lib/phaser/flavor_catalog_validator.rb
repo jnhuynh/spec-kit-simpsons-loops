@@ -59,6 +59,8 @@ module Phaser
       validate_inference_rules!
       validate_forbidden_operations!
       validate_stack_detection!
+      validate_validators_list!
+      validate_irreversible_task_types!
     end
 
     private
@@ -334,6 +336,51 @@ module Phaser
 
         raise FlavorLoadError,
               "flavor #{@directory_name.inspect} #{location} is missing #{field.inspect}"
+      end
+    end
+
+    # The optional `validators:` list names per-flavor Ruby modules
+    # (fully-qualified constant strings) the engine invokes after the
+    # engine-level PrecedentValidator. Each entry must be a non-empty
+    # string; the loader resolves the constants and raises a separate
+    # FlavorLoadError when a constant cannot be resolved (T055).
+    def validate_validators_list!
+      validators = @catalog['validators']
+      return if validators.nil?
+
+      unless validators.is_a?(Array)
+        raise FlavorLoadError,
+              "flavor #{@directory_name.inspect} validators must be a list of constant names"
+      end
+
+      validators.each_with_index do |validator, index|
+        next if validator.is_a?(String) && !validator.empty?
+
+        raise FlavorLoadError,
+              "flavor #{@directory_name.inspect} validators[#{index}] must be a non-empty string"
+      end
+    end
+
+    # The optional `irreversible_task_types:` list names task types whose
+    # commits the SafetyAssertionValidator (T054b, FR-018, plan.md D-017)
+    # requires `Safety-Assertion:` trailers on. Every entry must be the
+    # name of a declared task type so a typo cannot silently bypass the
+    # safety-assertion contract.
+    def validate_irreversible_task_types!
+      irreversible = @catalog['irreversible_task_types']
+      return if irreversible.nil?
+
+      unless irreversible.is_a?(Array)
+        raise FlavorLoadError,
+              "flavor #{@directory_name.inspect} irreversible_task_types must be a list of task type names"
+      end
+
+      irreversible.each_with_index do |type_name, index|
+        next if task_type_names.include?(type_name)
+
+        raise FlavorLoadError,
+              "flavor #{@directory_name.inspect} irreversible_task_types[#{index}] " \
+              "#{type_name.inspect} is not a known task type (known: #{task_type_names.inspect})"
       end
     end
   end

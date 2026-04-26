@@ -224,6 +224,10 @@ module UsersEmailRenameFixture
   # caching `email` in its column registry. This is the "ignored
   # columns directive" precedent the column-drop validator (FR-014)
   # demands. Returns the new SHA so step 7 can cite it.
+  #
+  # Inference signal: the ADDED `self.ignored_columns = ...` line is
+  # what the `code_ignore_column_for_pending_drop?` predicate matches
+  # (T051, inference.rb).
   def self.ignore_email_column_commit(repo)
     repo.commit(
       subject: FEATURE_COMMIT_SUBJECTS[1],
@@ -232,7 +236,10 @@ module UsersEmailRenameFixture
           # User model — ignore the legacy email column while the
           # rename rolls out so ActiveRecord does not cache it.
           class User < ApplicationRecord
-            self.ignored_columns = [:email]
+            self.ignored_columns = %w[email]
+
+            attr_accessor :email
+            validates :email, presence: true
 
             def primary_email
               email
@@ -248,29 +255,40 @@ module UsersEmailRenameFixture
   end
 
   # Step 3 — code dual-write-old-and-new-column. The User model now
-  # writes BOTH `email` and `email_address` on every update so readers
-  # of either column see consistent data while the backfill runs. The
-  # `dual` keyword and the explicit assignment to both columns are the
-  # signal the inference layer matches.
+  # mirrors writes from `email` into `email_address` on every save via
+  # a `before_save` callback. The inference predicate
+  # `code_dual_write_old_and_new_column?` (T051) matches the ADDED
+  # `before_save :sync_email_address` line.
   def self.dual_write_commit(repo)
     repo.commit(
       subject: FEATURE_COMMIT_SUBJECTS[2],
       files: {
         'app/models/user.rb' => <<~RUBY
-          # User model — dual-write email and email_address so reads
-          # from either column see consistent data during the rename.
+          # User model — dual-write email and email_address via a
+          # before_save callback so reads from either column see
+          # consistent data during the rename.
           class User < ApplicationRecord
-            self.ignored_columns = [:email]
+            self.ignored_columns = %w[email]
+
+            attr_accessor :email
+            validates :email, presence: true
+
+            before_save :sync_email_address
+
+            def self.find_by_email(address)
+              where(email: address).first
+            end
 
             def primary_email
               email
             end
 
             def primary_email=(value)
-              # dual-write the legacy email column and the new
-              # email_address column on every assignment.
               self.email = value
-              self.email_address = value
+            end
+
+            def sync_email_address
+              self.email_address = email
             end
           end
         RUBY
@@ -283,7 +301,9 @@ module UsersEmailRenameFixture
   # `disable_ddl_transaction!`. The backfill-safety validator
   # (FR-013, T053) inspects the diff for `find_each`/`in_batches`,
   # `sleep`, and `disable_ddl_transaction!` — all three are present so
-  # the validator accepts the commit.
+  # the validator accepts the commit. The inference predicate
+  # `data_backfill_batched?` (T051) matches the ADDED
+  # `User.in_batches(...)` + `update_all(...)` lines.
   def self.backfill_commit(repo)
     repo.commit(
       subject: FEATURE_COMMIT_SUBJECTS[3],
@@ -291,16 +311,16 @@ module UsersEmailRenameFixture
         'lib/tasks/backfill_email_address.rake' => <<~RUBY
           # Backfill email_address from email in batches. Runs outside
           # a DDL transaction (the strong_migrations gem requires it),
-          # processes 1_000 rows at a time via find_each, and sleeps
-          # between batches to keep replica lag bounded.
+          # processes 1_000 rows at a time via in_batches + update_all,
+          # and sleeps between batches to keep replica lag bounded.
           disable_ddl_transaction!
 
           namespace :users do
             desc 'Backfill email_address from email in batches.'
             task backfill_email_address: :environment do
-              User.where(email_address: nil).find_each(batch_size: 1_000) do |user|
-                user.update_columns(email_address: user.email)
-                sleep(0.05)
+              User.in_batches(of: 1_000) do |relation|
+                relation.update_all('email_address = email')
+                sleep 0.05
               end
             end
           end
@@ -310,28 +330,41 @@ module UsersEmailRenameFixture
   end
 
   # Step 5 — code switch-reads-to-new-column. The User model now reads
-  # from `email_address` instead of `email`. Writes still hit both
-  # columns until step 6 removes the legacy reference; the switch is a
-  # read-only flip so reverting it is safe.
+  # via a `where(email_address: ...)` scope instead of
+  # `where(email: ...)`. The inference predicate
+  # `code_switch_reads_to_new_column?` (T051) matches a single hunk
+  # that REMOVES `where(email: ...)` AND ADDS
+  # `where(email_address: ...)` — the canonical column-swap pattern.
   def self.switch_reads_commit(repo)
     repo.commit(
       subject: FEATURE_COMMIT_SUBJECTS[4],
       files: {
         'app/models/user.rb' => <<~RUBY
           # User model — switch reads to email_address. Writes still
-          # update both columns until the legacy reference is removed.
+          # mirror via the before_save callback until the legacy
+          # reference is removed.
           class User < ApplicationRecord
-            self.ignored_columns = [:email]
+            self.ignored_columns = %w[email]
+
+            attr_accessor :email
+            validates :email, presence: true
+
+            before_save :sync_email_address
+
+            def self.find_by_email(address)
+              where(email_address: address).first
+            end
 
             def primary_email
               email_address
             end
 
             def primary_email=(value)
-              # dual-write the legacy email column and the new
-              # email_address column on every assignment.
               self.email = value
-              self.email_address = value
+            end
+
+            def sync_email_address
+              self.email_address = email
             end
           end
         RUBY
@@ -339,11 +372,13 @@ module UsersEmailRenameFixture
     )
   end
 
-  # Step 6 — code remove-references-to-pending-drop-column. Drops the
-  # last write to `email` (the dual-write) and removes any other
-  # reference to the legacy column. After this commit no application
-  # code reads or writes `email`. Returns the new SHA so step 7 can
-  # cite it as the reference-removal precedent.
+  # Step 6 — code remove-references-to-pending-drop-column. Removes
+  # the `attr_accessor :email` and `validates :email, ...` references
+  # to the legacy column. After this commit no application code reads
+  # or writes `email`. The inference predicate
+  # `code_remove_references_to_pending_drop_column?` (T051) matches
+  # REMOVED `attr_accessor` / `validates` lines. Returns the new SHA
+  # so step 7 can cite it as the reference-removal precedent.
   def self.remove_references_commit(repo)
     repo.commit(
       subject: FEATURE_COMMIT_SUBJECTS[5],
@@ -353,14 +388,21 @@ module UsersEmailRenameFixture
           # column. The ignored_columns directive remains in place
           # until the drop migration removes it.
           class User < ApplicationRecord
-            self.ignored_columns = [:email]
+            self.ignored_columns = %w[email]
+
+            before_save :sync_email_address
+
+            def self.find_by_email(address)
+              where(email_address: address).first
+            end
 
             def primary_email
               email_address
             end
 
-            def primary_email=(value)
-              self.email_address = value
+            def sync_email_address
+              # The legacy column has no live writers; this callback
+              # will be removed in the follow-up cleanup phase.
             end
           end
         RUBY

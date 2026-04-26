@@ -3,6 +3,7 @@
 require 'spec_helper'
 require 'fileutils'
 require 'json'
+require 'open3'
 require 'stringio'
 require 'tmpdir'
 require 'yaml'
@@ -293,8 +294,11 @@ RSpec.describe 'rails-postgres-strong-migrations column-rename worked example' d
   end
 
   def read_commit_header(sha)
-    raw = `git show --no-patch --format=%s%x1f%aI%x1f%(trailers:only,unfold) #{sha}`.chomp
-    raw.split("\x1f", 3)
+    raw, _status = Open3.capture2(
+      'git', 'show', '--no-patch',
+      '--format=%s%x1f%aI%x1f%(trailers:only,unfold)', sha
+    )
+    raw.chomp.split("\x1f", 3)
   end
 
   def parse_trailers(block)

@@ -122,6 +122,9 @@ module Phaser
       validated_results = @precedent_validator.validate(
         classification_results, flavor
       )
+      validated_results = run_flavor_validators(
+        validated_results, non_empty_commits, flavor
+      )
       @size_guard.enforce(validated_results, flavor)
       phase_groups = @isolation_resolver.resolve(validated_results, flavor)
 
@@ -130,6 +133,24 @@ module Phaser
       emit_phase_records(manifest.phases)
       clear_prior_status_file
       manifest_path
+    end
+
+    # Per-flavor validators are wired through `flavor_loader.rb` (T055).
+    # Each entry in `flavor.validators` is a class constant the loader
+    # resolved at load time; we instantiate it (no arguments — the
+    # bypass-empty contract requires a parameterless constructor) and
+    # invoke its `#validate(classification_results, commits, flavor)`
+    # method. Each validator returns a NEW list of classification
+    # results (possibly with audit-trail fields like
+    # `safety_assertion_precedents` populated) which becomes the input
+    # to the next validator in the list. Validators may raise any
+    # `Phaser::ValidationError` descendant; the engine's outer rescue
+    # in `#process` funnels the failure to stderr and the status file
+    # via the same path the engine-level validators use.
+    def run_flavor_validators(classification_results, commits, flavor)
+      flavor.validators.reduce(classification_results) do |results, validator_class|
+        validator_class.new.validate(results, commits, flavor)
+      end
     end
 
     # FR-009 empty-diff filter. An empty-diff commit is logged once and
@@ -231,7 +252,8 @@ module Phaser
           id: "phase-#{phase_number}-task-#{task_index + 1}",
           task_type: result.task_type,
           commit_hash: result.commit_hash,
-          commit_subject: commit.subject
+          commit_subject: commit.subject,
+          safety_assertion_precedents: result.safety_assertion_precedents
         )
       end
     end

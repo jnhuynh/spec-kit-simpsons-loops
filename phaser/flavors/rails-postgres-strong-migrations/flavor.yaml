@@ -56,6 +56,20 @@ validators:
   - Phaser::Flavors::RailsPostgresStrongMigrations::PrecedentValidator
   - Phaser::Flavors::RailsPostgresStrongMigrations::SafetyAssertionValidator
 
+# Irreversible task types (FR-018, plan.md D-017): the
+# SafetyAssertionValidator (T054b) requires a `Safety-Assertion:` trailer
+# (or fenced safety-assertion block) on every commit classified into one
+# of these types so audit reviewers can trace the precedent chain. The
+# four types below are the schema/code operations whose effects cannot
+# be reversed by simply reverting the commit (the column/table/index is
+# already gone; the ignored-columns directive removal exposes the model
+# to a column that may have already been dropped).
+irreversible_task_types:
+  - schema drop-column-with-cleanup-precedent
+  - schema drop-table
+  - schema drop-concurrent-index
+  - code remove-ignored-columns-directive
+
 # Backfill sequencing (FR-037): leave at the default `false` so two
 # backfill commits in the same feature land in sequential phases. Some
 # Rails teams batch independent backfills together; that is opt-in per
@@ -214,6 +228,10 @@ precedent_rules:
     subject_type: code remove-references-to-pending-drop-column
     predecessor_type: code switch-reads-to-new-column
     error_message: Reference removal must follow switch-reads so no read path references the legacy column.
+  - name: drop-column-after-ignored-columns
+    subject_type: schema drop-column-with-cleanup-precedent
+    predecessor_type: code ignore-column-for-pending-drop
+    error_message: Column drop must follow the ignored-columns directive so ActiveRecord no longer caches the legacy column.
   - name: drop-column-after-remove-references
     subject_type: schema drop-column-with-cleanup-precedent
     predecessor_type: code remove-references-to-pending-drop-column

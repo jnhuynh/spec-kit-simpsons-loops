@@ -59,25 +59,20 @@ module Phaser
     # `"Phaser::Flavors::RailsPostgresStrongMigrations::Inference"`) into
     # the actual Module constant the classifier and forbidden-operations
     # gate dispatch through. Returns nil when the catalog declared no
-    # module string (the YAML field is optional) OR when the named
-    # constant cannot be resolved (e.g., the companion Ruby file has not
-    # been shipped yet). Callers that depend on the resolved module
-    # treating nil as "fall through to default" — the classifier's
-    # `module_method_match?` and the gate's `module_method_match?` both
-    # handle a nil module gracefully (the classifier returns false; the
-    # gate raises a configuration error so the operator notices).
-    #
-    # NOTE: T055 will tighten this to fail fast when a declared module
-    # cannot be resolved. Until then we degrade gracefully so tests for
-    # individual flavor modules (T051, T052, T053, T054, T054b) can land
-    # incrementally without each one having to ship every other module's
-    # companion Ruby file.
+    # module string (the YAML field is optional). Raises
+    # `FlavorLoadError` when the catalog DECLARED a module string but
+    # the constant cannot be resolved — a misdeclared flavor must fail
+    # at load time rather than silently misclassify commits later (T055,
+    # FR-007 spirit).
     def self.resolve_module_constant(module_name)
       return nil if module_name.nil? || module_name.empty?
 
       Object.const_get(module_name)
     rescue NameError
-      nil
+      raise FlavorLoadError,
+            "flavor declared module #{module_name.inspect} but the constant could not be resolved; " \
+            'check that the companion Ruby file is shipped under the flavor directory ' \
+            'and defines the named constant'
     end
 
     # Names of every shipped flavor under the loader's flavors root.
@@ -120,14 +115,27 @@ module Phaser
     def build_flavor(catalog)
       Flavor.new(
         **identity_attributes(catalog),
+        **catalog_collections(catalog),
+        **dispatch_attributes(catalog)
+      )
+    end
+
+    def catalog_collections(catalog)
+      {
         task_types: catalog['task_types'].map { |t| build_task_type(t) },
         precedent_rules: catalog['precedent_rules'].map { |r| build_precedent_rule(r) },
         inference_rules: catalog['inference_rules'].map { |r| build_inference_rule(r) },
         forbidden_operations: catalog['forbidden_operations'],
-        stack_detection: build_stack_detection(catalog['stack_detection']),
-        validators: catalog['validators'] || [],
+        stack_detection: build_stack_detection(catalog['stack_detection'])
+      }
+    end
+
+    def dispatch_attributes(catalog)
+      {
+        validators: resolve_validator_constants(catalog['validators']),
+        irreversible_task_types: catalog['irreversible_task_types'] || [],
         allow_parallel_backfills: catalog.fetch('allow_parallel_backfills', false)
-      )
+      }
     end
 
     def identity_attributes(catalog)
@@ -140,6 +148,19 @@ module Phaser
       }
     end
 
+    # Resolve every entry in the catalog's `validators:` list to the
+    # actual Ruby constant the engine instantiates and invokes (T055,
+    # plan.md "Validators-list dispatch"). The companion Ruby files
+    # were already required by `load_companion_ruby_files` so the
+    # constants exist by the time this runs. A missing constant raises
+    # `FlavorLoadError` so a misdeclared catalog fails fast at load time
+    # rather than silently skipping a validator.
+    def resolve_validator_constants(validators)
+      Array(validators).map do |constant_name|
+        self.class.resolve_module_constant(constant_name)
+      end
+    end
+
     # The classifier and forbidden-operations gate dispatch through real
     # Module constants, not through the raw `inference_module` /
     # `forbidden_module` strings. Companion Ruby files
@@ -149,20 +170,30 @@ module Phaser
     # `FlavorLoadError` if a file is missing instead of a NameError later
     # in the pipeline.
     #
-    # Files that don't exist yet are simply skipped — incremental
-    # implementation (T051..T054b) lands one module at a time, and a
-    # missing file should not break flavors whose other modules ARE
-    # shipped. T055 will tighten this once every reference-flavor module
-    # is in place.
+    # `inference.rb` / `forbidden_operations.rb` are loaded only when the
+    # catalog DECLARED a corresponding `inference_module:` /
+    # `forbidden_module:` field — flavors that ship neither (e.g.,
+    # `example-minimal` test fixtures) keep working without those files.
+    # When the field IS declared but the file is absent, the constant
+    # resolver in `resolve_module_constant` raises so the operator sees a
+    # single descriptive FlavorLoadError (T055).
     def load_companion_ruby_files(name, catalog)
       flavor_dir = File.join(@flavors_root, name)
-      %w[inference.rb forbidden_operations.rb].each do |file|
-        path = File.join(flavor_dir, file)
-        require path if File.file?(path)
-      end
+      load_inference_file(flavor_dir, catalog) if catalog['inference_module']
+      load_forbidden_file(flavor_dir, catalog) if catalog['forbidden_module']
       Array(catalog['validators']).each do |validator|
         require_validator_file(flavor_dir, validator)
       end
+    end
+
+    def load_inference_file(flavor_dir, _catalog)
+      path = File.join(flavor_dir, 'inference.rb')
+      require path if File.file?(path)
+    end
+
+    def load_forbidden_file(flavor_dir, _catalog)
+      path = File.join(flavor_dir, 'forbidden_operations.rb')
+      require path if File.file?(path)
     end
 
     # The `validators:` list in flavor.yaml references constants by their
