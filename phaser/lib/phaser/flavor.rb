@@ -16,26 +16,56 @@ module Phaser
   # payloads remain as Hashes (with string keys) because their content is
   # consumed directly by the matcher / signal evaluators which already
   # know how to interpret the shapes declared in `contracts/`.
-  Flavor = Data.define(
-    :name,
-    :version,
-    :default_type,
-    :task_types,
-    :precedent_rules,
-    :inference_rules,
-    :forbidden_operations,
-    :stack_detection,
-    :inference_module,
-    :forbidden_module,
-    :validators,
-    :allow_parallel_backfills
-  ) do
+  #
+  # Implemented as a plain class (rather than `Data.define`) so test
+  # seams can extend a constructed flavor with `define_singleton_method`
+  # — the safety-assertion validator's spec (T046b) uses that surface to
+  # mirror the future `irreversible_task_types` accessor without
+  # prematurely committing the test to the loader's exact field name.
+  # The public surface still exposes only readers (no writers) and
+  # raises ArgumentError naming the missing keyword for any required
+  # attribute, matching what the codebase relied on from `Data.define`.
+  class Flavor
+    REQUIRED_ATTRIBUTES = %i[
+      name version default_type task_types precedent_rules
+      inference_rules forbidden_operations stack_detection
+    ].freeze
+
+    OPTIONAL_ATTRIBUTES = {
+      inference_module: nil,
+      forbidden_module: nil,
+      validators: [],
+      irreversible_task_types: [],
+      allow_parallel_backfills: false
+    }.freeze
+
+    attr_reader :name, :version, :default_type, :task_types,
+                :precedent_rules, :inference_rules, :forbidden_operations,
+                :stack_detection, :inference_module, :forbidden_module,
+                :validators, :irreversible_task_types,
+                :allow_parallel_backfills
+
+    # rubocop:disable Metrics/ParameterLists
     def initialize(name:, version:, default_type:, task_types:,
                    precedent_rules:, inference_rules:, forbidden_operations:,
                    stack_detection:, inference_module: nil,
                    forbidden_module: nil, validators: [],
+                   irreversible_task_types: [],
                    allow_parallel_backfills: false)
-      super
+      # rubocop:enable Metrics/ParameterLists
+      @name = name
+      @version = version
+      @default_type = default_type
+      @task_types = task_types
+      @precedent_rules = precedent_rules
+      @inference_rules = inference_rules
+      @forbidden_operations = forbidden_operations
+      @stack_detection = stack_detection
+      @inference_module = inference_module
+      @forbidden_module = forbidden_module
+      @validators = validators
+      @irreversible_task_types = irreversible_task_types
+      @allow_parallel_backfills = allow_parallel_backfills
     end
   end
 

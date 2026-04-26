@@ -27,6 +27,17 @@ module Phaser
   #   * precedents_consulted  — optional; list of precedent rule names
   #                             that were checked for this commit. Nil
   #                             when no precedents were consulted.
+  #   * safety_assertion_precedents — optional; list of precedent commit
+  #                             SHAs cited in the source commit's
+  #                             safety-assertion block (FR-018, plan.md
+  #                             D-017). Set by the reference flavor's
+  #                             SafetyAssertionValidator (T054b) when
+  #                             the commit's task type is declared
+  #                             irreversible by the active flavor; nil
+  #                             otherwise. Forwarded by the engine into
+  #                             the corresponding `Phaser::Task#new`
+  #                             call so the audit trail reaches the
+  #                             manifest.
   #
   # Implemented with `Data.define` (Ruby 3.2+) for immutability,
   # value-equality, and a strict keyword constructor that raises
@@ -39,14 +50,16 @@ module Phaser
     :source,
     :isolation,
     :rule_name,
-    :precedents_consulted
+    :precedents_consulted,
+    :safety_assertion_precedents
   ) do
-    # Override the synthesized initializer to give the two optional
+    # Override the synthesized initializer to give the optional
     # attributes nil defaults. Data.define alone treats every member as
     # required; the spec asserts the optional fields default to nil
     # when omitted.
     def initialize(commit_hash:, task_type:, source:, isolation:,
-                   rule_name: nil, precedents_consulted: nil)
+                   rule_name: nil, precedents_consulted: nil,
+                   safety_assertion_precedents: nil)
       super
     end
   end
