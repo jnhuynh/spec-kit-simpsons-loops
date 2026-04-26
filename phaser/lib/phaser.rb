@@ -84,3 +84,14 @@ require 'phaser/isolation_resolver'
 # written; runs after the precedent validator and before the isolation
 # resolver / manifest writer; SC-014).
 require 'phaser/size_guard'
+
+# Engine (T035 — orchestration shell that wires the empty-diff filter
+# (FR-009), the forbidden-operations gate (FR-049), the classifier
+# (FR-004), the precedent validator (FR-006), the size guard (FR-048),
+# and the isolation resolver (FR-005) into a single deterministic
+# pipeline that produces a `Phaser::PhaseManifest` and writes it to
+# disk via `Phaser::ManifestWriter`; on validation failure persists
+# the payload via `Phaser::StatusWriter` and re-raises so the CLI
+# (T036) can map the exception to a non-zero exit code per
+# `contracts/phaser-cli.md`).
+require 'phaser/engine'
