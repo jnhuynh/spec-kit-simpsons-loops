@@ -238,13 +238,20 @@ RSpec.describe 'rails-postgres-strong-migrations forbidden-operations registry' 
     seed.rjust(40, identifier[0]).slice(0, 40)
   end
 
-  # Resolve the flavor's `forbidden_module` string (e.g.
-  # "Phaser::Flavors::RailsPostgresStrongMigrations::ForbiddenOperations")
-  # to the actual constant. Returns nil when the flavor does not
-  # declare a module — the gate constructor accepts nil for the
+  # Resolve the flavor's `forbidden_module` reference to the actual
+  # constant. The shipped `Phaser::FlavorLoader` already resolves the
+  # YAML string to a Module constant at load time (see
+  # `FlavorLoader.resolve_module_constant`), so for the
+  # rails-postgres-strong-migrations flavor `flavor.forbidden_module`
+  # arrives here as the Module itself. The String branch is retained so
+  # this helper still works against any future flavor whose loader
+  # surfaces the raw YAML string. Returns nil when the flavor declares
+  # no module — the gate constructor accepts nil for the
   # all-declarative case.
   def resolve_forbidden_module(name)
-    return nil if name.nil? || name.empty?
+    return nil if name.nil?
+    return name if name.is_a?(Module)
+    return nil if name.respond_to?(:empty?) && name.empty?
 
     name.split('::').inject(Object) { |const, part| const.const_get(part) }
   end
