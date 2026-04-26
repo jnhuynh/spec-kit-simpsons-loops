@@ -100,9 +100,14 @@ update_file() {
   local project_section
   project_section="$(sed -n "/${SEPARATOR}/,\$p" "$dest")"
 
+  # NOTE: command substitution `$(...)` strips trailing newlines, so
+  # `$project_section` has no trailing `\n`. The format string MUST
+  # restore it so the rewritten file is byte-identical to the one
+  # `init_file` produced — otherwise `setup.sh` is non-idempotent
+  # (T093 regression; covered by spec/setup_idempotency_spec.rb).
   {
     cat "$src"
-    printf '\n%s' "$project_section"
+    printf '\n%s\n' "$project_section"
   } > "$dest"
 
   echo "  ✅ Updated $dest"
