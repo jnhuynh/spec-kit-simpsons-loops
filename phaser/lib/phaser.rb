@@ -70,3 +70,10 @@ require 'phaser/forbidden_operations_gate'
 # predecessor commit in the input list; runs after the classifier and
 # before the size guard / isolation resolver / manifest writer).
 require 'phaser/precedent_validator'
+
+# Isolation resolver (T033 — partitions the post-precedent-validation
+# classification result list into ordered phases per FR-005 / FR-006 /
+# FR-037; honors `:alone`/`:groups` isolation, splits coalesced runs at
+# precedent boundaries, and keeps backfill tasks sequential by default
+# unless the flavor opts into parallel backfills).
+require 'phaser/isolation_resolver'
