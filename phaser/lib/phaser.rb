@@ -77,3 +77,10 @@ require 'phaser/precedent_validator'
 # precedent boundaries, and keeps backfill tasks sequential by default
 # unless the flavor opts into parallel backfills).
 require 'phaser/isolation_resolver'
+
+# Size guard (T034 — enforces FR-048's two hard bounds on feature size:
+# more than 200 non-empty commits or a worst-case projected phase count
+# above 50 raises `Phaser::SizeBoundError` BEFORE any manifest is
+# written; runs after the precedent validator and before the isolation
+# resolver / manifest writer; SC-014).
+require 'phaser/size_guard'
