@@ -205,7 +205,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 - [x] T082 [US5] Implement `phaser/bin/phaser-flavor-init` CLI entry point (parses `--force` and optional `--flavor <name>`; invokes `StackDetector`; prompts for confirmation on single match; writes `.specify/flavor.yaml` with the chosen flavor name; refuses to overwrite without `--force`) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/bin/phaser-flavor-init` (chmod +x) — make T080 pass
 - [x] T083 [US5] Author `speckit-commands/speckit.flavor.init.md` command file wrapping `phaser/bin/phaser-flavor-init` for the SpecKit command surface at `/home/jama/Projects/spec-kit-simpsons-loops/speckit-commands/speckit.flavor.init.md`
 - [x] T084 [US5] Modify `setup.sh` to also copy `speckit-commands/speckit.flavor.init.md` to `.claude/commands/speckit.flavor.init.md` and to install the `phaser/bin/phaser-flavor-init` entry point per R-017 at `/home/jama/Projects/spec-kit-simpsons-loops/setup.sh`
-- [ ] T085 [US5] Re-run `bash setup.sh` from repo root to install `.claude/commands/speckit.flavor.init.md` and the new `phaser/bin/` entry point
+- [x] T085 [US5] Re-run `bash setup.sh` from repo root to install `.claude/commands/speckit.flavor.init.md` and the new `phaser/bin/` entry point
 
 **Checkpoint**: User Story 5 fully functional. SC-007 (one-command opt-in) green.
 
