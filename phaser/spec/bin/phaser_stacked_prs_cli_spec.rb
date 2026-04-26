@@ -125,8 +125,19 @@ RSpec.describe 'phaser-stacked-prs CLI' do # rubocop:disable RSpec/DescribeClass
         f.puts(JSON.generate({ 'argv' => argv }))
       end
       table = JSON.parse(File.read(#{table_path.inspect}))
+      # The match column is a substring searched against BOTH the
+      # space-joined argv form (so an entry like "auth status" matches
+      # ARGV ["auth", "status"]) AND the JSON-serialised argv form (so
+      # an entry like "ref=refs/heads/..." matches a single argv token
+      # carrying that literal substring). Searching both forms keeps
+      # the test fixture's match column human-readable while still
+      # supporting matchers that target a single argv element verbatim.
+      argv_joined = argv.join(' ')
       argv_json = JSON.generate(argv)
-      match = table.find { |entry| argv_json.include?(entry['match'].to_s) }
+      match = table.find do |entry|
+        needle = entry['match'].to_s
+        argv_joined.include?(needle) || argv_json.include?(needle)
+      end
       match ||= { 'stdout' => '', 'stderr' => '', 'exitstatus' => 0 }
       $stdout.write(match['stdout']) if match['stdout']
       $stderr.write(match['stderr']) if match['stderr']

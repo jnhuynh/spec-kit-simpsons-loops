@@ -141,11 +141,7 @@ module Phaser
         gh_result = @git_host_cli.run(%w[auth status])
         exit_code = gh_result.status.exitstatus
         stderr_text = gh_result.stderr.to_s
-        stdout_text = gh_result.stdout.to_s
-        combined_text = "#{stdout_text}\n#{stderr_text}"
-
-        host = parse_host(combined_text)
-        scopes = parse_scopes(combined_text)
+        host, scopes = parse_identity(gh_result, stderr_text)
 
         @cached_result = if exit_code.zero? && scopes.include?('repo')
                            record_success(host: host, scopes: scopes)
@@ -161,6 +157,25 @@ module Phaser
       end
 
       private
+
+      # Parse the host name and the token-scope list from the gh auth
+      # status capture. Returns `[host, scopes]`.
+      #
+      # `full_stderr` is the multi-line capture exposed by GitHostCli so
+      # the probe can find the "Token scopes:" line on stderr line 3 of
+      # canonical 'gh auth status' output. Older test stubs that do not
+      # expose `#full_stderr` fall through to the truncated `#stderr`
+      # field — backward-compatible so the unit-level AuthProbe spec
+      # (T065) keeps passing without touching its stubbed result struct.
+      def parse_identity(gh_result, stderr_text)
+        full_stderr_text = if gh_result.respond_to?(:full_stderr)
+                             gh_result.full_stderr.to_s
+                           else
+                             stderr_text
+                           end
+        combined_text = "#{gh_result.stdout}\n#{full_stderr_text}"
+        [parse_host(combined_text), parse_scopes(combined_text)]
+      end
 
       # Success path — emit the auth-probe-result event and return a
       # successful Result. Does NOT consult the failure classifier

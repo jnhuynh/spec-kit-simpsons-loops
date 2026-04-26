@@ -80,8 +80,14 @@ module Phaser
       # (Ruby 3.2+) so it is immutable and value-equal — callers can
       # compare results in tests without worrying about identity. The
       # readers `#stdout`, `#stderr`, `#status` are exactly the surface
-      # that AuthProbe (T074) and Creator (T075) consume.
-      Result = Data.define(:stdout, :stderr, :status)
+      # that Creator (T075) consumes; `#full_stderr` is the full
+      # multi-line capture (with credential redaction applied across
+      # every line) that AuthProbe (T074) consumes when it must parse
+      # multi-line output from `gh auth status` (the canonical example:
+      # the "Token scopes:" line is on stderr line 3, not line 1).
+      # Both stderr surfaces run through the same credential-pattern
+      # redaction so neither path can serialise a token byte.
+      Result = Data.define(:stdout, :stderr, :full_stderr, :status)
 
       # Invoke `gh` with the given argv-style array and return a Result.
       #
@@ -100,6 +106,7 @@ module Phaser
         Result.new(
           stdout: stdout,
           stderr: sanitize_stderr(stderr),
+          full_stderr: sanitize_full_stderr(stderr),
           status: status
         )
       end
@@ -133,6 +140,18 @@ module Phaser
         CREDENTIAL_PATTERNS.reduce(line) do |scrubbed, pattern|
           scrubbed.gsub(pattern, REDACTION_MARKER)
         end
+      end
+
+      # Apply the credential-pattern redaction across every line of the
+      # full multi-line stderr capture. Returned as `#full_stderr` for
+      # the AuthProbe (T074) which must parse multi-line `gh auth status`
+      # output (host on line 1, "Token scopes:" on line 3). The stderr
+      # first-line surface remains the canonical caller-facing field
+      # for one-shot summary use.
+      def sanitize_full_stderr(stderr)
+        return '' if stderr.nil? || stderr.empty?
+
+        redact_credentials(stderr.to_s)
       end
     end
   end
