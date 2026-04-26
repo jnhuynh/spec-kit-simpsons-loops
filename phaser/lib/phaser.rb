@@ -105,3 +105,13 @@ require 'phaser/engine'
 # and the stderr first-line-only forwarding rule run unconditionally
 # on every subprocess outcome.
 require 'phaser/stacked_prs/git_host_cli'
+
+# Stacked-PR failure classifier (T073 — pure decision function that
+# maps a host-CLI subprocess outcome onto one of the five FR-046
+# `failure_class` enum values: `auth-missing`,
+# `auth-insufficient-scope`, `rate-limit`, `network`, `other`. The
+# classifier consults only its `(exit_code, stderr)` arguments — no
+# environment variable, file, or other ambient state — and never
+# raises (the `:other` catch-all bucket exists so every input maps
+# to a value). FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012.
+require 'phaser/stacked_prs/failure_classifier'
