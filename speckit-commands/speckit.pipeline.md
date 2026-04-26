@@ -76,8 +76,8 @@ Capture the result into a pipeline-scoped variable `FLAVOR_GATE`:
 
 The gate's effects are:
 
-- **`FLAVOR_GATE = present`**: After the polish phases (simplify, security-review) complete, the pipeline runs the phaser step and then invokes marge `N+1` times per FR-023 (once per phase with `--phase N` against the resolved phase manifest, then once holistically). If the phaser step fails, the pipeline MUST halt without invoking marge per FR-024.
-- **`FLAVOR_GATE = absent`**: The phaser step is skipped entirely, marge runs once holistically as a single pass, and the pipeline behaves byte-identically to the pre-feature pipeline per FR-025 and SC-006. This is the default for projects that have not opted into phasing.
+- **`FLAVOR_GATE = present`**: After the polish phases (simplify, security-review) complete, the pipeline runs the phaser step and then invokes marge `N+1` times per FR-023 (once per phase with `--phase N` against the resolved phase manifest, then once holistically). After marge succeeds across all phases (per-phase passes plus the holistic pass), the pipeline runs the stacked-PR creation step (`phaser/bin/phaser-stacked-prs`) per FR-026..FR-030, FR-039, FR-040, FR-044..FR-047. If the phaser step fails, the pipeline MUST halt without invoking marge per FR-024 (and therefore without invoking the stacked-PR creator either). If marge fails, the stacked-PR creator does not run.
+- **`FLAVOR_GATE = absent`**: The phaser step is skipped entirely, the stacked-PR creation step is skipped entirely, marge runs once holistically as a single pass, and the pipeline behaves byte-identically to the pre-feature pipeline per FR-025 and SC-006. This is the default for projects that have not opted into phasing.
 
 Additionally, the agent file check above is augmented when `FLAVOR_GATE = present`: also verify `.claude/agents/phaser.md` exists. If MISSING when the flavor gate is present, display the standard "Required agent file(s) not found" error naming `phaser.md` and **STOP**. When `FLAVOR_GATE = absent`, the absence of `phaser.md` is not an error (the phaser step will be skipped anyway).
 
@@ -115,6 +115,12 @@ After the polish phases and **before marge**, when `FLAVOR_GATE = present` (per 
 The phaser step is positioned **after** simplify/security-review per plan.md D-008 so that any commits created by those polish phases are classified into the manifest rather than left unclassified on the branch. When `FLAVOR_GATE = absent`, the phaser step is skipped entirely (FR-025). Like simplify and security-review, the phaser step is **not** part of the `--from` / `--stop-after` step mapping; it runs implicitly between security-review and marge when its gate is met. When `--stop-after ralph` halts the pipeline, the phaser step does not run.
 
 When `FLAVOR_GATE = present`, the marge step also gains phase-aware behavior: marge is invoked `N+1` times per FR-023 — once per phase listed in the manifest (with `--phase N` scoping each pass to that phase's diff range per FR-022) and then once more holistically across the whole feature. The holistic pass MUST run after every per-phase pass completes. When `FLAVOR_GATE = absent`, marge runs once holistically (a single pass, identical to the pre-feature pipeline).
+
+After the marge step finishes successfully, when `FLAVOR_GATE = present`, an additional **stacked-PR creation** step runs:
+
+- **stacked-pr-creation** — invokes `phaser/bin/phaser-stacked-prs --feature-dir <FEATURE_DIR>` to create one stacked branch and one pull request per phase listed in `<FEATURE_DIR>/phase-manifest.yaml` (FR-026..FR-030). Authentication is delegated entirely to the operator-configured `gh` CLI (FR-044, FR-045). Failures partway through are recoverable via idempotent re-runs (FR-039, FR-040). No log line or status-file field may contain credential material (FR-047, SC-013).
+
+The stacked-PR creation step is gated on the same `.specify/flavor.yaml` check as the phaser step. When `FLAVOR_GATE = absent`, it is skipped entirely. Like simplify, security-review, and phaser, it is **not** part of the `--from` / `--stop-after` step mapping; it runs implicitly after the marge step completes when its gate is met. When `--stop-after ralph` or `--stop-after marge` halts the pipeline, the stacked-PR creation step does not run.
 
 ## Instructions
 
@@ -456,6 +462,48 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), 
 5. Otherwise, continue to the next iteration.
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error) at any point during the per-phase or holistic passes, abort the pipeline immediately. Log failure context: iteration number, agent type (marge), the phase number when in a per-phase pass (or `holistic` when in the holistic pass), and the error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from marge`.
+
+#### Stacked PR Creation (conditional single-shot step — skip when flavor gate is absent)
+
+This step is gated entirely on `FLAVOR_GATE` (resolved in the Flavor Configuration Gate section). It runs **after** the marge step completes successfully (both the per-phase passes and the holistic pass when in per-phase + holistic mode, or the single holistic pass when in holistic-only mode), and only when `FLAVOR_GATE = present`. Per FR-026..FR-030, FR-039, FR-040, FR-044..FR-047 and `contracts/stacked-pr-creator-cli.md`, this step creates one stacked branch and one pull request per phase listed in `<FEATURE_DIR>/phase-manifest.yaml`.
+
+If `FLAVOR_GATE = absent`, log `no .specify/flavor.yaml found — skipping stacked-PR creation step (FR-025)` and proceed directly to Step 6 (Report Results). Do NOT spawn a sub agent and do NOT invoke the CLI.
+
+If marge did not complete successfully (failure, stuck, or max iterations), do NOT invoke the stacked-PR creation step — proceed directly to Step 6 (Report Results) so the pipeline reports the marge failure without attempting to create stacked PRs against an unreviewed implementation.
+
+If `FLAVOR_GATE = present` AND marge completed successfully, run the stacked-PR creator directly via the Bash tool (this step is a thin CLI invocation; it does not need a sub agent because the CLI itself encapsulates all `gh`-related logic, idempotency, and credential-handling guarantees per `contracts/stacked-pr-creator-cli.md`):
+
+```bash
+phaser/bin/phaser-stacked-prs --feature-dir <FEATURE_DIR>
+stacked_prs_exit=$?
+```
+
+**Pre-flight defensive check**: Before invoking the CLI, verify `<FEATURE_DIR>/phase-manifest.yaml` exists (the phaser step above already produced it; this is a defensive double-check). If missing, log `Cannot run stacked-PR creation: <FEATURE_DIR>/phase-manifest.yaml not found. Phaser step did not produce a manifest.` and proceed directly to Step 6 (Report Results) with the stacked-PR step recorded as a failure. Do NOT invoke the CLI.
+
+**After the CLI returns**, determine success vs. failure from `stacked_prs_exit`:
+
+1. **Success (exit 0)**: All phases have stacked branches and PRs (FR-026, FR-027). The CLI deletes `<FEATURE_DIR>/phase-creation-status.yaml` on full success per FR-040. Capture the JSON run-summary from stdout (per `contracts/stacked-pr-creator-cli.md` it is exactly one JSON object on one line: `{"phases_created": [...], "phases_skipped_existing": [...], "manifest": "<path>"}`) and surface it to the operator. Proceed to Step 6 (Report Results).
+
+2. **Failure (any non-zero exit)**: Per FR-039 and FR-045, the CLI has already written `<FEATURE_DIR>/phase-creation-status.yaml` with `stage: stacked-pr-creation`, the appropriate `failure_class` (`auth-missing`, `auth-insufficient-scope`, `rate-limit`, `network`, or `other` per FR-046), and `first_uncreated_phase`. Read the status file and print its contents to the operator so the failure class and resume point are visible without scrolling through stderr logs. Set the completion status to **failure** for Step 6's report. Suggest manual remediation per the `failure_class`:
+   - `auth-missing` → instruct the operator to run `gh auth login` and re-invoke the pipeline with `--from marge` (the holistic marge will re-run as a no-op and the stacked-PR creator will resume idempotently per FR-040).
+   - `auth-insufficient-scope` → instruct the operator to grant the `repo` scope (`gh auth refresh -s repo`) and re-invoke as above.
+   - `rate-limit` → instruct the operator to wait for the host's rate-limit window to reset, then re-invoke as above.
+   - `network` → instruct the operator to verify connectivity to the Git host, then re-invoke as above.
+   - `other` → instruct the operator to inspect the status file's `summary` field for the underlying message and re-invoke as above once resolved.
+
+**Map exit codes** per `contracts/stacked-pr-creator-cli.md`:
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Success — all phases have branches and PRs (status file deleted). |
+| 1 | Stacked-PR creation failure (network, rate-limit, unexpected gh error). Status file written. |
+| 2 | Authentication failure. Status file written with `failure_class: auth-missing` or `auth-insufficient-scope` and `first_uncreated_phase: 1`. |
+| 3 | Operational error (manifest missing, manifest schema invalid, gh binary not on PATH). No status file. |
+| 64 | Usage error. |
+
+**Failure handling for the CLI invocation itself**: If the CLI binary cannot be invoked at all (file not found, permission denied), log `stacked-PR creation step failed to invoke phaser/bin/phaser-stacked-prs` along with the underlying shell error, set the completion status to **failure**, and proceed to Step 6 (Report Results). Do NOT retry — the CLI failure is treated as deterministic and idempotent re-invocation is the operator's responsibility.
+
+This phase is not an independent step in the `--from` / `--stop-after` mapping; it runs implicitly after marge when `FLAVOR_GATE = present`. When `--stop-after ralph` or `--stop-after marge` halts the pipeline, the stacked-PR creation step does not run.
 
 ### Step 6: Report Results
 
