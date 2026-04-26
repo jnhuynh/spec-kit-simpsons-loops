@@ -95,3 +95,13 @@ require 'phaser/size_guard'
 # (T036) can map the exception to a non-zero exit code per
 # `contracts/phaser-cli.md`).
 require 'phaser/engine'
+
+# Stacked-PR gh subprocess wrapper (T072 — the SOLE in-process path
+# that ever shells out to the gh CLI; FR-044, FR-045, FR-046, FR-047,
+# SC-012, SC-013, plan.md "Pattern: gh Subprocess Wrapper" / D-009).
+# Every downstream stacked-PR module (AuthProbe, Creator,
+# FailureClassifier consumers) routes through
+# `Phaser::StackedPrs::GitHostCli#run` so the credential-leak guard
+# and the stderr first-line-only forwarding rule run unconditionally
+# on every subprocess outcome.
+require 'phaser/stacked_prs/git_host_cli'
