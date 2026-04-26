@@ -205,9 +205,13 @@ echo "    .claude/commands/speckit.flavor.init.md"
 PHASER_LINK="$PROJECT_DIR/phaser"
 PHASER_SOURCE="$SCRIPT_DIR/phaser"
 
-# Ensure the source-of-truth entry point is executable (git on some
-# filesystems may not preserve the bit).
+# Ensure the source-of-truth entry points are executable (git on some
+# filesystems may not preserve the bit). All three phaser bin wrappers
+# are tracked as 100755 in the index, so chmod every one of them to keep
+# the documented invocation paths working uniformly.
+chmod +x "$PHASER_SOURCE/bin/phaser"
 chmod +x "$PHASER_SOURCE/bin/phaser-flavor-init"
+chmod +x "$PHASER_SOURCE/bin/phaser-stacked-prs"
 
 if [[ -L "$PHASER_LINK" ]]; then
   current_target="$(readlink "$PHASER_LINK")"
