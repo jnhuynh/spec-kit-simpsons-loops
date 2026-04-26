@@ -91,11 +91,14 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 - **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+- **`--phase <N>`**: A 1-indexed phase number (e.g., `--phase 3`). If provided, scope the review to that phase's diff range as resolved from `<FEATURE_DIR>/phase-manifest.yaml`. Implements FR-022 / R-012. When absent, marge reviews the full feature diff (the holistic pass).
 
 **Parsing rules**:
 - A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
 - A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
-- If neither is provided, use defaults for both
+- The two-token sequence `--phase <N>` (where `<N>` is a positive integer) is treated as `phase`. The `<N>` token consumed by `--phase` is NOT also counted as `max-iterations`.
+- If `--phase` is provided without a following numeric `<N>`, abort: "`--phase` requires a positive integer phase number (e.g., `--phase 3`)."
+- If neither `spec-dir`, `max-iterations`, nor `--phase` is provided, use defaults for both.
 
 ### Step 2: Resolve Feature Directory
 
@@ -116,7 +119,15 @@ If any are missing, abort with guidance:
 - Missing `plan.md` → "Run /speckit.plan first"
 - Missing `tasks.md` → "Run /speckit.tasks first"
 
-Also confirm there is a diff to review. Run `git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD` via Bash tool; if the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review — run /speckit.ralph.implement first."
+If `--phase <N>` was parsed in Step 1, additionally:
+
+1. Confirm `<FEATURE_DIR>/phase-manifest.yaml` exists. If missing, abort: "Cannot scope review to phase <N>: <FEATURE_DIR>/phase-manifest.yaml not found. Run /speckit.phaser first to produce the manifest, or omit --phase to run the holistic review."
+2. Read the manifest and locate the entry whose `number` equals `<N>`. If no such entry exists, abort: "Phase <N> not found in <FEATURE_DIR>/phase-manifest.yaml. Available phases: <list of `number` fields>."
+3. Extract `BASE_BRANCH` from that entry's `base_branch` field and `HEAD_BRANCH` from its `branch_name` field. Both fields are required by the manifest schema (`contracts/phase-manifest.schema.yaml`); if either is empty, abort: "Phase <N> entry in phase-manifest.yaml is missing `base_branch` or `branch_name`. Manifest is malformed — re-run /speckit.phaser to regenerate."
+4. Compute the phase diff range as the literal string `<BASE_BRANCH>...<HEAD_BRANCH>` (three dots — symmetric-difference form, per R-012). This is the `PHASE_DIFF_RANGE` value passed to each sub agent in Step 5.
+5. Confirm there is a diff to review for that phase. Run `git diff --quiet <BASE_BRANCH>...<HEAD_BRANCH>` via Bash tool; if the command exits 0 (no diff), abort: "Phase <N> has no diff between `<BASE_BRANCH>` and `<HEAD_BRANCH>`. Nothing to review."
+
+If `--phase` was NOT provided, confirm there is a diff to review. Run `git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD` via Bash tool; if the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review — run /speckit.ralph.implement first."
 
 ### Step 4: Configuration
 
@@ -135,6 +146,10 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn 
      - Instruct the agent to read and follow `.claude/agents/marge.md`
      - When those instructions reference a slash command (e.g., `/speckit.review`), read the corresponding file from `.claude/commands/` and follow its instructions directly
      - Provide: `Feature directory: <FEATURE_DIR>`
+     - **If `--phase <N>` was parsed in Step 1**, also provide:
+       - `Phase scope: <N>`
+       - `Diff range: <PHASE_DIFF_RANGE>` (the `<BASE_BRANCH>...<HEAD_BRANCH>` string resolved in Step 3)
+       - The instruction: "When invoking /speckit.review, scope the review to the diff range above instead of the default merge-base diff. Concretely: invoke /speckit.review with the additional argument token `range:<PHASE_DIFF_RANGE>` and instruct it to use that range as the diff scope. Findings outside this range are out of scope for this iteration." This implements FR-022 / R-012 — per-phase scoping for the per-phase marge passes invoked by /speckit.pipeline.
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
 **After** each sub agent returns:
@@ -156,7 +171,9 @@ After the loop completes, report:
 
 ## Examples
 
-- `/speckit.marge.review` — Auto-detect spec dir from current branch, use default max iterations (30)
+- `/speckit.marge.review` — Auto-detect spec dir from current branch, use default max iterations (30); review the full feature diff (holistic pass)
 - `/speckit.marge.review specs/003-fix-pipeline-delegation` — Run for specific spec dir
 - `/speckit.marge.review 5` — Auto-detect spec dir, limit to 5 iterations
 - `/speckit.marge.review specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
+- `/speckit.marge.review --phase 3` — Auto-detect spec dir, scope review to phase 3's diff range as resolved from `<FEATURE_DIR>/phase-manifest.yaml` (FR-022 / R-012)
+- `/speckit.marge.review specs/007-multi-phase-pipeline --phase 1 5` — Specific spec dir, scope review to phase 1, limit to 5 iterations
