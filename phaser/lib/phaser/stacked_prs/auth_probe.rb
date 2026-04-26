@@ -2,7 +2,7 @@
 
 module Phaser
   module StackedPrs
-    # One-shot `gh auth status` probe that gates every
+    # One-shot gh auth status probe that gates every
     # `phaser-stacked-prs` invocation (feature 007-multi-phase-pipeline;
     # T074, FR-044, FR-045, FR-046, FR-047, SC-012, SC-013, plan.md
     # R-009 / D-012).
@@ -16,25 +16,25 @@ module Phaser
     #   `Phaser::StackedPrs::FailureClassifier`, and persists any
     #   failure to `<feature_dir>/phase-creation-status.yaml` via
     #   `Phaser::StatusWriter` so a re-run can resume cleanly. Any
-    #   downstream `gh` invocation that follows assumes the probe has
+    #   downstream gh invocation that follows assumes the probe has
     #   already returned a successful result.
     #
     # Contract pinned by spec/stacked_prs/auth_probe_spec.rb:
     #
-    #   1. Exactly one `gh auth status` invocation per probe (FR-045).
+    #   1. Exactly one gh auth status invocation per probe (FR-045).
     #      No retries, no per-phase re-probing.
     #
     #   2. Result caching across `#probe` calls on the same instance —
     #      a second call returns the same Result object without
-    #      consulting `gh` again. The Creator (T075) relies on this so
+    #      consulting gh again. The Creator (T075) relies on this so
     #      subsequent code paths cannot accidentally re-probe.
     #
     #   3. Fail-fast semantics:
-    #      - On `gh auth status` exit non-zero, the FailureClassifier
+    #      - On gh auth status exit non-zero, the FailureClassifier
     #        is consulted with the captured exit code and stderr; the
     #        returned `failure_class` is recorded in the result, the
     #        status file, and the `phase-creation-failed` ERROR event.
-    #      - On `gh auth status` exit zero, the probe inspects the
+    #      - On gh auth status exit zero, the probe inspects the
     #        captured "Token scopes:" listing for the `repo` scope; if
     #        absent, the FailureClassifier is consulted (it returns
     #        `:auth-insufficient-scope` from the same scope-parsing
@@ -53,10 +53,10 @@ module Phaser
     #        of outcome) — host, authenticated, scopes.
     #      - One additional `phase-creation-failed` ERROR record on
     #        failure with `phase_number: 1`, the matching
-    #        `failure_class`, the `gh_exit_code`, and the captured
+    #        `failure_class`, the gh_exit_code, and the captured
     #        stderr first line as `summary`.
     #
-    #   6. Credential-leak guard (FR-047, SC-013): the captured `gh`
+    #   6. Credential-leak guard (FR-047, SC-013): the captured gh
     #      stderr is passed verbatim to `Phaser::Observability` (which
     #      sanitises string-typed fields against the credential pattern
     #      list) and to `Phaser::StatusWriter` (which sanitises payload
@@ -76,7 +76,7 @@ module Phaser
       STATUS_FILENAME = 'phase-creation-status.yaml'
 
       # Token scopes parser — extracts the comma-separated scope list
-      # from a `gh auth status` stdout/stderr fragment shaped like:
+      # from a gh auth status stdout/stderr fragment shaped like:
       #
       #   Token scopes: 'gist', 'read:org'
       #
@@ -87,7 +87,7 @@ module Phaser
       TOKEN_SCOPES_PATTERN = /token scopes?:\s*([^\n]+)/i
 
       # Host parser — pulls the first hostname-like token from the
-      # `gh auth status` output. The canonical output line is:
+      # gh auth status output. The canonical output line is:
       #
       #   github.com
       #     Logged in to github.com as alice (oauth_token)
@@ -129,11 +129,11 @@ module Phaser
         @cached_result = nil
       end
 
-      # Probe `gh auth status` once. On the first call, invoke the host
+      # Probe gh auth status once. On the first call, invoke the host
       # CLI, classify the outcome, persist any failure, emit the
       # corresponding observability records, and return a Result. On
       # any subsequent call with the same instance, return the cached
-      # Result without consulting `gh` again (FR-045: exactly one
+      # Result without consulting gh again (FR-045: exactly one
       # invocation per run).
       def probe(feature_dir:)
         return @cached_result if @cached_result

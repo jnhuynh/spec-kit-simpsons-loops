@@ -139,7 +139,7 @@ module Phaser
     end
 
     # INFO: emitted exactly once after the stacked-PR creator's
-    # `gh auth status` probe completes (FR-045, contracts/observability-events.md
+    # gh auth status probe completes (FR-045, contracts/observability-events.md
     # "auth-probe-result"). The `host` and `scopes` fields are best-effort
     # parsed by the AuthProbe; on auth-missing they may be nil/empty —
     # the contract still requires the event so the operator sees a
@@ -153,13 +153,59 @@ module Phaser
       emit(level: 'INFO', event: 'auth-probe-result', payload: payload)
     end
 
+    # INFO: emitted once per phase skipped during a stacked-PR creator
+    # re-run because both the branch and PR already exist on the host
+    # with the manifest's expected base branch (FR-040,
+    # contracts/observability-events.md "phase-skipped-existing"). The
+    # `reason` field is a constant per the contract so an operator can
+    # grep for skip events without parsing the human-readable text.
+    def log_phase_skipped_existing(phase_number:, branch_name:, pr_number:)
+      payload = {
+        phase_number: phase_number,
+        branch_name: branch_name,
+        pr_number: pr_number,
+        reason: 'branch+pr-already-exist'
+      }
+      emit(level: 'INFO', event: 'phase-skipped-existing', payload: payload)
+    end
+
+    # INFO: emitted once after a stacked-PR creator successfully
+    # creates a phase branch via gh api (contracts/observability-events.md
+    # "phase-branch-created"). The `commits` field is the count of
+    # commits in the phase as recorded by the manifest, NOT a count
+    # taken from gh.
+    def log_phase_branch_created(phase_number:, branch_name:, base_branch:, commits:)
+      payload = {
+        phase_number: phase_number,
+        branch_name: branch_name,
+        base_branch: base_branch,
+        commits: commits
+      }
+      emit(level: 'INFO', event: 'phase-branch-created', payload: payload)
+    end
+
+    # INFO: emitted once after a stacked-PR creator successfully
+    # creates a phase PR via gh pr create
+    # (contracts/observability-events.md "phase-pr-created"). The
+    # `linked_to_previous_pr` discriminator is `false` for phase 1 and
+    # `true` for phases 2..N per FR-027.
+    def log_phase_pr_created(phase_number:, pr_number:, pr_url:, linked_to_previous_pr:)
+      payload = {
+        phase_number: phase_number,
+        pr_number: pr_number,
+        pr_url: pr_url,
+        linked_to_previous_pr: linked_to_previous_pr
+      }
+      emit(level: 'INFO', event: 'phase-pr-created', payload: payload)
+    end
+
     # ERROR: emitted exactly once on stacked-PR creator failure
     # (contracts/observability-events.md "phase-creation-failed";
     # FR-045, FR-046, FR-047, SC-012, SC-013). For auth-probe failures
     # the `phase_number` is always `1` (no branch creation has been
     # attempted yet); for per-phase failures the creator passes the
     # phase number that failed. The `summary` field carries the first
-    # line of `gh`'s stderr — credential-pattern sanitization applies
+    # line of gh's stderr — credential-pattern sanitization applies
     # automatically through `emit` so a stderr line that happens to
     # carry a token is redacted before the record reaches disk.
     def log_phase_creation_failed(phase_number:, failure_class:, gh_exit_code:, summary:)

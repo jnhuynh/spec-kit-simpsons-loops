@@ -116,11 +116,22 @@ require 'phaser/stacked_prs/git_host_cli'
 # to a value). FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012.
 require 'phaser/stacked_prs/failure_classifier'
 
-# Stacked-PR auth probe (T074 — one-shot `gh auth status` gate that
+# Stacked-PR auth probe (T074 — one-shot gh auth status gate that
 # runs at the start of every `phaser-stacked-prs` invocation. Probes
-# `gh` exactly once, delegates the exit-code → failure_class decision
+# gh exactly once, delegates the exit-code → failure_class decision
 # to FailureClassifier, persists any failure via StatusWriter with
 # `first_uncreated_phase: 1`, and emits both `auth-probe-result` and
 # `phase-creation-failed` observability records. FR-044, FR-045,
 # FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012).
 require 'phaser/stacked_prs/auth_probe'
+
+# Stacked-PR creator (T075 — idempotent walker over `phase-manifest.yaml`
+# that creates a branch + PR per phase via the GitHostCli wrapper.
+# Skips phases whose branch+PR already exist with the manifest's
+# expected base branch; resumes at the first uncreated phase on
+# re-run; writes `phase-creation-status.yaml` on failure with the
+# classified `failure_class` and `first_uncreated_phase`; deletes
+# the status file on full success. FR-026, FR-027, FR-028, FR-029,
+# FR-039, FR-040, FR-046, FR-047, SC-010, SC-013, plan.md
+# "Pattern: Idempotent Stacked-PR Creator" / D-012).
+require 'phaser/stacked_prs/creator'
