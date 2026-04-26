@@ -1,0 +1,42 @@
+#!/bin/sh
+# Shell wrapper for the phaser flavor-init CLI (feature
+# 007-multi-phase-pipeline; T082, FR-031, FR-032, FR-033, FR-034,
+# contracts/flavor-init-cli.md).
+#
+# Why a shell wrapper instead of a direct `#!/usr/bin/env ruby`:
+#
+# stdout is reserved for the operator-facing one-line outcome message
+# (success path, zero-match, multi-match, existing-file refusal) per
+# the contract; stderr carries the auto-detection details as plain
+# prose. Anything Ruby itself writes to stderr before our code runs
+# would muddle the prose stream the contract pins. This wrapper
+# follows the same hygiene pattern as `phaser/bin/phaser` and
+# `phaser/bin/phaser-stacked-prs`.
+#
+# When this binary is invoked from a parent `bundle exec` process
+# (every CI run does this; every developer running `bundle exec rspec`
+# does this) the parent injects `RUBYOPT=-rbundler/setup` plus a few
+# `BUNDLE_*` variables into our environment. On some Ruby/Bundler
+# pairings that wiring causes rubygems to re-initialize platform
+# constants and emit "already initialized constant" warnings on stderr
+# during Ruby startup — too early for any user-space `$VERBOSE = nil`
+# to suppress. The shell wrapper unsets the bundler variables before
+# `exec`-ing Ruby so the inherited environment is clean and the
+# subprocess starts with a pristine stderr.
+#
+# The wrapper preserves every other env var verbatim, including the
+# `PHASER_FLAVORS_ROOT` test seam, the operator's `PATH`, and the
+# working directory.
+
+unset RUBYOPT
+unset BUNDLE_BIN_PATH
+unset BUNDLE_GEMFILE
+unset BUNDLER_VERSION
+unset BUNDLER_SETUP
+
+# Resolve the absolute path of this wrapper so the Ruby entry point is
+# always loadable regardless of where the operator invokes the CLI
+# from (the wrapper sits next to phaser-flavor-init.rb under phaser/bin/).
+script_dir=$(cd "$(dirname "$0")" && pwd)
+
+exec ruby -W0 "$script_dir/phaser-flavor-init.rb" "$@"
