@@ -197,7 +197,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 ### Tests for User Story 5
 
 - [x] T079 [P] [US5] Write RSpec test for `Phaser::FlavorInit::StackDetector` (FR-031; iterates shipped flavors, evaluates each one's `stack_detection.signals` per data-model.md StackDetection table; returns matching flavor list) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/flavor_init/stack_detector_spec.rb`
-- [ ] T080 [P] [US5] Write RSpec test for `phaser/bin/phaser-flavor-init` CLI per `contracts/flavor-init-cli.md` (FR-032 single-match → suggest + confirm + write; FR-033 zero-match → `no flavor matched` non-zero; FR-034 existing file → refuse without `--force`, overwrite with; R-015 multi-match → list and instruct `--flavor <name>`) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/bin/phaser_flavor_init_cli_spec.rb`
+- [x] T080 [P] [US5] Write RSpec test for `phaser/bin/phaser-flavor-init` CLI per `contracts/flavor-init-cli.md` (FR-032 single-match → suggest + confirm + write; FR-033 zero-match → `no flavor matched` non-zero; FR-034 existing file → refuse without `--force`, overwrite with; R-015 multi-match → list and instruct `--flavor <name>`) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/bin/phaser_flavor_init_cli_spec.rb`
 
 ### Implementation for User Story 5
 
