@@ -125,6 +125,16 @@ require 'phaser/stacked_prs/failure_classifier'
 # FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012).
 require 'phaser/stacked_prs/auth_probe'
 
+# Flavor-init stack detector (T081 — pure stack-detection surface
+# consulted by the `phaser-flavor-init` CLI to suggest a shipped flavor
+# for a project that has not yet opted in. Iterates every shipped
+# flavor via `Phaser::FlavorLoader#shipped_flavor_names`, evaluates each
+# one's `stack_detection.signals` against the project root, and returns
+# the alphabetically-sorted list of matching flavor names. FR-031,
+# data-model.md "StackDetection", contracts/flavor-init-cli.md
+# "Auto-Detection (FR-031)").
+require 'phaser/flavor_init/stack_detector'
+
 # Stacked-PR creator (T075 — idempotent walker over `phase-manifest.yaml`
 # that creates a branch + PR per phase via the GitHostCli wrapper.
 # Skips phases whose branch+PR already exist with the manifest's

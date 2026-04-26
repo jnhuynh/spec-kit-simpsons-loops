@@ -201,7 +201,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 
 ### Implementation for User Story 5
 
-- [ ] T081 [US5] Implement `Phaser::FlavorInit::StackDetector` (loads each shipped flavor's stack-detection signals via `FlavorLoader`, evaluates `file_present` and `file_contains` checks against the project root, returns the list of matching flavors) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/lib/phaser/flavor_init/stack_detector.rb` — make T079 pass
+- [x] T081 [US5] Implement `Phaser::FlavorInit::StackDetector` (loads each shipped flavor's stack-detection signals via `FlavorLoader`, evaluates `file_present` and `file_contains` checks against the project root, returns the list of matching flavors) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/lib/phaser/flavor_init/stack_detector.rb` — make T079 pass
 - [ ] T082 [US5] Implement `phaser/bin/phaser-flavor-init` CLI entry point (parses `--force` and optional `--flavor <name>`; invokes `StackDetector`; prompts for confirmation on single match; writes `.specify/flavor.yaml` with the chosen flavor name; refuses to overwrite without `--force`) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/bin/phaser-flavor-init` (chmod +x) — make T080 pass
 - [ ] T083 [US5] Author `speckit-commands/speckit.flavor.init.md` command file wrapping `phaser/bin/phaser-flavor-init` for the SpecKit command surface at `/home/jama/Projects/spec-kit-simpsons-loops/speckit-commands/speckit.flavor.init.md`
 - [ ] T084 [US5] Modify `setup.sh` to also copy `speckit-commands/speckit.flavor.init.md` to `.claude/commands/speckit.flavor.init.md` and to install the `phaser/bin/phaser-flavor-init` entry point per R-017 at `/home/jama/Projects/spec-kit-simpsons-loops/setup.sh`
