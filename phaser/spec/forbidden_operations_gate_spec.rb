@@ -393,9 +393,9 @@ RSpec.describe Phaser::ForbiddenOperationsGate do # rubocop:disable RSpec/SpecFi
       # command line. We assert the surface contains exactly the two
       # documented keywords (`forbidden_operations:` required,
       # `forbidden_module:` optional).
+      keyword_kinds = %i[key keyreq].freeze
       keyword_params = described_class.instance_method(:initialize).parameters
-                                      .slice(:key, :keyreq)
-                                      .map { |_, name| name }
+                                      .filter_map { |kind, name| name if keyword_kinds.include?(kind) }
 
       expect(keyword_params).to contain_exactly(:forbidden_operations, :forbidden_module)
       forbidden_keywords = %i[skip force allow bypass override]

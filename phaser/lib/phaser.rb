@@ -56,3 +56,10 @@ require 'phaser/flavor_loader'
 # FR-004 / FR-007 / FR-036; the second stage of the engine's per-commit
 # pipeline after the empty-diff filter and forbidden-operations gate).
 require 'phaser/classifier'
+
+# Forbidden-operations gate (T031 — pre-classification gate per FR-049
+# / D-016; rejects any commit whose diff matches an entry in the
+# active flavor's forbidden-operations registry; runs BEFORE the
+# classifier with no operator-supplied bypass surface; SC-005, SC-008,
+# SC-015).
+require 'phaser/forbidden_operations_gate'
