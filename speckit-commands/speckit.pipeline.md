@@ -57,7 +57,31 @@ the behavior of each pipeline phase. Ensure all agent files are present:
   .claude/agents/marge.md
 ```
 
-If **all** agent files exist, proceed to the Overview section below.
+If **all** agent files exist, proceed to the Flavor Configuration Gate below.
+
+## Flavor Configuration Gate
+
+Per FR-019, FR-025, and plan.md D-008, the phaser stage and per-phase marge invocations are gated entirely on the presence of `.specify/flavor.yaml` at the repository root. Detect the gate state once, immediately after pre-flight, and reuse it throughout the pipeline.
+
+Run the following via the Bash tool (per quickstart.md "Pattern: Conditional Pipeline Behavior"):
+
+```bash
+if test -f .specify/flavor.yaml; then echo "FLAVOR_PRESENT"; else echo "FLAVOR_ABSENT"; fi
+```
+
+Capture the result into a pipeline-scoped variable `FLAVOR_GATE`:
+
+- `FLAVOR_GATE = present` when the file exists.
+- `FLAVOR_GATE = absent` when the file does not exist.
+
+The gate's effects are:
+
+- **`FLAVOR_GATE = present`**: After the polish phases (simplify, security-review) complete, the pipeline runs the phaser step and then invokes marge `N+1` times per FR-023 (once per phase with `--phase N` against the resolved phase manifest, then once holistically). If the phaser step fails, the pipeline MUST halt without invoking marge per FR-024.
+- **`FLAVOR_GATE = absent`**: The phaser step is skipped entirely, marge runs once holistically as a single pass, and the pipeline behaves byte-identically to the pre-feature pipeline per FR-025 and SC-006. This is the default for projects that have not opted into phasing.
+
+Additionally, the agent file check above is augmented when `FLAVOR_GATE = present`: also verify `.claude/agents/phaser.md` exists. If MISSING when the flavor gate is present, display the standard "Required agent file(s) not found" error naming `phaser.md` and **STOP**. When `FLAVOR_GATE = absent`, the absence of `phaser.md` is not an error (the phaser step will be skipped anyway).
+
+Proceed to the Overview section below.
 
 ## Overview
 
@@ -83,6 +107,14 @@ Between ralph and marge, two **optional polish phases** run automatically **if a
 - **security-review** — invokes the `/security-review` skill for a security audit
 
 If either skill is absent, that phase is silently skipped. These phases are **not** part of the `--from` / `--stop-after` step mapping; they always run between ralph and marge when present, and are skipped when `--stop-after ralph` halts the pipeline.
+
+After the polish phases and **before marge**, when `FLAVOR_GATE = present` (per the Flavor Configuration Gate section above), an additional **phaser** step runs:
+
+- **phaser** — invokes the `/speckit.phaser` command via the phaser sub agent to classify the feature branch's commits, validate them against the active flavor's rules, and write `phase-manifest.yaml` to the feature directory.
+
+The phaser step is positioned **after** simplify/security-review per plan.md D-008 so that any commits created by those polish phases are classified into the manifest rather than left unclassified on the branch. When `FLAVOR_GATE = absent`, the phaser step is skipped entirely (FR-025). Like simplify and security-review, the phaser step is **not** part of the `--from` / `--stop-after` step mapping; it runs implicitly between security-review and marge when its gate is met. When `--stop-after ralph` halts the pipeline, the phaser step does not run.
+
+When `FLAVOR_GATE = present`, the marge step also gains phase-aware behavior: marge is invoked `N+1` times per FR-023 — once per phase listed in the manifest (with `--phase N` scoping each pass to that phase's diff range per FR-022) and then once more holistically across the whole feature. The holistic pass MUST run after every per-phase pass completes. When `FLAVOR_GATE = absent`, marge runs once holistically (a single pass, identical to the pre-feature pipeline).
 
 ## Instructions
 
@@ -347,22 +379,83 @@ If **PRESENT**, spawn a sub agent:
 
 This phase is not an independent step in the `--stop-after` mapping; it runs implicitly between ralph and marge when its skill is present.
 
+#### Phaser (conditional single-shot step — skip when flavor gate is absent)
+
+This step is gated entirely on `FLAVOR_GATE` (resolved in the Flavor Configuration Gate section). Per FR-019, FR-024, FR-025, and plan.md D-008, the phaser stage runs **after** the simplify and security-review polish phases and **before** marge.
+
+If `FLAVOR_GATE = absent`, log `no .specify/flavor.yaml found — skipping phaser step (FR-025)` and proceed directly to marge. Initialize `PHASE_COUNT = 0` so that the marge step runs as a single holistic pass (per FR-025). Do NOT spawn a sub agent.
+
+If `FLAVOR_GATE = present`, spawn a sub agent:
+
+- **subagent_type**: `general-purpose`
+- **prompt**: Compose a prompt containing:
+  - Instruct the agent to read and follow `.claude/agents/phaser.md`
+  - When those instructions reference a slash command (e.g., `/speckit.phaser`), read the corresponding file from `.claude/commands/` and follow its instructions directly
+  - Provide: `Feature directory: <FEATURE_DIR>`
+
+The phaser agent is single-shot per its own guardrails (`.claude/agents/phaser.md`). Do **NOT** loop. Wait for the sub agent to return before continuing.
+
+**After the sub agent returns**, determine success vs. failure:
+
+1. **Success**: The sub agent returns and the file `<FEATURE_DIR>/phase-manifest.yaml` exists. Verify via Bash tool:
+
+   ```bash
+   test -f "<FEATURE_DIR>/phase-manifest.yaml" && echo "MANIFEST_PRESENT" || echo "MANIFEST_MISSING"
+   ```
+
+   Read the manifest's `phases` list and count its entries into `PHASE_COUNT` (used by the marge step below to determine the per-phase invocation count). Per FR-023, the marge step will then invoke marge `PHASE_COUNT + 1` times.
+
+2. **Failure**: The sub agent reports a non-zero phaser exit OR `<FEATURE_DIR>/phase-manifest.yaml` does not exist after the sub agent returns. Per FR-024, the pipeline MUST halt without invoking marge. Specifically:
+   - Read `<FEATURE_DIR>/phase-creation-status.yaml` (written by the phaser engine per FR-042) and print its contents to the operator so the offending commit hash, failing rule name, and (for forbidden operations) canonical decomposition message are visible.
+   - Set the completion status to **failure** and skip the marge step entirely (do NOT spawn the marge sub agent).
+   - Suggest manual review and resuming with `--from marge` once the phaser failure is resolved.
+
+**Failure handling for the sub agent itself**: If the sub agent crashes, times out, or errors before reaching either path above, treat the outcome as a phaser failure per FR-024: halt the pipeline without invoking marge, print the failure context (agent type: phaser, error message), set the completion status to **failure**, and suggest manual review. Do NOT retry — phaser sub agent failures are treated as deterministic.
+
+This phase is not an independent step in the `--stop-after` mapping; it runs implicitly between security-review and marge when `FLAVOR_GATE = present`. When `--stop-after ralph` halts the pipeline, the phaser step does not run.
+
 #### Marge (loop step)
+
+The marge step has two execution modes, selected by `FLAVOR_GATE` (resolved in the Flavor Configuration Gate section) and `PHASE_COUNT` (resolved by the phaser step):
+
+- **Holistic-only mode** (when `FLAVOR_GATE = absent`, OR when `FLAVOR_GATE = present` but `PHASE_COUNT = 0`): Run a single marge loop reviewing the full feature diff. This is the pre-feature pipeline behavior preserved by FR-025 and SC-006.
+- **Per-phase + holistic mode** (when `FLAVOR_GATE = present` AND `PHASE_COUNT >= 1`): Run marge `PHASE_COUNT + 1` times per FR-023 — once per phase scoped to that phase's diff range via `--phase N` (FR-022), then once holistically without the flag. The holistic pass MUST run after every per-phase pass completes.
+
+**Pre-flight for per-phase mode**: When in per-phase + holistic mode, before spawning any sub agents, verify `<FEATURE_DIR>/phase-manifest.yaml` exists (the phaser step above already produced it; this is a defensive double-check). If missing, abort with: "Cannot run per-phase marge: <FEATURE_DIR>/phase-manifest.yaml not found. Phaser step did not produce a manifest." and **STOP**.
+
+**Per-phase passes (only when in per-phase + holistic mode)**: For each phase number `N` from `1` through `PHASE_COUNT` (inclusive), in ascending order, run a per-phase marge loop:
+
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
 **Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
 
 - **subagent_type**: `general-purpose`
 - **agent file**: `.claude/agents/marge.md`
+- **prompt** (additional): Include the per-phase scope directive: `Phase scope: --phase <N>` and instruct the agent: "When invoking the marge command (`/speckit.marge.review`), pass `--phase <N>` so the review is scoped to that phase's diff range as resolved from `<FEATURE_DIR>/phase-manifest.yaml` (per FR-022 and R-012). Findings outside that range are out of scope for this iteration."
 
 **After** each sub agent returns:
-1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, marge is complete — proceed to reporting.
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, this per-phase marge pass is complete — proceed to phase `N+1` (or to the holistic pass if `N == PHASE_COUNT`).
 2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
 3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
+4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal in per-phase marge for phase `<N>`". Do NOT proceed to remaining per-phase passes or the holistic pass.
+5. Otherwise, continue to the next iteration of the same phase's loop.
+
+**Holistic pass (always runs in both modes, after any per-phase passes complete successfully)**: Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+
+**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+
+- **subagent_type**: `general-purpose`
+- **agent file**: `.claude/agents/marge.md`
+- **prompt**: Compose the standard marge prompt (no `--phase` directive). The agent reviews the full feature diff.
+
+**After** each sub agent returns:
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, the holistic marge pass is complete — proceed to reporting.
+2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
+3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
+4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal in holistic marge".
 5. Otherwise, continue to the next iteration.
 
-**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (marge), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from marge`.
+**Failure handling**: If a sub agent fails (crash, timeout, or error) at any point during the per-phase or holistic passes, abort the pipeline immediately. Log failure context: iteration number, agent type (marge), the phase number when in a per-phase pass (or `holistic` when in the holistic pass), and the error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from marge`.
 
 ### Step 6: Report Results
 
