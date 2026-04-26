@@ -141,7 +141,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 
 ### Tests for User Story 3
 
-- [ ] T056 [P] [US3] Write RSpec test for the no-flavor zero-regression contract (captures pipeline output on a fixture branch with no `.specify/flavor.yaml`; asserts byte-identical match against a stored baseline per SC-006) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/pipeline_no_flavor_baseline_spec.rb`
+- [x] T056 [P] [US3] Write RSpec test for the no-flavor zero-regression contract (captures pipeline output on a fixture branch with no `.specify/flavor.yaml`; asserts byte-identical match against a stored baseline per SC-006) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/pipeline_no_flavor_baseline_spec.rb`
 - [ ] T057 [P] [US3] Write a shellcheck-validated test scaffold that exercises the pipeline command's flavor-file detection branch (asserts the `test -f .specify/flavor.yaml` gate per quickstart.md "Pattern: Conditional Pipeline Behavior") at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/pipeline_flavor_gate_spec.rb`
 
 ### Implementation for User Story 3
