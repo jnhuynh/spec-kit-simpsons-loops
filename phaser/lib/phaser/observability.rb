@@ -138,6 +138,40 @@ module Phaser
       emit(level: 'ERROR', event: 'validation-failed', payload: payload)
     end
 
+    # INFO: emitted exactly once after the stacked-PR creator's
+    # `gh auth status` probe completes (FR-045, contracts/observability-events.md
+    # "auth-probe-result"). The `host` and `scopes` fields are best-effort
+    # parsed by the AuthProbe; on auth-missing they may be nil/empty —
+    # the contract still requires the event so the operator sees a
+    # negative-result record alongside any subsequent ERROR record.
+    def log_auth_probe_result(host:, authenticated:, scopes:)
+      payload = {
+        host: host,
+        authenticated: authenticated,
+        scopes: scopes
+      }
+      emit(level: 'INFO', event: 'auth-probe-result', payload: payload)
+    end
+
+    # ERROR: emitted exactly once on stacked-PR creator failure
+    # (contracts/observability-events.md "phase-creation-failed";
+    # FR-045, FR-046, FR-047, SC-012, SC-013). For auth-probe failures
+    # the `phase_number` is always `1` (no branch creation has been
+    # attempted yet); for per-phase failures the creator passes the
+    # phase number that failed. The `summary` field carries the first
+    # line of `gh`'s stderr — credential-pattern sanitization applies
+    # automatically through `emit` so a stderr line that happens to
+    # carry a token is redacted before the record reaches disk.
+    def log_phase_creation_failed(phase_number:, failure_class:, gh_exit_code:, summary:)
+      payload = {
+        phase_number: phase_number,
+        failure_class: failure_class,
+        gh_exit_code: gh_exit_code,
+        summary: summary
+      }
+      emit(level: 'ERROR', event: 'phase-creation-failed', payload: payload)
+    end
+
     private
 
     # Apply the credential-leak guard, then write the resulting record

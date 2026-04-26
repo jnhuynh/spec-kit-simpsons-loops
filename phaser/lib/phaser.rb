@@ -115,3 +115,12 @@ require 'phaser/stacked_prs/git_host_cli'
 # raises (the `:other` catch-all bucket exists so every input maps
 # to a value). FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012.
 require 'phaser/stacked_prs/failure_classifier'
+
+# Stacked-PR auth probe (T074 — one-shot `gh auth status` gate that
+# runs at the start of every `phaser-stacked-prs` invocation. Probes
+# `gh` exactly once, delegates the exit-code → failure_class decision
+# to FailureClassifier, persists any failure via StatusWriter with
+# `first_uncreated_phase: 1`, and emits both `auth-probe-result` and
+# `phase-creation-failed` observability records. FR-044, FR-045,
+# FR-046, FR-047, SC-012, SC-013, plan.md R-009 / D-012).
+require 'phaser/stacked_prs/auth_probe'
