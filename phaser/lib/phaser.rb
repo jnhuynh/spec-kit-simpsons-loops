@@ -51,3 +51,8 @@ require 'phaser/flavor'
 require 'phaser/precedent_rule_graph'
 require 'phaser/flavor_catalog_validator'
 require 'phaser/flavor_loader'
+
+# Classifier (T030 — operator-tag → inference → default cascade per
+# FR-004 / FR-007 / FR-036; the second stage of the engine's per-commit
+# pipeline after the empty-diff filter and forbidden-operations gate).
+require 'phaser/classifier'
