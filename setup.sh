@@ -163,6 +163,7 @@ cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
 cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
+cp "$SCRIPT_DIR/claude-agents/phaser.md"                        "$PROJECT_DIR/.claude/agents/phaser.md"
 cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
 cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
 cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
@@ -172,12 +173,14 @@ cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.claude/commands/speckit.marge.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.phaser.md"             "$PROJECT_DIR/.claude/commands/speckit.phaser.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
+echo "    .claude/agents/phaser.md"
 echo "    .claude/agents/plan.md"
 echo "    .claude/agents/tasks.md"
 echo "    .claude/agents/specify.md"
@@ -187,6 +190,7 @@ echo "    .claude/commands/speckit.homer.clarify.md"
 echo "    .claude/commands/speckit.marge.review.md"
 echo "    .claude/commands/speckit.review.md"
 echo "    .claude/commands/speckit.pipeline.md"
+echo "    .claude/commands/speckit.phaser.md"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship with the template. Copy each baseline file to
