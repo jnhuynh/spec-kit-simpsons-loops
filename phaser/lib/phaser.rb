@@ -63,3 +63,10 @@ require 'phaser/classifier'
 # classifier with no operator-supplied bypass surface; SC-005, SC-008,
 # SC-015).
 require 'phaser/forbidden_operations_gate'
+
+# Precedent validator (T032 — enforces a flavor's precedent rules over
+# the post-classification commit list per FR-006 / FR-041 / FR-042;
+# raises Phaser::PrecedentError when a subject commit has no earlier
+# predecessor commit in the input list; runs after the classifier and
+# before the size guard / isolation resolver / manifest writer).
+require 'phaser/precedent_validator'
