@@ -93,7 +93,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 - [x] T036 [US1] Implement `phaser/bin/phaser` CLI entry point (parses args via OptionParser per `contracts/phaser-cli.md`; reads commits from `git log` of the feature branch; loads flavor via `FlavorLoader`; invokes `Engine`; writes manifest path to stdout on success) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/bin/phaser` (chmod +x) — make T028 pass
 - [x] T037 [P] [US1] Author `phaser/flavors/example-minimal/flavor.yaml` (two task types, one precedent rule, one inference rule, default type, version) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/flavors/example-minimal/flavor.yaml`
 - [x] T038 [P] [US1] Author `phaser/flavors/example-minimal/inference.rb` (single pattern-matcher method referenced by the YAML inference rule) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/flavors/example-minimal/inference.rb`
-- [ ] T039 [US1] Add 100-iteration determinism check to `phaser/spec/manifest_writer_spec.rb` exercising the example-minimal fixture (verifies SC-002 end-to-end through the engine, not just the writer) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/manifest_writer_spec.rb`
+- [x] T039 [US1] Add 100-iteration determinism check to `phaser/spec/manifest_writer_spec.rb` exercising the example-minimal fixture (verifies SC-002 end-to-end through the engine, not just the writer) at `/home/jama/Projects/spec-kit-simpsons-loops/phaser/spec/manifest_writer_spec.rb`
 
 **Checkpoint**: User Story 1 fully functional. The engine, the example-minimal flavor, and the standalone CLI all work; SC-002, SC-003, SC-014, SC-011 (engine portion) all green.
 

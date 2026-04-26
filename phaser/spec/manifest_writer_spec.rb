@@ -1,9 +1,19 @@
 # frozen_string_literal: true
 
+require 'spec_helper'
 require 'fileutils'
+require 'open3'
+require 'stringio'
 require 'tmpdir'
 require 'yaml'
 require 'phaser'
+
+# Pull in the CLI's GitCommitReader so the end-to-end determinism check
+# below (T039) reads commits from the example-minimal fixture repo via
+# the same code path the production CLI uses. The bin file is gated by a
+# `$PROGRAM_NAME == __FILE__` guard so requiring it here does not
+# accidentally invoke the CLI.
+require_relative '../bin/phaser'
 
 # Specs for Phaser::ManifestWriter — the stable-key-order YAML emitter
 # that serializes a Phaser::PhaseManifest to disk as
@@ -435,6 +445,88 @@ RSpec.describe Phaser::ManifestWriter do # rubocop:disable RSpec/SpecFilePathFor
       writer.write(build_long_subject_manifest(long_subject), destination)
 
       expect(File.read(destination)).to include(long_subject)
+    end
+  end
+
+  # End-to-end determinism check (feature 007-multi-phase-pipeline; T039,
+  # FR-002, SC-002). The earlier 100-iteration test in this file pins the
+  # writer's own determinism in isolation; this one drives the full engine
+  # pipeline (empty-diff filter → forbidden-ops gate → classifier →
+  # precedent validator → size guard → isolation resolver → manifest
+  # writer) against the example-minimal Git fixture so we verify the
+  # composition is deterministic, not just the writer in isolation.
+  #
+  # Running the engine 100 times surfaces any nondeterminism leaked by an
+  # internal Hash insertion order, a wall-clock read, an ENV-dependent
+  # branch, or a filesystem listing order. The clock is pinned via
+  # `fixed_clock` so `generated_at` is stable; commits are read from the
+  # fixture once and reused across iterations so the assertion isolates
+  # "is the engine deterministic on identical inputs" from any drift in
+  # the GitCommitReader.
+  describe 'end-to-end determinism through the engine (T039, SC-002)' do
+    after { cleanup_fixture_repos }
+
+    let(:fixed_clock) { -> { '2026-04-25T12:00:00.000Z' } }
+
+    def example_minimal_flavor
+      Phaser::FlavorLoader.new.load('example-minimal')
+    end
+
+    # Build the fixture once and read its five commits via the same
+    # GitCommitReader the production CLI uses, so the engine sees the
+    # exact Phaser::Commit shape the operator-facing path produces. The
+    # fixture build is a per-example temp directory; the read happens
+    # inside `Dir.chdir` because GitCommitReader inherits the process CWD
+    # (matching how the CLI inherits it from the operator's shell).
+    def build_and_read_fixture_commits
+      repo_path = ExampleMinimalFixture.build(self)
+      Dir.chdir(repo_path) do
+        reader = Phaser::GitCommitReader.new
+        reader.read_commits(ExampleMinimalFixture::DEFAULT_BRANCH)
+      end
+    end
+
+    # The system-under-test for this block is the full engine pipeline
+    # (which happens to terminate in `Phaser::ManifestWriter` — the
+    # surrounding spec's described_class). The engine is reconstructed
+    # per iteration so any per-instance caching cannot leak across runs
+    # and falsely satisfy the byte-identical assertion.
+    def build_engine_for(feature_dir)
+      Phaser::Engine.new(
+        feature_dir: feature_dir,
+        feature_branch: ExampleMinimalFixture::FEATURE_BRANCH,
+        default_branch: ExampleMinimalFixture::DEFAULT_BRANCH,
+        observability: Phaser::Observability.new(stderr: StringIO.new, now: fixed_clock),
+        status_writer: Phaser::StatusWriter.new(now: fixed_clock),
+        manifest_writer: described_class.new,
+        clock: fixed_clock
+      )
+    end
+
+    # Run the engine once into the given feature_dir and return the
+    # bytes of the written manifest. The feature_dir is fresh per call
+    # so a stale prior write cannot mask a regression.
+    def run_engine_and_capture_bytes(commits, flavor, feature_dir)
+      engine = build_engine_for(feature_dir)
+      manifest_path = engine.process(commits, flavor)
+      File.binread(manifest_path)
+    end
+
+    it 'produces byte-identical manifests across 100 consecutive engine runs' do
+      commits = build_and_read_fixture_commits
+      flavor = example_minimal_flavor
+
+      Dir.mktmpdir('phaser-engine-determinism-baseline') do |baseline_dir|
+        baseline_bytes = run_engine_and_capture_bytes(commits, flavor, baseline_dir)
+
+        99.times do |iteration|
+          Dir.mktmpdir('phaser-engine-determinism-run') do |run_dir|
+            observed_bytes = run_engine_and_capture_bytes(commits, flavor, run_dir)
+            expect(observed_bytes).to eq(baseline_bytes),
+                                      "iteration #{iteration + 2}/100 diverged from baseline"
+          end
+        end
+      end
     end
   end
 end
