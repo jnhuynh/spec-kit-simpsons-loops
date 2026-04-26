@@ -217,7 +217,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 
 - [x] T086 [P] Update `.specify/quality-gates.sh` to run `(cd phaser && bundle exec rspec)` and `(cd phaser && bundle exec rubocop)` gated on `phaser/` directory existence per R-018 at `/home/jama/Projects/spec-kit-simpsons-loops/.specify/quality-gates.sh`
 - [x] T087 [P] Run `bash .specify/scripts/bash/update-agent-context.sh claude` to refresh the active-technologies entry in `CLAUDE.md` for Ruby 3.2+, RSpec, rubocop per quickstart.md Phase 6 at `/home/jama/Projects/spec-kit-simpsons-loops/CLAUDE.md`
-- [ ] T088 [P] Run `bundle exec rubocop -A` inside `/home/jama/Projects/spec-kit-simpsons-loops/phaser/` to auto-correct any style issues, then re-run `bundle exec rubocop` and assert exit 0
+- [x] T088 [P] Run `bundle exec rubocop -A` inside `/home/jama/Projects/spec-kit-simpsons-loops/phaser/` to auto-correct any style issues, then re-run `bundle exec rubocop` and assert exit 0
 - [ ] T089 [P] Run `shellcheck` against the modified `setup.sh` and `.specify/quality-gates.sh` and assert zero errors
 - [ ] T090 Run `bash .specify/quality-gates.sh` from `/home/jama/Projects/spec-kit-simpsons-loops/` and assert exit 0 (verifies all tests pass and lint is clean across both Bash and Ruby surfaces)
 - [ ] T091 Walk the verification checklist in `/home/jama/Projects/spec-kit-simpsons-loops/specs/007-multi-phase-pipeline/quickstart.md` end-to-end and tick each box; on any failure, file a follow-up task and resolve before declaring complete
