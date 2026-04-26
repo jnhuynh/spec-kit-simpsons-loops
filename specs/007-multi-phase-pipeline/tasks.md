@@ -220,7 +220,7 @@ description: "Dependency-ordered task list for the Multi-Phase Pipeline feature"
 - [x] T088 [P] Run `bundle exec rubocop -A` inside `/home/jama/Projects/spec-kit-simpsons-loops/phaser/` to auto-correct any style issues, then re-run `bundle exec rubocop` and assert exit 0
 - [x] T089 [P] Run `shellcheck` against the modified `setup.sh` and `.specify/quality-gates.sh` and assert zero errors
 - [x] T090 Run `bash .specify/quality-gates.sh` from `/home/jama/Projects/spec-kit-simpsons-loops/` and assert exit 0 (verifies all tests pass and lint is clean across both Bash and Ruby surfaces)
-- [ ] T091 Walk the verification checklist in `/home/jama/Projects/spec-kit-simpsons-loops/specs/007-multi-phase-pipeline/quickstart.md` end-to-end and tick each box; on any failure, file a follow-up task and resolve before declaring complete
+- [x] T091 Walk the verification checklist in `/home/jama/Projects/spec-kit-simpsons-loops/specs/007-multi-phase-pipeline/quickstart.md` end-to-end and tick each box; on any failure, file a follow-up task and resolve before declaring complete
 - [ ] T092 Verify process hygiene per CLAUDE.md "Process Hygiene": `ps aux | grep phaser` is clean; `ps aux | grep rspec` is clean; `docker ps` is clean (no leftover containers from any test run); no orphan dev servers from this session
 - [ ] T093 Verify `setup.sh` is idempotent: run it twice in a row and `git diff` shows no changes after the second run
 

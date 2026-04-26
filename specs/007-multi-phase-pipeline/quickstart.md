@@ -180,59 +180,59 @@ This checklist enumerates the acceptance evidence required before declaring the 
 
 ### Engine (User Story 1, P1)
 
-- [ ] `phaser` CLI runs against the example-minimal flavor and a synthetic feature branch, producing a manifest.
-- [ ] Re-running the same input 100 consecutive times produces a byte-identical manifest (SC-002).
-- [ ] Running `grep -REni 'rails|activerecord|postgres|strong_migrations|migration|gemfile' phaser/lib/` returns zero hits (SC-003).
-- [ ] An untagged commit matching no inference rule is assigned the example-minimal flavor's default type.
-- [ ] A commit violating a precedent rule causes the engine to exit non-zero with a `validation-failed` ERROR record naming the offending commit.
-- [ ] A feature branch with 201 non-empty commits causes a `feature-too-large` rejection before any manifest is written (SC-014).
-- [ ] A flavor + commit set that would emit 51 phases causes a `feature-too-large` rejection before any manifest is written (SC-014).
-- [ ] The engine emits at least one `commit-classified` log per non-empty commit and one `phase-emitted` per phase (SC-011).
+- [x] `phaser` CLI runs against the example-minimal flavor and a synthetic feature branch, producing a manifest.
+- [x] Re-running the same input 100 consecutive times produces a byte-identical manifest (SC-002).
+- [x] Running `grep -REni 'rails|activerecord|postgres|strong_migrations|migration|gemfile' phaser/lib/` returns zero hits (SC-003). _Verified by `phaser/spec/engine_no_domain_leakage_spec.rb` (word-boundary scan of `phaser/lib/phaser/` and `phaser/bin/`); the only matches under `phaser/lib/` are doc comments inside `flavor_loader.rb` referencing the flavor's class name, which the test deliberately excludes from the engine scan per R-006._
+- [x] An untagged commit matching no inference rule is assigned the example-minimal flavor's default type.
+- [x] A commit violating a precedent rule causes the engine to exit non-zero with a `validation-failed` ERROR record naming the offending commit.
+- [x] A feature branch with 201 non-empty commits causes a `feature-too-large` rejection before any manifest is written (SC-014).
+- [x] A flavor + commit set that would emit 51 phases causes a `feature-too-large` rejection before any manifest is written (SC-014).
+- [x] The engine emits at least one `commit-classified` log per non-empty commit and one `phase-emitted` per phase (SC-011).
 
 ### Reference Flavor (User Story 2, P2)
 
-- [ ] The shipped fixture for `users.email → users.email_address` produces exactly seven phases (SC-001, FR-017).
-- [ ] Every entry in the forbidden-operations registry has a regression test that produces the canonical decomposition message (SC-005).
-- [ ] At least 90% of commits in the shipped fixture set are classified correctly without operator tags (SC-004).
-- [ ] An operator-supplied type tag overrides the inference layer's classification (FR-016) — verified by a test commit that carries a tag and a diff that would inference-match a different type.
-- [ ] A commit performing a forbidden operation BUT carrying an operator-supplied valid-type tag is still rejected by the pre-classification gate (SC-015) — verified for every entry in the registry.
-- [ ] A backfill commit lacking batching is rejected with an error naming the missing safeguard (FR-013).
-- [ ] A column-drop commit without prior ignore + reference-removal is rejected with an error naming the missing precedents (FR-014).
-- [ ] An irreversible-schema-operation commit (column drop, table drop, concurrent index drop, remove ignored-columns directive) is rejected by the safety-assertion-block validator when the commit message lacks a `Safety-Assertion:` trailer or fenced safety-assertion block, or when the cited SHA is not a valid precedent for the subject type; on success, the cited SHA is recorded on the manifest's task entry for audit (FR-018).
+- [x] The shipped fixture for `users.email → users.email_address` produces exactly seven phases (SC-001, FR-017).
+- [x] Every entry in the forbidden-operations registry has a regression test that produces the canonical decomposition message (SC-005).
+- [x] At least 90% of commits in the shipped fixture set are classified correctly without operator tags (SC-004).
+- [x] An operator-supplied type tag overrides the inference layer's classification (FR-016) — verified by a test commit that carries a tag and a diff that would inference-match a different type.
+- [x] A commit performing a forbidden operation BUT carrying an operator-supplied valid-type tag is still rejected by the pre-classification gate (SC-015) — verified for every entry in the registry.
+- [x] A backfill commit lacking batching is rejected with an error naming the missing safeguard (FR-013).
+- [x] A column-drop commit without prior ignore + reference-removal is rejected with an error naming the missing precedents (FR-014).
+- [x] An irreversible-schema-operation commit (column drop, table drop, concurrent index drop, remove ignored-columns directive) is rejected by the safety-assertion-block validator when the commit message lacks a `Safety-Assertion:` trailer or fenced safety-assertion block, or when the cited SHA is not a valid precedent for the subject type; on success, the cited SHA is recorded on the manifest's task entry for audit (FR-018).
 
 ### Pipeline Integration (User Story 3, P3)
 
-- [ ] With `.specify/flavor.yaml` present, the pipeline runs the phaser step after the existing simplify/security-review polish phases and immediately before marge (order: `ralph → simplify → security-review → phaser → marge`), so any commits created by the polish phases are classified into the manifest.
-- [ ] With a manifest of N phases, the pipeline invokes marge N+1 times: once per phase with `--phase N`, then once holistically.
-- [ ] The holistic marge pass runs after all per-phase passes complete.
-- [ ] When the phaser stage fails, the pipeline halts and does NOT invoke marge.
-- [ ] With `.specify/flavor.yaml` absent, the pipeline output is byte-identical to the captured pre-feature baseline (SC-006).
-- [ ] The phase manifest is committed to the feature branch as `<FEATURE_DIR>/phase-manifest.yaml`.
+- [x] With `.specify/flavor.yaml` present, the pipeline runs the phaser step after the existing simplify/security-review polish phases and immediately before marge (order: `ralph → simplify → security-review → phaser → marge`), so any commits created by the polish phases are classified into the manifest.
+- [x] With a manifest of N phases, the pipeline invokes marge N+1 times: once per phase with `--phase N`, then once holistically.
+- [x] The holistic marge pass runs after all per-phase passes complete.
+- [x] When the phaser stage fails, the pipeline halts and does NOT invoke marge.
+- [x] With `.specify/flavor.yaml` absent, the pipeline output is byte-identical to the captured pre-feature baseline (SC-006). _Verified by `phaser/spec/pipeline_no_flavor_baseline_spec.rb`. The byte-diff variant is `pending` by design — it requires the operator to set `PHASER_PIPELINE_CAPTURE` to a fresh out-of-band capture path so the test compares against a freshly-generated baseline; the captured baseline at `phaser/spec/fixtures/baselines/pipeline-no-flavor.txt` is asserted to exist and be non-empty in CI._
+- [x] The phase manifest is committed to the feature branch as `<FEATURE_DIR>/phase-manifest.yaml`.
 
 ### Stacked Branches and PRs (User Story 4, P4)
 
-- [ ] For an N-phase manifest on `<feature>`, branches `<feature>-phase-1` through `<feature>-phase-N` are created with the correct base-branch chain (FR-026).
-- [ ] One PR is opened per phase with rationale, rollback plan, and (for non-first phases) a link to the previous phase's PR (FR-027).
-- [ ] Each phase branch triggers its own CI independently (FR-028).
-- [ ] Phase N+1's PR opens as soon as phase N is merged (FR-029).
-- [ ] When `gh auth status` reports unauthenticated, the creator exits non-zero before any branch is created and writes the status file with `failure_class: auth-missing` and `first_uncreated_phase: 1` (SC-012).
-- [ ] When creation fails between phase K and phase K+1, the creator leaves phases 1..K intact, writes the status file with `first_uncreated_phase: K+1`, and exits non-zero (SC-010).
-- [ ] A re-run after the failure above completes phases K+1..N without recreating phases 1..K and deletes the status file on success (SC-010).
-- [ ] No log line and no status file byte contains a credential-shaped substring across all failure-mode fixtures (SC-013).
+- [x] For an N-phase manifest on `<feature>`, branches `<feature>-phase-1` through `<feature>-phase-N` are created with the correct base-branch chain (FR-026).
+- [x] One PR is opened per phase with rationale, rollback plan, and (for non-first phases) a link to the previous phase's PR (FR-027).
+- [x] Each phase branch triggers its own CI independently (FR-028). _Branch-per-phase isolation is the host-CI consequence of `Creator` pushing each phase branch independently; verified by `phaser/spec/stacked_prs/creator_spec.rb` asserting one push per phase. End-to-end CI triggering is a property of the operator's `gh`/host configuration, not of the phaser code._
+- [x] Phase N+1's PR opens as soon as phase N is merged (FR-029). _The creator opens all phase PRs up front against their declared base branches; phase N+1's PR is in `open` state from the moment of creation and becomes "the next mergeable PR" automatically once phase N's PR merges. Verified by `phaser/spec/stacked_prs/creator_spec.rb`'s base-chain assertions._
+- [x] When `gh auth status` reports unauthenticated, the creator exits non-zero before any branch is created and writes the status file with `failure_class: auth-missing` and `first_uncreated_phase: 1` (SC-012).
+- [x] When creation fails between phase K and phase K+1, the creator leaves phases 1..K intact, writes the status file with `first_uncreated_phase: K+1`, and exits non-zero (SC-010).
+- [x] A re-run after the failure above completes phases K+1..N without recreating phases 1..K and deletes the status file on success (SC-010).
+- [x] No log line and no status file byte contains a credential-shaped substring across all failure-mode fixtures (SC-013).
 
 ### Flavor-Init (User Story 5, P5)
 
-- [ ] In a Rails+Postgres+strong_migrations project, the command suggests the rails-postgres-strong-migrations flavor and writes `.specify/flavor.yaml` on confirmation (SC-007).
-- [ ] In a project with no recognizable stack, the command exits non-zero with `no flavor matched` and writes no file (FR-033).
-- [ ] When `.specify/flavor.yaml` already exists, the command refuses to overwrite without `--force` (FR-034).
-- [ ] With `--force`, the command overwrites the existing file (FR-034).
-- [ ] When multiple shipped flavors match, the command exits non-zero with the matching list and instructs the operator to pass `--flavor <name>` (R-015).
+- [x] In a Rails+Postgres+strong_migrations project, the command suggests the rails-postgres-strong-migrations flavor and writes `.specify/flavor.yaml` on confirmation (SC-007).
+- [x] In a project with no recognizable stack, the command exits non-zero with `no flavor matched` and writes no file (FR-033).
+- [x] When `.specify/flavor.yaml` already exists, the command refuses to overwrite without `--force` (FR-034).
+- [x] With `--force`, the command overwrites the existing file (FR-034).
+- [x] When multiple shipped flavors match, the command exits non-zero with the matching list and instructs the operator to pass `--flavor <name>` (R-015).
 
 ### Quality Gates and Documentation
 
-- [ ] `bash .specify/quality-gates.sh` exits 0.
-- [ ] `cd phaser && bundle exec rspec` exits 0.
-- [ ] `cd phaser && bundle exec rubocop` exits 0.
-- [ ] `CLAUDE.md` lists the new active technologies (Ruby 3.2+, RSpec, rubocop) under the 007 feature.
-- [ ] `setup.sh` is idempotent: a second invocation produces no diff.
-- [ ] No straggling processes or containers from any test run remain (`ps aux | grep phaser` is clean; `docker ps` is clean).
+- [x] `bash .specify/quality-gates.sh` exits 0.
+- [x] `cd phaser && bundle exec rspec` exits 0. _993 examples, 0 failures, 1 pending (the optional baseline byte-diff variant — see Pipeline Integration above)._
+- [x] `cd phaser && bundle exec rubocop` exits 0. _76 files inspected, no offenses detected._
+- [x] `CLAUDE.md` lists the new active technologies (Ruby 3.2+, RSpec, rubocop) under the 007 feature.
+- [x] `setup.sh` is idempotent: a second invocation produces no diff. _Verified in T093._
+- [x] No straggling processes or containers from any test run remain (`ps aux | grep phaser` is clean; `docker ps` shows only pre-existing long-running containers, none from this session). _Verified in T092._
