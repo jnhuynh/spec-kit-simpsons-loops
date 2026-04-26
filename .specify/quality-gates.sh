@@ -19,6 +19,9 @@ fi
 # Gated on phaser/ directory existence so existing repositories without the
 # phaser feature are unaffected.
 if [ -d phaser ]; then
-  ( cd phaser && bundle exec rspec )
-  ( cd phaser && bundle exec rubocop )
+  (
+    cd phaser
+    bundle exec rspec
+    bundle exec rubocop
+  )
 fi

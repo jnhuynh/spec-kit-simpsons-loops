@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'phaser/internal/text_helpers'
+
 module Phaser
   module StackedPrs
     # One-shot gh auth status probe that gates every
@@ -211,7 +213,7 @@ module Phaser
       #      probe outcome before the consequent error.
       def record_failure(feature_dir:, exit_code:, stderr_text:, host:, scopes:)
         failure_class = @failure_classifier.classify(exit_code: exit_code, stderr: stderr_text).to_s
-        summary = first_line(stderr_text)
+        summary = Phaser::Internal::TextHelpers.first_line(stderr_text)
 
         write_status_file(feature_dir: feature_dir, failure_class: failure_class)
         emit_failure_events(
@@ -289,16 +291,6 @@ module Phaser
         return [] unless match
 
         match[1].scan(/[a-z_:]+/i).map(&:downcase)
-      end
-
-      # First non-empty line of the captured stderr, used as the
-      # `summary` field on the phase-creation-failed event. Returns
-      # an empty string when stderr is empty/nil so the event payload
-      # always carries a defined string for the field.
-      def first_line(text)
-        return '' if text.nil? || text.empty?
-
-        text.each_line.first.to_s.chomp
       end
     end
   end

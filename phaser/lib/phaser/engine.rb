@@ -62,25 +62,6 @@ module Phaser
       build_internal_collaborators
     end
 
-    private
-
-    def assign_required_options(options)
-      REQUIRED_INIT_KEYS.each do |key|
-        raise ArgumentError, "missing keyword: :#{key}" unless options.key?(key)
-
-        instance_variable_set("@#{key}", options.fetch(key))
-      end
-    end
-
-    def build_internal_collaborators
-      @classifier = Classifier.new
-      @precedent_validator = PrecedentValidator.new
-      @size_guard = SizeGuard.new
-      @isolation_resolver = IsolationResolver.new
-    end
-
-    public
-
     # Single public entry point. On success returns the absolute path to
     # the written manifest. On any validation failure raises a subclass
     # of `Phaser::ValidationError` (or `Phaser::ClassificationError`,
@@ -106,6 +87,21 @@ module Phaser
     end
 
     private
+
+    def assign_required_options(options)
+      REQUIRED_INIT_KEYS.each do |key|
+        raise ArgumentError, "missing keyword: :#{key}" unless options.key?(key)
+
+        instance_variable_set("@#{key}", options.fetch(key))
+      end
+    end
+
+    def build_internal_collaborators
+      @classifier = Classifier.new
+      @precedent_validator = PrecedentValidator.new
+      @size_guard = SizeGuard.new
+      @isolation_resolver = IsolationResolver.new
+    end
 
     # Walk the per-commit and per-feature stages in the order documented
     # in quickstart.md "Pattern: Pre-Classification Gate Discipline". A

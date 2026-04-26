@@ -3,6 +3,7 @@
 require 'json'
 require 'yaml'
 
+require 'phaser/internal/text_helpers'
 require 'phaser/stacked_prs/creator_gh_calls'
 require 'phaser/stacked_prs/creator_result'
 
@@ -317,7 +318,7 @@ module Phaser
           phase_number: phase['number'],
           failure_class: outcome[:failure_class],
           gh_exit_code: outcome[:gh_exit_code],
-          summary: first_line(outcome[:stderr])
+          summary: Phaser::Internal::TextHelpers.first_line(outcome[:stderr])
         )
         { status: :failed, failure_class: outcome[:failure_class] }
       end
@@ -341,16 +342,6 @@ module Phaser
       # error is the right surface to halt on.
       def load_manifest(path)
         YAML.safe_load_file(path) || {}
-      end
-
-      # First non-empty line of the captured stderr, used as the
-      # `summary` field on the phase-creation-failed event. Returns
-      # an empty string when stderr is empty/nil so the event payload
-      # always carries a defined string for the field.
-      def first_line(text)
-        return '' if text.nil? || text.empty?
-
-        text.each_line.first.to_s.chomp
       end
 
       # Forwarders to the per-variant builders in CreatorResult. The

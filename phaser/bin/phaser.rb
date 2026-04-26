@@ -35,7 +35,6 @@
 
 require 'English'
 require 'open3'
-require 'optparse'
 
 # Ensure `require 'phaser'` resolves regardless of how the binary is
 # invoked. The wrapper lives at `phaser/bin/phaser`; the library lives
@@ -45,6 +44,7 @@ require 'optparse'
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
 require 'phaser'
+require 'phaser/internal/cli_option_parser'
 
 module Phaser
   # Operator-facing CLI for the phaser engine. Kept as a small command
@@ -85,7 +85,7 @@ module Phaser
 
       validate_required_options!(options)
       execute_pipeline(options)
-    rescue UsageError => e
+    rescue Phaser::Internal::CliOptionParser::UsageError => e
       @stderr.puts(e.message)
       EXIT_USAGE
     rescue ConfigurationError => e
@@ -104,7 +104,6 @@ module Phaser
     # `Phaser::ValidationError` / `Phaser::ClassificationError` and
     # returns `EXIT_VALIDATION` directly because the engine has already
     # written the status file and emitted the ERROR record.
-    class UsageError < StandardError; end
     class ConfigurationError < StandardError; end
     class OperationalError < StandardError; end
 
@@ -119,65 +118,53 @@ module Phaser
       'R' => :renamed, 'C' => :copied, 'T' => :modified
     }.freeze
 
-    # Each entry maps an OptionParser switch to the values-hash key it
-    # populates. Defined at class scope so `build_option_parser` has
-    # only declarative wiring, keeping its ABC size below the
-    # community-default budget. Bundled into a Data.define so
-    # `register_option` can take a single Option argument and stay
-    # within the project's parameter-count limit.
-    Option = Data.define(:switch, :desc, :key, :kind)
-
+    # Switches accepted by the phaser engine CLI per
+    # `contracts/phaser-cli.md`. Wired through
+    # `Phaser::Internal::CliOptionParser` so the OptionParser
+    # scaffolding (parse + dispatch + UsageError) stays in one place
+    # across all three phaser CLIs.
     OPTION_DEFS = [
-      Option.new('--feature-dir PATH', 'Path to the feature spec directory', :feature_dir, :value),
-      Option.new('--flavor NAME', 'Override the flavor name', :flavor_name, :value),
-      Option.new('--default-branch BRANCH', 'Override the default integration branch', :default_branch, :value),
-      Option.new('--clock ISO8601', 'Pin the generation timestamp (test seam)', :clock, :value),
-      Option.new('--help', 'Print usage and exit 0', :show_help, :flag),
-      Option.new('--version', 'Print engine version and exit 0', :show_version, :flag)
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--feature-dir PATH', 'Path to the feature spec directory', :feature_dir, :value
+      ),
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--flavor NAME', 'Override the flavor name', :flavor_name, :value
+      ),
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--default-branch BRANCH', 'Override the default integration branch', :default_branch, :value
+      ),
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--clock ISO8601', 'Pin the generation timestamp (test seam)', :clock, :value
+      ),
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--help', 'Print usage and exit 0', :show_help, :flag
+      ),
+      Phaser::Internal::CliOptionParser::Option.new(
+        '--version', 'Print engine version and exit 0', :show_version, :flag
+      )
     ].freeze
 
-    private_constant :Option, :OPTION_DEFS
+    OPTION_DEFAULTS = {
+      feature_dir: nil,
+      flavor_name: nil,
+      default_branch: nil,
+      clock: nil,
+      show_help: false,
+      show_version: false
+    }.freeze
+
+    private_constant :OPTION_DEFS, :OPTION_DEFAULTS
 
     private
 
-    # OptionParser surface per `contracts/phaser-cli.md`. The parser
-    # captures `--help`'s rendered usage string into the returned
-    # Options value object so `handle_help` can print the same text
-    # that `--help` advertised, including the option summary.
     def parse_options(argv)
-      values = {
-        feature_dir: nil,
-        flavor_name: nil,
-        default_branch: nil,
-        clock: nil,
-        show_help: false,
-        show_version: false
-      }
-
-      parser = build_option_parser(values)
-
-      begin
-        parser.parse(argv)
-      rescue OptionParser::InvalidOption, OptionParser::MissingArgument => e
-        raise UsageError, e.message
-      end
-
-      Options.new(**values, help_text: parser.help)
-    end
-
-    def build_option_parser(values)
-      OptionParser.new do |opts|
-        opts.banner = 'Usage: phaser --feature-dir <path> [options]'
-        OPTION_DEFS.each { |opt| register_option(opts, values, opt) }
-      end
-    end
-
-    def register_option(opts, values, opt)
-      if opt.kind == :flag
-        opts.on(opt.switch, opt.desc) { values[opt.key] = true }
-      else
-        opts.on(opt.switch, opt.desc) { |v| values[opt.key] = v }
-      end
+      values, help_text = Phaser::Internal::CliOptionParser.parse(
+        argv,
+        defaults: OPTION_DEFAULTS,
+        banner: 'Usage: phaser --feature-dir <path> [options]',
+        options: OPTION_DEFS
+      )
+      Options.new(**values, help_text: help_text)
     end
 
     def handle_help(options)
@@ -191,7 +178,8 @@ module Phaser
     end
 
     def validate_required_options!(options)
-      raise UsageError, 'missing required argument: --feature-dir' if options.feature_dir.nil?
+      raise Phaser::Internal::CliOptionParser::UsageError,
+            'missing required argument: --feature-dir' if options.feature_dir.nil?
     end
 
     # Resolve the flavor, build the engine, run `#process`, and map the

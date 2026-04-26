@@ -62,12 +62,14 @@ module Phaser
       # Return the list of shipped flavor names whose required
       # stack-detection signals all match the project at `project_root`.
       # The returned list is sorted alphabetically for deterministic
-      # disambiguation rendering by the CLI.
+      # disambiguation rendering by the CLI; `shipped_flavor_names`
+      # already returns its list sorted so `select` preserves that
+      # order without an additional `.sort` pass.
       def detect(project_root:)
         @flavor_loader.shipped_flavor_names.select do |flavor_name|
           flavor = @flavor_loader.load(flavor_name)
           flavor_matches?(flavor, project_root)
-        end.sort
+        end
       end
 
       private

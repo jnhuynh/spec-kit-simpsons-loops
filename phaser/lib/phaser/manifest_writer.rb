@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-require 'psych'
-require 'fileutils'
-require 'securerandom'
+require 'phaser/internal/atomic_yaml_writer'
 
 module Phaser
   # Stable-key-order YAML emitter that serializes a Phaser::PhaseManifest
@@ -68,32 +66,12 @@ module Phaser
     # write or rename fails; in that case the previous destination
     # content (if any) is preserved.
     def write(manifest, path)
-      yaml = dump_yaml(build_manifest_hash(manifest))
-      atomic_write(path, yaml)
+      yaml = Internal::AtomicYamlWriter.dump_yaml(build_manifest_hash(manifest))
+      Internal::AtomicYamlWriter.atomic_write(path, yaml)
       path
     end
 
     private
-
-    # Emit the explicitly ordered Hash as a YAML document with the
-    # contractual flags from plan.md "Pattern: Manifest Writer":
-    # `line_width: -1` disables Psych's default 80-column wrapping (long
-    # commit subjects MUST stay on a single line so SC-002 holds across
-    # locales), and the `---` document header is suppressed by marking
-    # the underlying document node implicit. We build the YAMLTree
-    # directly instead of relying on `Psych.dump`'s `header:` keyword
-    # because that keyword is silently ignored on current Psych
-    # releases — going through the tree is the supported way to omit
-    # the header on every Psych version Ruby 3.2+ ships with.
-    def dump_yaml(hash)
-      visitor = Psych::Visitors::YAMLTree.create(line_width: -1)
-      visitor << hash
-      stream = visitor.tree
-      document = stream.children.first
-      document.implicit = true
-      document.implicit_end = true
-      stream.to_yaml
-    end
 
     # Build the top-level explicitly ordered Hash that Psych will dump.
     # Phases are sorted by `number` so the output ordering is a function
@@ -138,27 +116,6 @@ module Phaser
       precedents = task.safety_assertion_precedents
       hash['safety_assertion_precedents'] = precedents unless precedents.nil?
       hash
-    end
-
-    # Atomic write: write to a temp file under the destination directory
-    # then rename it over the destination. If either step fails, the
-    # previous destination content is preserved and any temp file is
-    # cleaned up before the exception is re-raised.
-    def atomic_write(path, content)
-      destination_dir = File.dirname(path)
-      FileUtils.mkdir_p(destination_dir)
-      temp_path = File.join(
-        destination_dir,
-        ".#{File.basename(path)}.#{SecureRandom.hex(8)}.tmp"
-      )
-
-      begin
-        File.binwrite(temp_path, content)
-        File.rename(temp_path, path)
-      rescue StandardError
-        FileUtils.rm_f(temp_path)
-        raise
-      end
     end
   end
 end

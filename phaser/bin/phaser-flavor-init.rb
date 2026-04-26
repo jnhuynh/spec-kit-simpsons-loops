@@ -47,7 +47,6 @@
 
 require 'English'
 require 'fileutils'
-require 'optparse'
 
 # Ensure `require 'phaser'` resolves regardless of how the binary is
 # invoked. The wrapper lives at `phaser/bin/phaser-flavor-init`; the
@@ -55,6 +54,7 @@ require 'optparse'
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 
 require 'phaser'
+require 'phaser/internal/cli_option_parser'
 
 module Phaser
   module FlavorInit
@@ -78,21 +78,36 @@ module Phaser
         :flavor_name, :force, :yes, :show_help, :show_version, :help_text
       )
 
-      # Each entry maps an OptionParser switch to the values-hash key it
-      # populates. Defined at class scope so `build_option_parser` has
-      # only declarative wiring, keeping its method size below the
-      # community-default budget.
-      Option = Data.define(:switch, :desc, :key, :kind)
-
+      # Switches accepted by `phaser-flavor-init`. Wired through
+      # `Phaser::Internal::CliOptionParser` so the OptionParser
+      # scaffolding stays in one place across all three phaser CLIs.
       OPTION_DEFS = [
-        Option.new('--flavor NAME', 'Skip auto-detection; select named flavor', :flavor_name, :value),
-        Option.new('--force', 'Overwrite an existing .specify/flavor.yaml', :force, :flag),
-        Option.new('--yes', 'Skip the confirmation prompt', :yes, :flag),
-        Option.new('--help', 'Print usage and exit 0', :show_help, :flag),
-        Option.new('--version', 'Print version and exit 0', :show_version, :flag)
+        Phaser::Internal::CliOptionParser::Option.new(
+          '--flavor NAME', 'Skip auto-detection; select named flavor', :flavor_name, :value
+        ),
+        Phaser::Internal::CliOptionParser::Option.new(
+          '--force', 'Overwrite an existing .specify/flavor.yaml', :force, :flag
+        ),
+        Phaser::Internal::CliOptionParser::Option.new(
+          '--yes', 'Skip the confirmation prompt', :yes, :flag
+        ),
+        Phaser::Internal::CliOptionParser::Option.new(
+          '--help', 'Print usage and exit 0', :show_help, :flag
+        ),
+        Phaser::Internal::CliOptionParser::Option.new(
+          '--version', 'Print version and exit 0', :show_version, :flag
+        )
       ].freeze
 
-      private_constant :Option, :OPTION_DEFS
+      OPTION_DEFAULTS = {
+        flavor_name: nil,
+        force: false,
+        yes: false,
+        show_help: false,
+        show_version: false
+      }.freeze
+
+      private_constant :OPTION_DEFS, :OPTION_DEFAULTS
 
       def self.run(argv, stdout: $stdout, stderr: $stderr, stdin: $stdin, env: ENV)
         new(stdout: stdout, stderr: stderr, stdin: stdin, env: env).run(argv)
@@ -114,54 +129,21 @@ module Phaser
         return handle_version if options.show_version
 
         execute(options)
-      rescue UsageError => e
+      rescue Phaser::Internal::CliOptionParser::UsageError => e
         @stderr.puts(e.message)
         EXIT_USAGE
       end
 
-      # Internal exception family for argument-parsing problems. The
-      # rescue clause above maps it to exit 64 per the contract's
-      # exit-code table.
-      class UsageError < StandardError; end
-
       private
 
       def parse_options(argv)
-        values = empty_option_values
-        parser = build_option_parser(values)
-
-        begin
-          parser.parse(argv)
-        rescue OptionParser::InvalidOption, OptionParser::MissingArgument => e
-          raise UsageError, e.message
-        end
-
-        Options.new(**values, help_text: parser.help)
-      end
-
-      def empty_option_values
-        {
-          flavor_name: nil,
-          force: false,
-          yes: false,
-          show_help: false,
-          show_version: false
-        }
-      end
-
-      def build_option_parser(values)
-        OptionParser.new do |opts|
-          opts.banner = 'Usage: phaser-flavor-init [--flavor <name>] [--force] [--yes]'
-          OPTION_DEFS.each { |opt| register_option(opts, values, opt) }
-        end
-      end
-
-      def register_option(opts, values, opt)
-        if opt.kind == :flag
-          opts.on(opt.switch, opt.desc) { values[opt.key] = true }
-        else
-          opts.on(opt.switch, opt.desc) { |v| values[opt.key] = v }
-        end
+        values, help_text = Phaser::Internal::CliOptionParser.parse(
+          argv,
+          defaults: OPTION_DEFAULTS,
+          banner: 'Usage: phaser-flavor-init [--flavor <name>] [--force] [--yes]',
+          options: OPTION_DEFS
+        )
+        Options.new(**values, help_text: help_text)
       end
 
       def handle_help(options)

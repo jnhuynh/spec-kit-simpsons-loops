@@ -1,9 +1,7 @@
 # frozen_string_literal: true
 
-require 'psych'
-require 'fileutils'
-require 'securerandom'
-require 'time'
+require 'phaser/internal/atomic_yaml_writer'
+require 'phaser/internal/iso8601_clock'
 
 module Phaser
   # Stable-key-order YAML emitter that serializes
@@ -90,7 +88,7 @@ module Phaser
     #           with millisecond precision so production callers do not
     #           have to inject one.
     def initialize(now: nil)
-      @now = now || method(:default_now)
+      @now = now || Internal::Iso8601Clock.method(:now)
     end
 
     # Serialize the given payload to the given path under the given
@@ -106,7 +104,7 @@ module Phaser
       sanitized_payload = sanitize_payload(payload)
       hash = build_hash(stage, sanitized_payload)
 
-      atomic_write(path, dump_yaml(hash))
+      Internal::AtomicYamlWriter.atomic_write(path, Internal::AtomicYamlWriter.dump_yaml(hash))
       path
     end
 
@@ -182,22 +180,6 @@ module Phaser
       end
     end
 
-    # Dump the explicitly ordered Hash as a YAML document with the same
-    # contractual flags the manifest writer uses: `line_width: -1`
-    # disables 80-column wrapping (long decomposition messages MUST
-    # stay on a single line so byte-identical determinism holds), and
-    # the `---` document header is suppressed by marking the underlying
-    # document node implicit.
-    def dump_yaml(hash)
-      visitor = Psych::Visitors::YAMLTree.create(line_width: -1)
-      visitor << hash
-      stream = visitor.tree
-      document = stream.children.first
-      document.implicit = true
-      document.implicit_end = true
-      stream.to_yaml
-    end
-
     # Replace any credential-shaped string value with the redaction
     # marker before it reaches disk. Non-string values pass through
     # untouched so integer payload fields (commit_count, phase_count,
@@ -214,35 +196,6 @@ module Phaser
 
     def credential_pattern_match?(string)
       CREDENTIAL_PATTERNS.any? { |pattern| string.match?(pattern) }
-    end
-
-    # Atomic write: write to a temp file under the destination
-    # directory then rename it over the destination. If either step
-    # fails, the previous destination content is preserved and any
-    # temp file is cleaned up before the exception is re-raised.
-    def atomic_write(path, content)
-      destination_dir = File.dirname(path)
-      FileUtils.mkdir_p(destination_dir)
-      temp_path = File.join(
-        destination_dir,
-        ".#{File.basename(path)}.#{SecureRandom.hex(8)}.tmp"
-      )
-
-      begin
-        File.binwrite(temp_path, content)
-        File.rename(temp_path, path)
-      rescue StandardError
-        FileUtils.rm_f(temp_path)
-        raise
-      end
-    end
-
-    # Default clock: ISO-8601 UTC with millisecond precision. Matches
-    # the format pinned by contracts/observability-events.md so the
-    # status file's timestamp is comparable to the log records emitted
-    # alongside it.
-    def default_now
-      Time.now.utc.iso8601(3).sub(/\+00:00\z/, 'Z')
     end
   end
 end

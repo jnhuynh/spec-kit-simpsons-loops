@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'time'
+
+require 'phaser/internal/iso8601_clock'
 
 module Phaser
   # JSON-line stderr observability surface for the phaser engine and
@@ -64,7 +65,7 @@ module Phaser
     #              clock with millisecond precision.
     def initialize(stderr:, now: nil)
       @stderr = stderr
-      @now = now || method(:default_now)
+      @now = now || Internal::Iso8601Clock.method(:now)
     end
 
     # INFO: emitted once per non-empty commit after classification
@@ -327,14 +328,6 @@ module Phaser
           { 'commit_hash' => task[:commit_hash], 'task_type' => task[:task_type] }
         end
       end
-    end
-
-    # Default clock: ISO-8601 UTC with millisecond precision (the
-    # format pinned by contracts/observability-events.md "Common
-    # Fields"). Time#iso8601(3) emits the `+00:00` suffix on a UTC
-    # time, so we substitute the `Z` suffix the contract requires.
-    def default_now
-      Time.now.utc.iso8601(3).sub(/\+00:00\z/, 'Z')
     end
   end
 end
