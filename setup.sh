@@ -174,6 +174,7 @@ cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.phaser.md"             "$PROJECT_DIR/.claude/commands/speckit.phaser.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.flavor.init.md"        "$PROJECT_DIR/.claude/commands/speckit.flavor.init.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
@@ -191,6 +192,39 @@ echo "    .claude/commands/speckit.marge.review.md"
 echo "    .claude/commands/speckit.review.md"
 echo "    .claude/commands/speckit.pipeline.md"
 echo "    .claude/commands/speckit.phaser.md"
+echo "    .claude/commands/speckit.flavor.init.md"
+
+# ── 2a. Install phaser/ entry points (R-017, D-015) ─────────────────
+# The phaser engine is shipped as a Ruby toolkit under $SCRIPT_DIR/phaser/.
+# Target projects access it via a `phaser/` symlink at the project root so
+# the documented invocation path `phaser/bin/phaser-flavor-init` (and the
+# other phaser bins) resolves. Idempotent: an existing correct symlink is
+# left alone; a stale link is replaced; a real `phaser/` directory in the
+# target is preserved with a warning.
+
+PHASER_LINK="$PROJECT_DIR/phaser"
+PHASER_SOURCE="$SCRIPT_DIR/phaser"
+
+# Ensure the source-of-truth entry point is executable (git on some
+# filesystems may not preserve the bit).
+chmod +x "$PHASER_SOURCE/bin/phaser-flavor-init"
+
+if [[ -L "$PHASER_LINK" ]]; then
+  current_target="$(readlink "$PHASER_LINK")"
+  if [[ "$current_target" == "$PHASER_SOURCE" ]]; then
+    echo "  phaser/ symlink already points to $PHASER_SOURCE — skipped"
+  else
+    rm "$PHASER_LINK"
+    ln -s "$PHASER_SOURCE" "$PHASER_LINK"
+    echo "  Updated phaser/ symlink → $PHASER_SOURCE"
+  fi
+elif [[ -e "$PHASER_LINK" ]]; then
+  echo "  WARNING: $PHASER_LINK exists and is not a symlink — leaving untouched."
+  echo "           The phaser entry points may not resolve from $PROJECT_DIR/phaser/bin/."
+else
+  ln -s "$PHASER_SOURCE" "$PHASER_LINK"
+  echo "  Created phaser/ symlink → $PHASER_SOURCE"
+fi
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship with the template. Copy each baseline file to
