@@ -1,0 +1,79 @@
+# example-minimal — toy reference flavor for the multi-phase pipeline
+# (feature 007-multi-phase-pipeline; T037).
+#
+# This flavor exists to prove the engine is genuinely flavor-agnostic.
+# It carries the smallest catalog that still exercises every catalog
+# concept (two task types with both isolation modes, one inference
+# rule, one precedent rule, a default-type cascade), and it is what the
+# `phaser/spec/fixtures/repos/example-minimal/recipe.rb` fixture
+# (T029) is constructed against. Edits here MUST stay in sync with the
+# recipe — the spec at `phaser/spec/flavors/example_minimal/
+# flavor_yaml_spec.rb` is the byte-stable contract between the two.
+#
+# Catalog shape:
+#
+#   * Two task types:
+#       - schema (alone)  — schema-level changes, each gets its own
+#                           phase per FR-005.
+#       - misc   (groups) — default catch-all; multiple `misc` commits
+#                           may share a phase.
+#
+#   * One inference rule:
+#       - schema-by-path  — any commit touching `db/migrate/*.rb`
+#                           classifies as `schema` (FR-012).
+#
+#   * One precedent rule:
+#       - misc-after-schema — every `misc` commit must follow a
+#                             `schema` commit; demonstrates the
+#                             precedent surface without binding to any
+#                             real-world domain rule.
+#
+#   * Default type: `misc` — commits matching no inference rule and
+#     carrying no operator tag fall through to this type per FR-004.
+#
+#   * Empty `forbidden_operations` — the toy flavor intentionally bans
+#     nothing; the forbidden-operations gate (FR-049) is exercised by
+#     the rails-postgres-strong-migrations flavor in US2.
+#
+#   * Single `stack_detection` signal — `Gemfile` presence. The signal
+#     is only used by `phaser-flavor-init` (US5) to decide when to
+#     suggest this flavor; it has no bearing on engine behavior.
+#
+# Determinism (FR-002, SC-002): the field order below mirrors the
+# stable key ordering enforced by `Phaser::ManifestWriter` and
+# `Phaser::FlavorLoader`. Reordering keys here is harmless (YAML loads
+# into a Hash before validation), but matching the documented order
+# keeps human review easy.
+name: example-minimal
+version: 0.1.0
+default_type: misc
+
+task_types:
+  - name: schema
+    isolation: alone
+    description: Schema-level change requiring its own phase.
+  - name: misc
+    isolation: groups
+    description: Default catch-all for unclassified commits.
+
+precedent_rules:
+  - name: misc-after-schema
+    subject_type: misc
+    predecessor_type: schema
+    error_message: A misc commit must follow at least one schema commit.
+
+inference_rules:
+  - name: schema-by-path
+    precedence: 100
+    task_type: schema
+    match:
+      kind: file_glob
+      pattern: db/migrate/*.rb
+
+forbidden_operations: []
+
+stack_detection:
+  signals:
+    - type: file_present
+      path: Gemfile
+      required: true
