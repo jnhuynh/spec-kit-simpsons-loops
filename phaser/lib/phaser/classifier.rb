@@ -71,7 +71,7 @@ module Phaser
       tag = commit.message_trailers[OPERATOR_TAG_TRAILER]
       return classify_by_operator_tag(commit, flavor, tag) if tag && !tag.empty?
 
-      winning_rule = highest_precedence_match(commit, flavor.inference_rules)
+      winning_rule = highest_precedence_match(commit, flavor)
       return classify_by_inference(commit, flavor, winning_rule) if winning_rule
 
       classify_by_default(commit, flavor)
@@ -137,23 +137,25 @@ module Phaser
     # the rule with the highest `precedence`. Ties on `precedence` are
     # broken alphabetically by `name` so the cascade is deterministic
     # across runs (FR-036, SC-002). Returns nil when no rule matches.
-    def highest_precedence_match(commit, inference_rules)
-      matching = inference_rules.select { |rule| rule_matches?(rule, commit) }
+    def highest_precedence_match(commit, flavor)
+      matching = flavor.inference_rules.select do |rule|
+        rule_matches?(rule, commit, flavor)
+      end
       return nil if matching.empty?
 
       matching.min_by { |rule| [-rule.precedence, rule.name] }
     end
 
-    def rule_matches?(rule, commit)
+    def rule_matches?(rule, commit, flavor)
       case rule.match['kind']
-      when 'file_glob'    then file_glob_match?(rule.match, commit)
-      when 'path_regex'   then path_regex_match?(rule.match, commit)
+      when 'file_glob'     then file_glob_match?(rule.match, commit)
+      when 'path_regex'    then path_regex_match?(rule.match, commit)
       when 'content_regex' then content_regex_match?(rule.match, commit)
+      when 'module_method' then module_method_match?(rule.match, commit, flavor)
       else
-        # Unknown match kinds (e.g., module_method) are not handled by
-        # the classifier directly; the flavor loader is responsible for
-        # rejecting unsupported shapes. Fail closed if one slips
-        # through so the determinism contract is not silently violated.
+        # Unknown match kinds are rejected by the flavor loader's schema
+        # validation. Fail closed if one slips through so the
+        # determinism contract is not silently violated.
         false
       end
     end
@@ -176,6 +178,30 @@ module Phaser
 
         file.hunks.any? { |hunk| regex.match?(hunk) }
       end
+    end
+
+    # Dispatch a `module_method` inference rule to the flavor's
+    # `inference_module`. Mirrors the dispatch shape
+    # `Phaser::ForbiddenOperationsGate#module_method_match?` uses for the
+    # forbidden-operations registry: the predicate takes the whole commit
+    # value object, returns a boolean, and is invoked via `public_send`
+    # so the module's interface stays the documented `module_function`
+    # surface.
+    #
+    # When the active flavor declares no `inference_module` (e.g., a
+    # YAML-only flavor that ships no Ruby), or the named method is
+    # missing, the rule is treated as non-matching so a misdeclared
+    # flavor cannot silently corrupt classification. Flavor schema
+    # validation at load time is the authoritative gate against the
+    # misdeclaration; this is the runtime fail-closed backstop.
+    def module_method_match?(match, commit, flavor)
+      module_constant = flavor.inference_module
+      return false if module_constant.nil?
+
+      method_name = match['method'].to_sym
+      return false unless module_constant.respond_to?(method_name)
+
+      module_constant.public_send(method_name, commit)
     end
   end
 end

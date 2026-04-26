@@ -51,7 +51,33 @@ module Phaser
     def load(name)
       catalog = parse_catalog(name)
       FlavorCatalogValidator.new(name, catalog).validate!
+      load_companion_ruby_files(name, catalog)
       build_flavor(catalog)
+    end
+
+    # Resolve a fully-qualified Ruby module name (e.g.,
+    # `"Phaser::Flavors::RailsPostgresStrongMigrations::Inference"`) into
+    # the actual Module constant the classifier and forbidden-operations
+    # gate dispatch through. Returns nil when the catalog declared no
+    # module string (the YAML field is optional) OR when the named
+    # constant cannot be resolved (e.g., the companion Ruby file has not
+    # been shipped yet). Callers that depend on the resolved module
+    # treating nil as "fall through to default" — the classifier's
+    # `module_method_match?` and the gate's `module_method_match?` both
+    # handle a nil module gracefully (the classifier returns false; the
+    # gate raises a configuration error so the operator notices).
+    #
+    # NOTE: T055 will tighten this to fail fast when a declared module
+    # cannot be resolved. Until then we degrade gracefully so tests for
+    # individual flavor modules (T051, T052, T053, T054, T054b) can land
+    # incrementally without each one having to ship every other module's
+    # companion Ruby file.
+    def self.resolve_module_constant(module_name)
+      return nil if module_name.nil? || module_name.empty?
+
+      Object.const_get(module_name)
+    rescue NameError
+      nil
     end
 
     # Names of every shipped flavor under the loader's flavors root.
@@ -109,9 +135,49 @@ module Phaser
         name: catalog['name'],
         version: catalog['version'],
         default_type: catalog['default_type'],
-        inference_module: catalog['inference_module'],
-        forbidden_module: catalog['forbidden_module']
+        inference_module: self.class.resolve_module_constant(catalog['inference_module']),
+        forbidden_module: self.class.resolve_module_constant(catalog['forbidden_module'])
       }
+    end
+
+    # The classifier and forbidden-operations gate dispatch through real
+    # Module constants, not through the raw `inference_module` /
+    # `forbidden_module` strings. Companion Ruby files
+    # (`inference.rb`, `forbidden_operations.rb`, plus any per-flavor
+    # validator files referenced by the `validators:` list) are loaded
+    # here BEFORE constant resolution so the operator sees a single
+    # `FlavorLoadError` if a file is missing instead of a NameError later
+    # in the pipeline.
+    #
+    # Files that don't exist yet are simply skipped — incremental
+    # implementation (T051..T054b) lands one module at a time, and a
+    # missing file should not break flavors whose other modules ARE
+    # shipped. T055 will tighten this once every reference-flavor module
+    # is in place.
+    def load_companion_ruby_files(name, catalog)
+      flavor_dir = File.join(@flavors_root, name)
+      %w[inference.rb forbidden_operations.rb].each do |file|
+        path = File.join(flavor_dir, file)
+        require path if File.file?(path)
+      end
+      Array(catalog['validators']).each do |validator|
+        require_validator_file(flavor_dir, validator)
+      end
+    end
+
+    # The `validators:` list in flavor.yaml references constants by their
+    # fully-qualified Ruby name (e.g.,
+    # `Phaser::Flavors::RailsPostgresStrongMigrations::BackfillValidator`).
+    # Convert the trailing constant name to a snake_case filename and
+    # require it from the flavor's directory if a matching file exists.
+    def require_validator_file(flavor_dir, validator)
+      constant_name = validator.split('::').last
+      snake_case = constant_name
+                   .gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                   .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                   .downcase
+      path = File.join(flavor_dir, "#{snake_case}.rb")
+      require path if File.file?(path)
     end
 
     def build_task_type(task_type)
