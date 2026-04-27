@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+# Rakefile for the Phaser engine and reference flavor.
+#
+# Exposes the two task surfaces the project's quality gates depend on:
+#
+#   * `rake test` — runs the full RSpec suite via Bundler so the Gemfile.lock
+#     pin is honored. This is the entry point invoked by
+#     `.specify/quality-gates.sh` and by every CI run.
+#
+#   * `rake lint` — runs RuboCop with the rules declared in `.rubocop.yml`
+#     (community defaults plus rubocop-rspec). Same Bundler invocation
+#     pattern so the linter version stays pinned.
+#
+# `rake` with no arguments runs both — test first, lint second — so a
+# developer can verify the full local quality gate with a single command
+# from `phaser/`.
+
+desc 'Run the full RSpec suite via Bundler'
+task :test do
+  sh 'bundle exec rspec'
+end
+
+desc 'Run RuboCop against the entire phaser tree'
+task :lint do
+  sh 'bundle exec rubocop'
+end
+
+desc 'Run tests, then lint (the local quality gate)'
+task default: %i[test lint]

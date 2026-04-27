@@ -1,0 +1,41 @@
+#!/bin/sh
+# Shell wrapper for the phaser stacked-PR creator CLI (feature
+# 007-multi-phase-pipeline; T076, FR-026..FR-030, FR-039, FR-040,
+# FR-044..FR-047, contracts/stacked-pr-creator-cli.md).
+#
+# Why a shell wrapper instead of a direct `#!/usr/bin/env ruby`:
+#
+# stdout is reserved for the JSON run-summary on success per the
+# contract; stderr is reserved for JSON-line observability records via
+# `Phaser::Observability` per FR-041. Anything Ruby itself writes to
+# stderr before our code runs would corrupt the JSON-line stream the
+# CLI's spec validates against (`contracts/stacked-pr-creator-cli.md`,
+# `contracts/observability-events.md`).
+#
+# When this binary is invoked from a parent `bundle exec` process
+# (every CI run does this; every developer running `bundle exec rspec`
+# does this) the parent injects `RUBYOPT=-rbundler/setup` plus a few
+# `BUNDLE_*` variables into our environment. On some Ruby/Bundler
+# pairings that wiring causes rubygems to re-initialize platform
+# constants and emit "already initialized constant" warnings on stderr
+# during Ruby startup — too early for any user-space `$VERBOSE = nil`
+# to suppress. The shell wrapper unsets the bundler variables before
+# `exec`-ing Ruby so the inherited environment is clean and the
+# subprocess starts with a pristine stderr.
+#
+# The wrapper preserves every other env var verbatim, including the
+# `PHASER_GH_BIN` test seam (consumed via PATH manipulation by the
+# spec harness), the operator's `PATH`, and the working directory.
+
+unset RUBYOPT
+unset BUNDLE_BIN_PATH
+unset BUNDLE_GEMFILE
+unset BUNDLER_VERSION
+unset BUNDLER_SETUP
+
+# Resolve the absolute path of this wrapper so the Ruby entry point is
+# always loadable regardless of where the operator invokes the CLI
+# from (the wrapper sits next to phaser-stacked-prs.rb under phaser/bin/).
+script_dir=$(cd "$(dirname "$0")" && pwd)
+
+exec ruby -W0 "$script_dir/phaser-stacked-prs.rb" "$@"

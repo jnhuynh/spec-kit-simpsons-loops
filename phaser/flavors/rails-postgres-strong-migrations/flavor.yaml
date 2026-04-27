@@ -1,0 +1,618 @@
+# rails-postgres-strong-migrations — reference flavor for the
+# multi-phase pipeline (feature 007-multi-phase-pipeline; T050).
+#
+# Purpose: a real-world deploy-safety domain catalog for Rails
+# applications backed by Postgres with the strong_migrations gem. Every
+# task type FR-010 enumerates is declared here with the isolation rule
+# FR-011 mandates; the file-pattern inference layer (FR-012) routes
+# commits without operator tags to the correct task type; the
+# backfill-safety (FR-013) and column-drop precedent (FR-014)
+# validators run after classification; the forbidden-operations
+# registry (FR-015) rejects unsafe operations BEFORE classification
+# (FR-049, SC-015).
+#
+# This file is the source-of-truth catalog. Per CLAUDE.md "Source vs
+# Installed Files" it is shipped under `phaser/flavors/`; the engine
+# loads it via `Phaser::FlavorLoader#load('rails-postgres-strong-migrations')`,
+# validates it against `contracts/flavor.schema.yaml`, and wraps the
+# validated content in a `Phaser::Flavor` value object the engine
+# consumes.
+#
+# Pattern-matcher modules (`inference.rb`, `forbidden_operations.rb`,
+# `backfill_validator.rb`, `precedent_validator.rb`,
+# `safety_assertion_validator.rb`) live alongside this YAML and are
+# referenced by name below (T051..T054b). Most inference and
+# forbidden-operation matchers use `module_method` so the catalog stays
+# readable while the actual Ruby logic (regex / AST inspection) is
+# kept in the modules.
+#
+# Determinism (FR-002, SC-002): the field order below mirrors the
+# stable key ordering enforced by `Phaser::ManifestWriter` and
+# `Phaser::FlavorLoader`. Inference rules are listed in DECREASING
+# precedence so a reader can see the resolution order at a glance,
+# even though the classifier itself sorts by `precedence` at lookup
+# time.
+
+name: rails-postgres-strong-migrations
+version: 0.1.0
+default_type: code default-catch-all-change
+
+# Optional Ruby pattern-matcher modules. The classifier and the
+# forbidden-operations gate dispatch to methods on these modules when
+# a rule's `match` (or detector) declares `kind: module_method`. The
+# module names are resolved at engine wiring time (T055); the modules
+# themselves ship at `phaser/flavors/rails-postgres-strong-migrations/
+# inference.rb` (T051) and `forbidden_operations.rb` (T052).
+inference_module: Phaser::Flavors::RailsPostgresStrongMigrations::Inference
+forbidden_module: Phaser::Flavors::RailsPostgresStrongMigrations::ForbiddenOperations
+
+# Per-flavor validators wired through `flavor_loader.rb` in T055. Each
+# validator is loaded as a Ruby constant and invoked after the engine's
+# core classifier / precedent validator pass; the engine's outer
+# rescue clause catches `Phaser::ValidationError` descendants raised by
+# these validators uniformly with the engine-level validators.
+validators:
+  - Phaser::Flavors::RailsPostgresStrongMigrations::BackfillValidator
+  - Phaser::Flavors::RailsPostgresStrongMigrations::PrecedentValidator
+  - Phaser::Flavors::RailsPostgresStrongMigrations::SafetyAssertionValidator
+
+# Irreversible task types (FR-018, plan.md D-017): the
+# SafetyAssertionValidator (T054b) requires a `Safety-Assertion:` trailer
+# (or fenced safety-assertion block) on every commit classified into one
+# of these types so audit reviewers can trace the precedent chain. The
+# four types below are the schema/code operations whose effects cannot
+# be reversed by simply reverting the commit (the column/table/index is
+# already gone; the ignored-columns directive removal exposes the model
+# to a column that may have already been dropped).
+irreversible_task_types:
+  - schema drop-column-with-cleanup-precedent
+  - schema drop-table
+  - schema drop-concurrent-index
+  - code remove-ignored-columns-directive
+
+# Backfill sequencing (FR-037): leave at the default `false` so two
+# backfill commits in the same feature land in sequential phases. Some
+# Rails teams batch independent backfills together; that is opt-in per
+# the FR-037 override and is intentionally NOT enabled here.
+allow_parallel_backfills: false
+
+# ---------------------------------------------------------------------
+# Task type catalog (FR-010 + FR-011)
+# ---------------------------------------------------------------------
+# Every task type FR-010 enumerates is present below. Isolation choice
+# follows the deploy-safety domain logic per FR-011:
+#
+#   * `alone` — schema-changing commits, data-changing commits
+#     (backfills/cleanups), and infra provision/decommission. Each
+#     touches durable shared state (DB schema, infra resources) and
+#     MUST own its own deploy-and-verify window.
+#   * `groups` — code-only changes, feature-flag toggles, and
+#     infra "wire" commits (config edits that connect already-
+#     provisioned infra to the application). These can ship together
+#     in a single deploy unit.
+#
+# For FR-017's column-rename worked example (R-016, SC-001), the
+# precedent rules below force a phase boundary between every
+# coalescing groups-isolation commit, so the seven-step canonical
+# sequence still produces seven phases without making every code type
+# `alone`.
+
+task_types:
+  # ── schema (own phase per FR-011) ────────────────────────────────
+  - name: schema add-nullable-column
+    isolation: alone
+    description: Add a nullable column with no default. Always reversible without table rewrite.
+  - name: schema add-column-with-static-default
+    isolation: alone
+    description: Add a column with a non-volatile default (boolean, integer, fixed string).
+  - name: schema add-table
+    isolation: alone
+    description: Create a new table. Other tables remain unaffected; safe in isolation.
+  - name: schema add-concurrent-index
+    isolation: alone
+    description: Add an index concurrently (no table lock). Requires disable_ddl_transaction!.
+  - name: schema add-foreign-key-without-validation
+    isolation: alone
+    description: 'Add a foreign key without validating existing rows (validate: false).'
+  - name: schema validate-foreign-key
+    isolation: alone
+    description: Validate an existing foreign key constraint after rows are known good.
+  - name: schema add-check-constraint-without-validation
+    isolation: alone
+    description: 'Add a check constraint without validating existing rows (validate: false).'
+  - name: schema validate-check-constraint
+    isolation: alone
+    description: Validate an existing check constraint after rows are known good.
+  - name: schema add-virtual-not-null-via-check
+    isolation: alone
+    description: Add a NOT NULL guarantee via an unvalidated check constraint (no full table scan).
+  - name: schema flip-real-not-null-after-check
+    isolation: alone
+    description: Flip the column's real NOT NULL flag after the check constraint has been validated.
+  - name: schema change-column-default
+    isolation: alone
+    description: Change a column's default. Affects only future inserts; not a table rewrite.
+  - name: schema drop-column-with-cleanup-precedent
+    isolation: alone
+    description: Drop a column whose code references and ignored-columns directive have shipped.
+  - name: schema drop-table
+    isolation: alone
+    description: Drop a table whose references have already been removed from application code.
+  - name: schema drop-concurrent-index
+    isolation: alone
+    description: Drop an index concurrently (no table lock). Requires disable_ddl_transaction!.
+
+  # ── data (own phase per FR-037 backfill sequencing) ──────────────
+  - name: data backfill-batched
+    isolation: alone
+    description: Batched, throttled backfill rake task that runs outside a transaction.
+  - name: data cleanup-batched
+    isolation: alone
+    description: Batched, throttled cleanup rake task (delete-only) that runs outside a transaction.
+
+  # ── code (groups; precedent rules force phase boundaries when needed) ─
+  - name: code default-catch-all-change
+    isolation: groups
+    description: Default catch-all for code commits that match no other inference rule.
+  - name: code dual-write-old-and-new-column
+    isolation: groups
+    description: Application code writes both the old and new column during a column rename window.
+  - name: code switch-reads-to-new-column
+    isolation: groups
+    description: Application code reads from the new column instead of the old one.
+  - name: code ignore-column-for-pending-drop
+    isolation: groups
+    description: Add self.ignored_columns directive to mark a column as pending drop.
+  - name: code remove-references-to-pending-drop-column
+    isolation: groups
+    description: Remove all application-code references to a column slated for drop.
+  - name: code remove-ignored-columns-directive
+    isolation: groups
+    description: Remove the self.ignored_columns directive after the column drop has shipped.
+
+  # ── feature-flag (groups) ────────────────────────────────────────
+  - name: feature-flag create-default-off
+    isolation: groups
+    description: Create a new feature flag whose default is off.
+  - name: feature-flag enable
+    isolation: groups
+    description: Flip an existing feature flag's default to on.
+  - name: feature-flag remove
+    isolation: groups
+    description: Remove a feature flag definition that is no longer referenced.
+
+  # ── infra (alone for provision/decommission, groups for wire) ────
+  - name: infra provision
+    isolation: alone
+    description: Provision a new infrastructure resource (terraform apply) the app does not yet use.
+  - name: infra wire
+    isolation: groups
+    description: Connect application configuration to a previously provisioned infrastructure resource.
+  - name: infra decommission
+    isolation: alone
+    description: Decommission an infrastructure resource whose application references have been removed.
+
+# ---------------------------------------------------------------------
+# Precedent rules (FR-006 — engine-level, one rule at a time)
+# ---------------------------------------------------------------------
+# These rules force the engine's IsolationResolver to open a new phase
+# whenever a subject task type's predecessor exists in the current
+# phase (per `Phaser::IsolationResolver#precedent_boundary?`). They
+# are the engine-level safety net — the per-flavor PrecedentValidator
+# (T054, FR-014) runs AFTER these rules and adds the conjoined
+# "column-drop requires BOTH ignore AND reference-removal" check the
+# engine's one-rule-at-a-time validator cannot express.
+#
+# The rules below capture the canonical "safe rename" deploy
+# sequence (R-016): each safe column-rename step requires its
+# predecessor in an earlier phase.
+
+precedent_rules:
+  - name: ignore-after-add-nullable-column
+    subject_type: code ignore-column-for-pending-drop
+    predecessor_type: schema add-nullable-column
+    error_message: An ignored-columns directive must follow the add-nullable-column commit that introduced the replacement column.
+  - name: dual-write-after-ignore
+    subject_type: code dual-write-old-and-new-column
+    predecessor_type: code ignore-column-for-pending-drop
+    error_message: Dual-write must follow the ignored-columns directive so the legacy column is no longer auto-loaded.
+  - name: backfill-after-dual-write
+    subject_type: data backfill-batched
+    predecessor_type: code dual-write-old-and-new-column
+    error_message: Backfill must follow dual-write so writes to the legacy column are mirrored into the replacement during the backfill window.
+  - name: switch-reads-after-backfill
+    subject_type: code switch-reads-to-new-column
+    predecessor_type: data backfill-batched
+    error_message: Switch reads must follow backfill so the replacement column has the legacy column's data before any read targets it.
+  - name: remove-references-after-switch-reads
+    subject_type: code remove-references-to-pending-drop-column
+    predecessor_type: code switch-reads-to-new-column
+    error_message: Reference removal must follow switch-reads so no read path references the legacy column.
+  - name: drop-column-after-ignored-columns
+    subject_type: schema drop-column-with-cleanup-precedent
+    predecessor_type: code ignore-column-for-pending-drop
+    error_message: Column drop must follow the ignored-columns directive so ActiveRecord no longer caches the legacy column.
+  - name: drop-column-after-remove-references
+    subject_type: schema drop-column-with-cleanup-precedent
+    predecessor_type: code remove-references-to-pending-drop-column
+    error_message: Column drop must follow reference removal so no application code references the dropped column.
+  - name: validate-foreign-key-after-add
+    subject_type: schema validate-foreign-key
+    predecessor_type: schema add-foreign-key-without-validation
+    error_message: A foreign-key validation must follow the add-foreign-key-without-validation commit that introduced the constraint.
+  - name: validate-check-constraint-after-add
+    subject_type: schema validate-check-constraint
+    predecessor_type: schema add-check-constraint-without-validation
+    error_message: A check-constraint validation must follow the add-check-constraint-without-validation commit that introduced the constraint.
+  - name: flip-real-not-null-after-virtual
+    subject_type: schema flip-real-not-null-after-check
+    predecessor_type: schema add-virtual-not-null-via-check
+    error_message: Flipping the real NOT NULL flag must follow the virtual-not-null check constraint that proved the column is now non-null.
+  - name: feature-flag-enable-after-create
+    subject_type: feature-flag enable
+    predecessor_type: feature-flag create-default-off
+    error_message: Enabling a feature flag requires the flag definition to ship in a strictly earlier phase.
+  - name: feature-flag-remove-after-enable
+    subject_type: feature-flag remove
+    predecessor_type: feature-flag enable
+    error_message: Removing a feature flag requires the flag to be permanently enabled in a strictly earlier phase.
+  - name: infra-wire-after-provision
+    subject_type: infra wire
+    predecessor_type: infra provision
+    error_message: Infrastructure wiring must follow the provision commit that introduced the resource.
+  - name: infra-decommission-after-wire-removal
+    subject_type: infra decommission
+    predecessor_type: code default-catch-all-change
+    error_message: Infrastructure decommission must follow a code change that removed the application's references to the resource.
+
+# ---------------------------------------------------------------------
+# Inference rules (FR-004, FR-012, FR-036)
+# ---------------------------------------------------------------------
+# Each rule classifies a commit by file pattern (`file_glob`,
+# `path_regex`) or by content (`content_regex`); the AST-aware
+# discriminators (e.g., distinguishing add-virtual-not-null from
+# add-check-constraint-without-validation, both of which use
+# `add_check_constraint`) are delegated to the inference module via
+# `kind: module_method`.
+#
+# Precedence (FR-036): higher number wins. The cascade is designed
+# so the most-specific patterns (concurrent index, FK validation,
+# specific code patterns) win over the catch-all `db/migrate/*.rb`
+# fallback. Ties on `precedence` are broken alphabetically by `name`
+# so the cascade is reproducible across runs.
+#
+# Most rules use `kind: module_method` because the discriminators
+# require AST awareness or multi-line content inspection that is
+# clearer in Ruby than as a regex literal. The shipped methods live
+# in `phaser/flavors/rails-postgres-strong-migrations/inference.rb`
+# (T051).
+
+inference_rules:
+  # ── schema (highest precedence — most specific signals first) ─────
+  - name: schema-add-concurrent-index-by-content
+    precedence: 200
+    task_type: schema add-concurrent-index
+    match:
+      kind: module_method
+      method: schema_add_concurrent_index?
+
+  - name: schema-drop-concurrent-index-by-content
+    precedence: 200
+    task_type: schema drop-concurrent-index
+    match:
+      kind: module_method
+      method: schema_drop_concurrent_index?
+
+  - name: schema-add-foreign-key-without-validation-by-content
+    precedence: 190
+    task_type: schema add-foreign-key-without-validation
+    match:
+      kind: module_method
+      method: schema_add_foreign_key_without_validation?
+
+  - name: schema-validate-foreign-key-by-content
+    precedence: 190
+    task_type: schema validate-foreign-key
+    match:
+      kind: module_method
+      method: schema_validate_foreign_key?
+
+  - name: schema-add-virtual-not-null-via-check-by-content
+    precedence: 185
+    task_type: schema add-virtual-not-null-via-check
+    match:
+      kind: module_method
+      method: schema_add_virtual_not_null_via_check?
+
+  - name: schema-add-check-constraint-without-validation-by-content
+    precedence: 180
+    task_type: schema add-check-constraint-without-validation
+    match:
+      kind: module_method
+      method: schema_add_check_constraint_without_validation?
+
+  - name: schema-validate-check-constraint-by-content
+    precedence: 180
+    task_type: schema validate-check-constraint
+    match:
+      kind: module_method
+      method: schema_validate_check_constraint?
+
+  - name: schema-flip-real-not-null-after-check-by-content
+    precedence: 175
+    task_type: schema flip-real-not-null-after-check
+    match:
+      kind: module_method
+      method: schema_flip_real_not_null_after_check?
+
+  - name: schema-change-column-default-by-content
+    precedence: 170
+    task_type: schema change-column-default
+    match:
+      kind: module_method
+      method: schema_change_column_default?
+
+  - name: schema-drop-table-by-content
+    precedence: 170
+    task_type: schema drop-table
+    match:
+      kind: module_method
+      method: schema_drop_table?
+
+  - name: schema-add-table-by-content
+    precedence: 165
+    task_type: schema add-table
+    match:
+      kind: module_method
+      method: schema_add_table?
+
+  - name: schema-drop-column-with-cleanup-precedent-by-content
+    precedence: 165
+    task_type: schema drop-column-with-cleanup-precedent
+    match:
+      kind: module_method
+      method: schema_drop_column_with_cleanup_precedent?
+
+  - name: schema-add-column-with-static-default-by-content
+    precedence: 160
+    task_type: schema add-column-with-static-default
+    match:
+      kind: module_method
+      method: schema_add_column_with_static_default?
+
+  - name: schema-add-nullable-column-by-content
+    precedence: 150
+    task_type: schema add-nullable-column
+    match:
+      kind: module_method
+      method: schema_add_nullable_column?
+
+  # ── data (lib/tasks/**/*.rake) ───────────────────────────────────
+  - name: data-backfill-batched-by-path
+    precedence: 140
+    task_type: data backfill-batched
+    match:
+      kind: module_method
+      method: data_backfill_batched?
+
+  - name: data-cleanup-batched-by-path
+    precedence: 140
+    task_type: data cleanup-batched
+    match:
+      kind: module_method
+      method: data_cleanup_batched?
+
+  # ── code (app/**/*.rb) ───────────────────────────────────────────
+  - name: code-ignore-column-for-pending-drop-by-content
+    precedence: 130
+    task_type: code ignore-column-for-pending-drop
+    match:
+      kind: module_method
+      method: code_ignore_column_for_pending_drop?
+
+  - name: code-remove-ignored-columns-directive-by-content
+    precedence: 130
+    task_type: code remove-ignored-columns-directive
+    match:
+      kind: module_method
+      method: code_remove_ignored_columns_directive?
+
+  - name: code-dual-write-old-and-new-column-by-content
+    precedence: 125
+    task_type: code dual-write-old-and-new-column
+    match:
+      kind: module_method
+      method: code_dual_write_old_and_new_column?
+
+  - name: code-switch-reads-to-new-column-by-content
+    precedence: 125
+    task_type: code switch-reads-to-new-column
+    match:
+      kind: module_method
+      method: code_switch_reads_to_new_column?
+
+  - name: code-remove-references-to-pending-drop-column-by-content
+    precedence: 125
+    task_type: code remove-references-to-pending-drop-column
+    match:
+      kind: module_method
+      method: code_remove_references_to_pending_drop_column?
+
+  # ── feature-flag (config/features/**/*.yml) ──────────────────────
+  - name: feature-flag-create-default-off-by-content
+    precedence: 120
+    task_type: feature-flag create-default-off
+    match:
+      kind: module_method
+      method: feature_flag_create_default_off?
+
+  - name: feature-flag-enable-by-content
+    precedence: 120
+    task_type: feature-flag enable
+    match:
+      kind: module_method
+      method: feature_flag_enable?
+
+  - name: feature-flag-remove-by-content
+    precedence: 120
+    task_type: feature-flag remove
+    match:
+      kind: module_method
+      method: feature_flag_remove?
+
+  # ── infra (terraform/**/*.tf, config/**/*.yml) ───────────────────
+  - name: infra-provision-by-content
+    precedence: 110
+    task_type: infra provision
+    match:
+      kind: module_method
+      method: infra_provision?
+
+  - name: infra-decommission-by-content
+    precedence: 110
+    task_type: infra decommission
+    match:
+      kind: module_method
+      method: infra_decommission?
+
+  - name: infra-wire-by-path
+    precedence: 100
+    task_type: infra wire
+    match:
+      kind: module_method
+      method: infra_wire?
+
+# ---------------------------------------------------------------------
+# Forbidden operations (FR-015, FR-049, SC-005, SC-015)
+# ---------------------------------------------------------------------
+# Pre-classification gate entries. Operator type tags MUST NOT be
+# capable of suppressing these (D-016, FR-049, SC-015). Each entry
+# carries:
+#
+#   * `name`     — surfaces as `failing_rule` in the validation-failed
+#                  ERROR record (FR-041) and the status file (FR-042).
+#   * `identifier` — surfaces as `forbidden_operation` in the same
+#                    record / file. Stable across version bumps.
+#   * `detector`  — `kind: module_method` for AST-aware detection;
+#                   the actual matchers live in `forbidden_operations.rb`
+#                   (T052).
+#   * `decomposition_message` — the canonical safe-replacement
+#                               sequence operators see when the gate
+#                               rejects their commit (FR-015, SC-008).
+#                               Lists the safe replacement task names
+#                               so the operator can rewrite their
+#                               feature into the safe sequence.
+
+forbidden_operations:
+  - name: direct-column-type-change
+    identifier: direct-column-type-change
+    detector:
+      kind: module_method
+      method: direct_column_type_change?
+    decomposition_message: |-
+      Direct column-type change rewrites the table and locks writes for the duration. Decompose into:
+        1. add column (new type, nullable, no default).
+        2. dual-write old and new columns.
+        3. backfill the new column from the old column (batched, throttled, outside transaction).
+        4. switch reads to the new column.
+        5. remove references to the old column.
+        6. drop the old column (after the cleanup precedent has shipped).
+
+  - name: direct-column-rename
+    identifier: direct-column-rename
+    detector:
+      kind: module_method
+      method: direct_column_rename?
+    decomposition_message: |-
+      Direct column rename is unsafe: in-flight writes to the old column name fail during deploy. Decompose into:
+        1. add column with the new name (nullable, no default).
+        2. add ignored-columns directive for the old column.
+        3. dual-write to both columns.
+        4. backfill the new column from the old column (batched, throttled, outside transaction).
+        5. switch reads to the new column.
+        6. remove references to the old column.
+        7. drop the old column.
+
+  - name: non-concurrent-index
+    identifier: non-concurrent-index
+    detector:
+      kind: module_method
+      method: non_concurrent_index?
+    decomposition_message: |-
+      Non-concurrent index acquires a long-held write lock that blocks production traffic. Decompose into:
+        1. wrap the migration with disable_ddl_transaction!.
+        2. add the index concurrently using algorithm: :concurrently.
+
+  - name: direct-add-not-null-column
+    identifier: direct-add-not-null-column
+    detector:
+      kind: module_method
+      method: direct_add_not_null_column?
+    decomposition_message: |-
+      Adding a NOT NULL column directly rewrites the table for every existing row. Decompose into:
+        1. add the column nullable (no default, no constraint).
+        2. backfill the column with valid non-null values (batched, throttled, outside transaction).
+        3. add a check constraint asserting the column is NOT NULL (validate: false).
+        4. validate the check constraint after backfill completes.
+        5. flip the real NOT NULL flag on the column.
+
+  - name: direct-add-foreign-key
+    identifier: direct-add-foreign-key
+    detector:
+      kind: module_method
+      method: direct_add_foreign_key?
+    decomposition_message: |-
+      Adding a foreign key directly validates every existing row under a write lock. Decompose into:
+        1. add the foreign key with validate: false (or NOT VALID in raw SQL) so existing rows are not scanned.
+        2. validate the foreign key in a separate, later migration once rows are known good.
+
+  - name: add-column-with-volatile-default
+    identifier: add-column-with-volatile-default
+    detector:
+      kind: module_method
+      method: add_column_with_volatile_default?
+    decomposition_message: |-
+      Adding a column with a volatile default (e.g., now(), uuid_generate_v4()) rewrites every row at migration time. Decompose into:
+        1. add the column without a default.
+        2. backfill the column in batches with the desired computed value.
+        3. set the column default in a follow-up migration so future inserts populate it automatically.
+
+  - name: drop-column-without-code-cleanup
+    identifier: drop-column-without-code-cleanup
+    detector:
+      kind: module_method
+      method: drop_column_without_code_cleanup?
+    decomposition_message: |-
+      Dropping a column whose code references are still live causes runtime failures on the next deploy. Decompose into:
+        1. add a self.ignored_columns directive for the column on every model that references it.
+        2. remove references to the column from every code path (queries, validations, attr_accessors, view templates).
+        3. drop the column in a separate phase after the cleanup precedent has shipped to production.
+
+# ---------------------------------------------------------------------
+# Stack detection (FR-031, R-015)
+# ---------------------------------------------------------------------
+# Used by `phaser-flavor-init` (T081/T082, US5) to suggest this flavor
+# during one-shot opt-in. ALL `required: true` signals must be
+# satisfied for the flavor to be considered a candidate.
+#
+# The signals below identify a Rails app on Postgres that uses the
+# strong_migrations gem — the precise triple FR-010..FR-018 designs
+# the catalog around.
+
+stack_detection:
+  signals:
+    - type: file_present
+      path: Gemfile.lock
+      required: true
+    - type: file_contains
+      path: Gemfile.lock
+      pattern: 'pg \('
+      required: true
+    - type: file_contains
+      path: Gemfile.lock
+      pattern: 'strong_migrations \('
+      required: true
+    - type: file_contains
+      path: Gemfile.lock
+      pattern: 'rails \('
+      required: true

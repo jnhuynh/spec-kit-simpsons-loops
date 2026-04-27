@@ -50,7 +50,6 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
-- **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
 - Exit after each iteration — restart with fresh context
 
 <!-- ====== PROJECT SPECIFIC ====== -->
@@ -78,6 +77,7 @@ The **source of truth** for SpecKit command and agent files lives in the repo ro
 - Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `jq`) (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`) (006-stop-after-param)
+- Ruby 3.2+ for the phaser engine and reference flavor (per the spec's Assumptions section: "the phaser engine is implemented in a language that allows the reference flavor to parse its target language's source files natively. The user's input nominates Ruby for this purpose"). Bash 4+ and Markdown for SpecKit command/agent files, consistent with the rest of the repository. RSpec for engine and flavor unit tests; rubocop for Ruby linting. (007-multi-phase-pipeline)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)

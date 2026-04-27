@@ -1,0 +1,23 @@
+# JSON Schema (YAML-encoded) for .specify/flavor.yaml
+# Implements FR-019, FR-031, FR-032. Presence opts the project into phasing; absence preserves single-PR behavior (FR-025).
+
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://speckit.simpsons.local/schemas/flavor-config.schema.yaml
+title: FlavorConfiguration
+description: Selects which shipped flavor a project uses. File presence is the opt-in gate.
+type: object
+additionalProperties: false
+required:
+  - flavor
+
+properties:
+  flavor:
+    type: string
+    description: The shipped flavor name. MUST resolve to a directory under phaser/flavors/.
+    pattern: ^[a-z][a-z0-9-]*$
+
+# Notes:
+# - When this file is absent, the modified speckit.pipeline.md skips the phaser stage entirely
+#   and behavior is byte-identical to the pre-feature pipeline (FR-025, SC-006).
+# - When this file is present but `flavor` references an unknown name, the pipeline halts with
+#   a clear error listing shipped flavors (Edge Cases in spec.md).

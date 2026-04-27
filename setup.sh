@@ -163,6 +163,7 @@ cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
 cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
+cp "$SCRIPT_DIR/claude-agents/phaser.md"                        "$PROJECT_DIR/.claude/agents/phaser.md"
 cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
 cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
 cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
@@ -172,12 +173,15 @@ cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.claude/commands/speckit.marge.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.phaser.md"             "$PROJECT_DIR/.claude/commands/speckit.phaser.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.flavor.init.md"        "$PROJECT_DIR/.claude/commands/speckit.flavor.init.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
+echo "    .claude/agents/phaser.md"
 echo "    .claude/agents/plan.md"
 echo "    .claude/agents/tasks.md"
 echo "    .claude/agents/specify.md"
@@ -187,6 +191,44 @@ echo "    .claude/commands/speckit.homer.clarify.md"
 echo "    .claude/commands/speckit.marge.review.md"
 echo "    .claude/commands/speckit.review.md"
 echo "    .claude/commands/speckit.pipeline.md"
+echo "    .claude/commands/speckit.phaser.md"
+echo "    .claude/commands/speckit.flavor.init.md"
+
+# ── 2a. Install phaser/ entry points (R-017, D-015) ─────────────────
+# The phaser engine is shipped as a Ruby toolkit under $SCRIPT_DIR/phaser/.
+# Target projects access it via a `phaser/` symlink at the project root so
+# the documented invocation path `phaser/bin/phaser-flavor-init` (and the
+# other phaser bins) resolves. Idempotent: an existing correct symlink is
+# left alone; a stale link is replaced; a real `phaser/` directory in the
+# target is preserved with a warning.
+
+PHASER_LINK="$PROJECT_DIR/phaser"
+PHASER_SOURCE="$SCRIPT_DIR/phaser"
+
+# Ensure the source-of-truth entry points are executable (git on some
+# filesystems may not preserve the bit). All three phaser bin wrappers
+# are tracked as 100755 in the index, so chmod every one of them to keep
+# the documented invocation paths working uniformly.
+chmod +x "$PHASER_SOURCE/bin/phaser"
+chmod +x "$PHASER_SOURCE/bin/phaser-flavor-init"
+chmod +x "$PHASER_SOURCE/bin/phaser-stacked-prs"
+
+if [[ -L "$PHASER_LINK" ]]; then
+  current_target="$(readlink "$PHASER_LINK")"
+  if [[ "$current_target" == "$PHASER_SOURCE" ]]; then
+    echo "  phaser/ symlink already points to $PHASER_SOURCE — skipped"
+  else
+    rm "$PHASER_LINK"
+    ln -s "$PHASER_SOURCE" "$PHASER_LINK"
+    echo "  Updated phaser/ symlink → $PHASER_SOURCE"
+  fi
+elif [[ -e "$PHASER_LINK" ]]; then
+  echo "  WARNING: $PHASER_LINK exists and is not a symlink — leaving untouched."
+  echo "           The phaser entry points may not resolve from $PROJECT_DIR/phaser/bin/."
+else
+  ln -s "$PHASER_SOURCE" "$PHASER_LINK"
+  echo "  Created phaser/ symlink → $PHASER_SOURCE"
+fi
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship with the template. Copy each baseline file to
