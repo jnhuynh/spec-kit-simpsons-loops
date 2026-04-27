@@ -25,6 +25,7 @@ Marge's loop agent invokes this in remediate-one mode. Humans typically invoke i
 
 - Default: `git diff $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD`. This is the feature branch's diff against its merge base with main.
 - If `$ARGUMENTS` contains a token matching `pr:<number>` or a GitHub PR URL, fetch via `gh pr diff <number>` instead.
+- If `$ARGUMENTS` contains a token matching `range:<base>...<head>` (e.g., `range:feature-foo-phase-1...feature-foo-phase-2`), fetch via `git diff <base>...<head>` instead. Used by `/speckit.marge.review --phase <N>` to scope the review to a single phase's diff range as resolved from `<FEATURE_DIR>/phase-manifest.yaml` (FR-022 / R-012). The `<base>...<head>` substring is passed verbatim to `git diff` — it must be a valid symmetric-difference range expression. The `range:` and `pr:` tokens are mutually exclusive; if both are present, abort: "range: and pr: cannot be combined — pass only one diff-scope token."
 - If the diff is empty, abort: "No changes to review."
 
 Capture the diff AND the list of modified files.
@@ -148,6 +149,7 @@ If in remediate-one mode, additionally print which finding was remediated and wh
 - `/speckit.review` — Report mode, default scope (feature branch vs main)
 - `/speckit.review specs/001-feat-auth` — Report mode with feature-artifact cross-reference
 - `/speckit.review pr:123` — Report mode against PR #123
+- `/speckit.review range:feature-foo-phase-1...feature-foo-phase-2` — Report mode against a phase diff range (used by `/speckit.marge.review --phase <N>` per FR-022 / R-012)
 - `/speckit.review --strict` — Report mode, include low-confidence findings
 - `/speckit.review --show low` — Report mode, expand the Low bucket
 - `/speckit.review Remediate only the single highest-severity finding without asking for confirmation` — Remediate-one mode (used by Marge Phase 0)
