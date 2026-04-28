@@ -1,6 +1,6 @@
 # Data Model: Multi-Phase Deploy Support
 
-This feature introduces no new database tables, no new persistent state stores, and no new in-memory data structures. It introduces **eight named entities** that live entirely in Markdown files and Git refs. They are documented here so the implementation can refer to a single canonical definition.
+This feature introduces no new database tables, no new persistent state stores, and no new in-memory data structures. It introduces **nine named entities** that live entirely in Markdown files and Git refs (matching the "Key Entities" list in spec.md). They are documented here so the implementation can refer to a single canonical definition.
 
 ## Entities
 
@@ -150,6 +150,29 @@ A pull request produced by the split step for each phase branch, forming a stack
 - For single-phase features, exactly one pull request is opened against `main` (FR-019), matching today's behavior.
 
 **Storage**: GitHub repository (managed via `gh pr create` and `gh pr edit`).
+
+---
+
+### Per-Phase Finding
+
+A review finding tagged with the phase number that introduced the issue. Used by the split step to gate which pull requests it is willing to open (FR-011, FR-018).
+
+| Attribute | Type | Description |
+|---|---|---|
+| `id` | String | Stable per-finding identifier the review step assigns (matches the `ID` column of the Review Report row) |
+| `severity` | Enum | `high`, `medium`, `low`, `informational`; only `high` gates the split step |
+| `phase` | Integer or `-` | Integer phase number for findings attributable to a single phase (multi-phase); literal `-` for single-phase features OR for structural inconsistencies the migration-safety check pack cannot attribute (S3, S4) |
+| `status` | Enum | `open`, `resolved`; the split step treats anything other than `resolved` as gating |
+| `check_pack` | String | Source check pack filename (informational; not used for gating) |
+| `summary` | String | Single-sentence description |
+
+**Validation rules**:
+
+- A Per-Phase Finding is **not** a standalone artifact; it is a row of the Review Report (see below). This entry exists in the data model because spec.md lists it under "Key Entities" so the implementation can reason about gating semantics by name; the canonical schema and storage are the Review Report's table rows.
+- For multi-phase features, the Phase column carries the integer phase number for findings attributable to a single phase, or `-` for structural inconsistencies. For single-phase features, every finding's Phase column is `-` per FR-012a.
+- The split step's gating contract (FR-018) operates on Per-Phase Findings via the Review Report parser; it does not introduce any other access path.
+
+**Storage**: As a row of `<FEATURE_DIR>/review-report.md` (see Review Report below). No separate file or in-memory representation.
 
 ---
 
