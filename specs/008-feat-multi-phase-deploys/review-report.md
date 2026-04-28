@@ -7,4 +7,4 @@ This is a single-phase feature for the spec-kit repository itself (`plan.md` has
 | ID | Severity | Phase | Status | Check Pack | Summary |
 | --- | -------- | ----- | -------- | ---------------- | ------- |
 | F001 | low | - | resolved | architecture.md | M8 entry in `.specify/marge/checks/migrations.md` had a duplicated `**Severity:** HIGH.` marker and two consecutive `Signal:` paragraphs (A6 / A7); consolidated into one severity marker and one merged signal description. |
-| F002 | low | - | open | architecture.md | `CLAUDE.md` Active Technologies entry for 008-feat-multi-phase-deploys lists `Claude CLI (\`claude\` command)` twice (A7 copy-paste duplication) — leave the trailing duplicate to be removed in a subsequent iteration. |
+| F002 | low | - | resolved | architecture.md | `CLAUDE.md` Active Technologies entry for 008-feat-multi-phase-deploys listed `Claude CLI (\`claude\` command)` twice (A7 copy-paste duplication); removed the trailing duplicate so the entry mirrors the structure of the other Active Technologies rows. |
