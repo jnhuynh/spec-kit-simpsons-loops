@@ -40,12 +40,30 @@ If validation fails:
 ## Phase 3: Commit & Exit
 
 1. Mark task `- [x]` in tasks.md
-2. Commit and push:
+2. **Detect the task's phase tag** (multi-phase feature support):
+   - Inspect the just-completed task's entry in `tasks.md` for a `[phase-N]` tag (e.g., `[phase-2]`).
+   - If the task entry carries `[phase-N]`, set `PHASE=N` (an integer).
+   - If the task entry has no `[phase-N]` tag, leave `PHASE` unset — the commit message MUST NOT include a `Phase:` trailer in this case. Do NOT silently default to `Phase: 1` in the commit text; an absent tag means an absent trailer.
+   - This applies uniformly: single-phase features (no `## Deploy Phases` section in `plan.md`, no `[phase-N]` tags in `tasks.md`) produce commits without the trailer; multi-phase features produce one trailer per task whose value matches the task's tag.
+3. Commit (do NOT push — see Guardrails):
    ```bash
-   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] [task summary]"
-   git push origin $(git branch --show-current)
+   git add -A
+   type=$(git branch --show-current | cut -f 2 -d '-')
+   scope=$(git branch --show-current | cut -f 3- -d '-')
+   ticket=$(git branch --show-current | cut -f 1 -d '-')
+   subject="$type($scope): [$ticket] [task summary]"
+
+   # Multi-phase: append a Phase: N git trailer (RFC 5322) when the task carries [phase-N].
+   # Use --trailer so git interpret-trailers / git log --format='%(trailers:key=Phase,valueonly)'
+   # parse it deterministically. Omit the flag entirely when the task has no phase tag.
+   if [ -n "${PHASE:-}" ]; then
+     git commit -m "$subject" --trailer "Phase: $PHASE"
+   else
+     git commit -m "$subject"
+   fi
    ```
-3. Exit immediately — you will restart with fresh context for the next task
+4. **Do NOT push.** All implementation work for a multi-phase feature MUST occur on a single feature branch end to end before any pull request is opened (FR-008). The split step (`/speckit.split`) is responsible for creating phase branches and opening pull requests after Marge review completes; pushing the integrated feature branch from Ralph is not part of the loop. Per CLAUDE.md "Git Discipline", pushing is gated behind explicit user permission.
+5. Exit immediately — you will restart with fresh context for the next task
 
 ## Guardrails
 
