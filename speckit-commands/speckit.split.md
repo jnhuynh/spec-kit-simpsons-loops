@@ -398,7 +398,7 @@ The single-phase row uses `Phase` = `single`, `Branch` = `<feature_branch_name>`
 
 Overwrite `<FEATURE_DIR>/split-report.md` with the report. The file MAY contain optional human-readable prose before/after the table; the machine-readable surface is **exactly one** GFM table.
 
-Required header row, in this exact order:
+Required header row, in this exact order (no deviation permitted — the pipeline orchestrator parses the table by matching this header exactly):
 
 ```markdown
 | Phase | Status | Branch | PR URL | Reason |
@@ -408,12 +408,27 @@ Required header row, in this exact order:
 For each row written during Steps 7c or 8c (in deploy order, or the single row for single-phase, or the single `failed` row from Step 4):
 
 - `Phase`: integer phase number (multi-phase) or literal `single` (single-phase).
-- `Status`: one of `created`, `updated`, `unchanged`, `skipped-merged`, `gated`, `failed`.
+- `Status`: one of the six terminal statuses below (exactly one per row per run).
 - `Branch`: the phase branch name (multi-phase), the feature branch name (single-phase), or literal `-` only when the run failed before resolving the branch name (e.g., fetch failure).
 - `PR URL`: the pull-request URL, or literal `-` when omitted.
-- `Reason`: single-sentence explanation, or literal `-`. Pipe characters in cell values MUST be escaped as `\|`.
+- `Reason`: single-sentence explanation, or literal `-`.
 
-The file MUST be overwritten in full on every run (never appended to). If the file cannot be written (e.g., permission error), surface the failure and **STOP**.
+The six terminal statuses MUST be emitted exactly as follows (matching `specs/008-feat-multi-phase-deploys/contracts/split-report.md`):
+
+| Status | Emitted when |
+|---|---|
+| `created` | Phase branch did not exist on the remote; this run created the branch and opened a new pull request. PR URL is the newly-opened PR. |
+| `updated` | Phase branch existed on the remote; this run rebuilt it (force-pushed via `--force-with-lease`) and/or rewrote the PR title/body. PR URL is the existing PR. |
+| `unchanged` | Recomputed branch SHA already matched `origin/<phase_branch_name>` AND the existing PR title and body already matched the recomputed values. No force-push, no `gh pr edit`. PR URL is the existing PR if available. |
+| `skipped-merged` | Phase branch's pull request was already merged into `origin/main`; the split step skipped rebuild to protect shipped history (FR-017). Reason cites the merged state. |
+| `gated` | Phase has an unresolved high-severity finding in `<FEATURE_DIR>/review-report.md` (or is downstream of a gated phase, or the global gate is non-empty); the split step refused to open or update the pull request (FR-018). Reason cites the gating finding's ID and summary. |
+| `failed` | Split step failed fast on this phase per FR-017's fail-fast rule. Reason cites the failure (e.g., `gh pr create` exit code, cherry-pick conflict, fetch failure). |
+
+**Cell-value escaping**: Pipe (`|`) characters in **any** cell value (Phase, Status, Branch, PR URL, Reason) MUST be escaped as `\|` so that `awk -F '|'` parses the table cleanly. The header row's pipes are NOT escaped (they are the delimiters).
+
+**Empty cells use the literal `-`**: Empty cells MUST use the literal `-` rather than an empty cell, except where the schema explicitly allows a string (e.g., a non-`-` Reason on `failed`/`gated`/`skipped-merged` rows).
+
+The file MUST be overwritten in full on every run (never appended to). If the file cannot be written (e.g., permission error), surface the failure and **STOP**. The pipeline orchestrator treats absence of `<FEATURE_DIR>/split-report.md` after a split-step invocation as a split-step failure (FR-019a). The one exception is Step 3 (review-report missing), which is a refusal to run rather than a run that failed: per Step 3's instructions the split step displays the verbatim error and exits without writing the split-report — the orchestrator's absence-equals-failure invariant correctly surfaces this as a failure to the author. Step 4 (fetch failure) and every per-phase fail-fast path persist a `failed` row before stopping so the report is always written when the step actually progressed past Step 3.
 
 ### Step 10: Mirror Summary to Stdout
 
