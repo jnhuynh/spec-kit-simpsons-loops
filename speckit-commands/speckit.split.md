@@ -213,7 +213,23 @@ Group commits by phase number. For commits with no `Phase:` trailer, default the
    - `expected_title` = `[Phase K/N] ${feature_branch_name}`
    - `expected_body` = the deterministic body composed per the FR-016 layout below.
 
-2. **`skipped-merged` check (FR-017)**: If the remote branch `phase_branch_name` exists AND its corresponding pull request is already merged into `origin/main` (verify via `gh pr list --base main --head phase_branch_name --state merged --json number,url`), write a `skipped-merged` row with the merged PR URL preserved in the `PR URL` column and a reason citing the merged state. **Continue to phase K+1** without rebuilding.
+2. **`skipped-merged` check (FR-017)**: If the remote branch `phase_branch_name` exists AND its corresponding pull request is already merged into `origin/main`, treat the phase as **immutable history** — skip rebuilding, never force-push, and never invoke `gh pr edit`. Verify the merged state via:
+
+   ```bash
+   gh pr list --base main --head <phase_branch_name> --state merged --json number,url --jq '.[0]'
+   ```
+
+   If the query returns a non-empty result (i.e., a merged PR exists for the phase branch with `main` as base), write a `skipped-merged` row to the in-memory split-report rows with:
+
+   - `Phase` = K
+   - `Status` = `skipped-merged`
+   - `Branch` = `<phase_branch_name>`
+   - `PR URL` = the merged PR's URL (preserved verbatim)
+   - `Reason` = `Phase K pull request <pr-url> is already merged into origin/main; skipping rebuild to preserve shipped history.` (escape pipe characters as `\|`)
+
+   **Continue to phase K+1** without rebuilding. Do NOT run `git checkout -B`, `git reset --hard`, `git cherry-pick`, `git push`, or `gh pr edit` for this phase.
+
+   **Rationale**: This is the **only** safeguard against the spec-freeze edge case where a `tasks.md` `[phase-N]` tag is changed after commits with that tag have already shipped to `main`. Once a phase pull request is merged, its commits are part of `main`'s permanent history; force-pushing the phase branch (or rewriting its PR) would diverge from what was actually deployed. The split step refuses to do so per FR-017. Authors who need to amend a shipped phase MUST open a follow-up feature instead of re-running `/speckit.split`.
 
 3. **Gating check (FR-018)**:
    - If `global_gate` is non-empty: write a `gated` row with reason `Global gate: <id> (<summary>)` (citing the first global-gate finding). **Continue to phase K+1.**
@@ -381,6 +397,8 @@ This mirrors the persisted report's rows so a human running the command sees the
 | `git push --force-with-lease` rejected | Write `failed` row for phase K with reason; **STOP**. Author must reconcile manually |
 
 In every fail-fast case, phase branches and pull requests built earlier in the same run are left in their successfully-completed state. The next idempotent re-run resumes from the failed phase per the contract in `specs/008-feat-multi-phase-deploys/contracts/split-command.md` "Failure handling" section.
+
+**`skipped-merged` is not a failure**: When a phase pull request is already merged into `origin/main`, the split step writes a `skipped-merged` row (per Step 7c.2) and continues to phase K+1. This is a successful terminal status — it protects shipped history from being rewritten when a `[phase-N]` tag in `tasks.md` is changed after commits with that tag have already shipped (the spec-freeze edge case). The run proceeds normally for unmerged phases; only an actual error triggers fail-fast.
 
 ## Persisted Split Report (FR-019a)
 
