@@ -10,6 +10,7 @@
 ### Session 2026-04-27
 
 - Q: When the split step fails partway through opening a stack of pull requests (for example, `gh pr create` succeeds for phase 1 but errors on phase 2 because of a network or API failure), what should the split step do? → A: Fail fast on first error, leave successfully-created branches and pull requests in place, and rely on idempotent re-runs to complete the stack.
+- Q: How does the split step discover review findings so it can enforce the per-phase gating rule in FR-018, given that today's review step prints findings to stdout only and does not persist them? → A: The review step persists its report to `<FEATURE_DIR>/review-report.md` on every run; the split step reads that file to identify unresolved high-severity findings and their phase tags. Absence of the file means the split step refuses to run and instructs the author to run review first.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -114,6 +115,7 @@ When the split step runs more than once on the same feature branch — because t
 - **FR-010**: The migration-safety check pack MUST cover at minimum: NOT NULL column adds without default; column drops while prior-phase code still reads them; renames executed in a single phase rather than the four-step expand-contract pattern; long-transaction backfills on hot tables; missing index for a new read path; phases containing both a schema change and code that depends on the new schema; removed function or endpoint while prior-phase callers still exist; per-phase deployability (each phase must be deployable on top of `main + earlier phases` while previous-phase code is still running).
 - **FR-011**: When the feature is multi-phase, every review finding MUST be tagged with the phase that introduced the issue.
 - **FR-012**: The review step MUST run once on the whole integrated feature branch before the split step runs. Per-phase review MUST be expressed as findings tagged by phase, not as separate per-phase review passes.
+- **FR-012a**: The review step MUST persist its findings report to `<FEATURE_DIR>/review-report.md` on every run, overwriting any prior copy. The persisted report MUST include each finding's severity, phase tag (when the feature is multi-phase), and resolution status, so downstream steps can read it deterministically.
 
 #### Splitting
 
@@ -122,7 +124,7 @@ When the split step runs more than once on the same feature branch — because t
 - **FR-015**: For each phase 1..N, the split step MUST create a stacked branch named `NNNN-<type>-<slug>-phaseK` (where `NNNN-<type>-<slug>` is the feature branch name and `K` is the phase number) by cherry-picking that phase's commits onto the previous phase's branch (or onto `main` for phase 1).
 - **FR-016**: The split step MUST open a pull request for every phase branch immediately, with the correct base-branch chain (`main` <- phase1 <- phase2 <- ... <- phaseN), so reviewers can read them in sequence.
 - **FR-017**: The split step MUST be idempotent: re-running it MUST update existing phase branches and pull requests in place rather than creating duplicates. When the split step encounters an error while creating or updating a phase branch or its pull request (for example, a `gh pr create` failure on phase K), it MUST fail fast on the first error, leave already-completed phase branches and pull requests in place, and report which phase failed and why so that an idempotent re-run can resume from the failed phase.
-- **FR-018**: The split step MUST refuse to open or update a pull request for any phase that has an unresolved high-severity review finding tagged to it. The split step MUST report which finding blocked which phase.
+- **FR-018**: The split step MUST refuse to open or update a pull request for any phase that has an unresolved high-severity review finding tagged to it. The split step MUST read findings from the persisted review report at `<FEATURE_DIR>/review-report.md` (see FR-012a). If the review report is missing, the split step MUST refuse to run and instruct the author to run the review step first. The split step MUST report which finding blocked which phase.
 - **FR-019**: When the feature is single-phase (no "Deploy Phases" section in the plan), the split step MUST produce exactly one pull request against `main`, matching today's single-PR behavior, with no additional branches created.
 
 #### Pipeline orchestration
@@ -152,6 +154,7 @@ When the split step runs more than once on the same feature branch — because t
 - **Phase Branch**: A stacked branch produced by the split step, named `NNNN-<type>-<slug>-phaseK`. Contains the cherry-picked commits for one phase and is based on either `main` (phase 1) or the previous phase's branch.
 - **Phase Pull Request**: A pull request produced by the split step for each phase branch. Forms a stack with the correct base-branch chain so reviewers read phases in deploy order.
 - **Per-Phase Finding**: A review finding tagged with the phase number that introduced the issue. Used by the split step to gate which pull requests it is willing to open.
+- **Review Report**: A persisted artifact at `<FEATURE_DIR>/review-report.md` produced by the review step on every run. Lists all findings (severity, phase tag when multi-phase, resolution status). Read by the split step to enforce per-phase gating without re-running review.
 
 ## Success Criteria *(mandatory)*
 
