@@ -140,7 +140,9 @@ Marge MUST run exactly **one review pass** on the integrated feature branch, reg
 
 ## Migration-Safety Check Pack
 
-The migration-safety check pack at `.specify/marge/checks/migrations.md` is loaded automatically by the existing check-pack discovery loop (which scans `.specify/marge/checks/*.md` by filename). No agent-side discovery code changes are required to pick it up. The pack covers the eight production-breaking patterns M1-M8 and the four structural-consistency patterns S1-S4 per FR-009 and FR-010.
+The migration-safety check pack at `.specify/marge/checks/migrations.md` is loaded automatically by the existing check-pack discovery loop, which lives in `speckit-commands/speckit.review.md` ("Discover every `*.md` file under `.specify/marge/checks/` via Glob"). The discovery loop scans `.specify/marge/checks/*.md` by filename, so dropping `migrations.md` into that directory is sufficient to make it discoverable per FR-023 — no agent-side discovery code changes are required to pick it up. The pack covers the eight production-breaking patterns M1-M8 and the four structural-consistency patterns S1-S4 per FR-009 and FR-010.
+
+**Verification (FR-023)**: The check-pack discovery is filename-driven (glob over `.specify/marge/checks/*.md`), not allow-list-driven. When `migrations.md` is present in the checks directory, it is loaded alongside the other baseline packs (`architecture.md`, `generic-bugs.md`, `security.md`, `testing.md`) without any modification to `claude-agents/marge.md` or `speckit-commands/speckit.review.md`. When `migrations.md` is absent (single-phase project that did not seed it via `setup.sh`), the loop simply does not load it — Marge continues to function with the remaining packs. This makes the migration-safety pack opt-in by file presence, consistent with the rest of the check-pack loading model.
 
 ## Guardrails
 
