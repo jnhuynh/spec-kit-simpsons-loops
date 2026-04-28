@@ -5,6 +5,12 @@
 **Status**: Draft
 **Input**: User description: "Add multi-phase deploy support to the speckit + Simpsons-loops pipeline so a single feature can ship as a stack of independently-deployable PRs."
 
+## Clarifications
+
+### Session 2026-04-27
+
+- Q: When the split step fails partway through opening a stack of pull requests (for example, `gh pr create` succeeds for phase 1 but errors on phase 2 because of a network or API failure), what should the split step do? → A: Fail fast on first error, leave successfully-created branches and pull requests in place, and rely on idempotent re-runs to complete the stack.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Author a multi-phase feature end to end (Priority: P1)
@@ -82,6 +88,7 @@ When the split step runs more than once on the same feature branch — because t
 - The author runs the pipeline against a feature that produces only one phase even though a "Deploy Phases" section is present. The split step must produce exactly one PR (matching single-phase behavior) rather than an empty stack.
 - A phase contains code that references symbols that will only be introduced in a later phase. The review step must flag this as a per-phase deployability violation.
 - Cherry-picking a phase's commits onto the previous phase branch produces a merge conflict. The split step must report the conflict and stop rather than committing a partial stack; conflict resolution is a manual step in this iteration.
+- Pull-request creation fails partway through the stack (for example, `gh pr create` succeeds for phase 1 but returns a network or API error on phase 2). The split step must fail fast on the first error, leave successfully-created phase branches and pull requests in place, report which phase failed and why, and rely on its idempotent re-run behavior (FR-017) to complete or repair the stack on the next invocation.
 
 ## Requirements *(mandatory)*
 
@@ -114,7 +121,7 @@ When the split step runs more than once on the same feature branch — because t
 - **FR-014**: Commits without a `Phase:` trailer MUST default to phase 1 for grouping purposes.
 - **FR-015**: For each phase 1..N, the split step MUST create a stacked branch named `NNNN-<type>-<slug>-phaseK` (where `NNNN-<type>-<slug>` is the feature branch name and `K` is the phase number) by cherry-picking that phase's commits onto the previous phase's branch (or onto `main` for phase 1).
 - **FR-016**: The split step MUST open a pull request for every phase branch immediately, with the correct base-branch chain (`main` <- phase1 <- phase2 <- ... <- phaseN), so reviewers can read them in sequence.
-- **FR-017**: The split step MUST be idempotent: re-running it MUST update existing phase branches and pull requests in place rather than creating duplicates.
+- **FR-017**: The split step MUST be idempotent: re-running it MUST update existing phase branches and pull requests in place rather than creating duplicates. When the split step encounters an error while creating or updating a phase branch or its pull request (for example, a `gh pr create` failure on phase K), it MUST fail fast on the first error, leave already-completed phase branches and pull requests in place, and report which phase failed and why so that an idempotent re-run can resume from the failed phase.
 - **FR-018**: The split step MUST refuse to open or update a pull request for any phase that has an unresolved high-severity review finding tagged to it. The split step MUST report which finding blocked which phase.
 - **FR-019**: When the feature is single-phase (no "Deploy Phases" section in the plan), the split step MUST produce exactly one pull request against `main`, matching today's single-PR behavior, with no additional branches created.
 
