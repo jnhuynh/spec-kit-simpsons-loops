@@ -31,7 +31,7 @@ Always edit the source-of-truth files. Never edit `.claude/commands/*.md` or `.c
 
 **Purpose**: Confirm the source-of-truth directories and tooling required by every later phase are present and functioning.
 
-- [ ] T001 Run pre-flight checks from `specs/008-feat-multi-phase-deploys/quickstart.md` ("Pre-flight" section) to confirm `speckit-commands/`, `claude-agents/`, `.specify/marge/checks/`, `.specify/templates/`, and `templates/` exist; confirm `git` (2.32+ for trailer extraction), `gh` (authenticated), and `.specify/scripts/bash/check-prerequisites.sh` are available
+- [x] T001 Run pre-flight checks from `specs/008-feat-multi-phase-deploys/quickstart.md` ("Pre-flight" section) to confirm `speckit-commands/`, `claude-agents/`, `.specify/marge/checks/`, `.specify/templates/`, and `templates/` exist; confirm `git` (2.32+ for trailer extraction), `gh` (authenticated), and `.specify/scripts/bash/check-prerequisites.sh` are available
 
 ---
 
