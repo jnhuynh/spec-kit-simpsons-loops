@@ -187,6 +187,49 @@ The split step is fully idempotent: re-running with the same `(feature branch co
 
 This logic is implemented step-by-step in Step 7 (multi-phase) and Step 8 (single-phase) below; this section is the consolidated contract that those steps satisfy.
 
+### Fail-Fast Error Handling (FR-017)
+
+The split step uses **strict fail-fast** semantics: the first error during a phase's create-or-update sequence halts the entire run. No subsequent phases are processed; no recovery is attempted. The contract is:
+
+1. **Triggering errors**. The following non-zero exit codes during a phase K's processing are fail-fast errors:
+
+   | Step | Failing operation | Reason wording (verbatim into split-report `Reason`) |
+   |---|---|---|
+   | 7c.4 | `git cherry-pick <commit>` returns non-zero (conflict) | `Cherry-pick conflict on commit <sha>: <conflict description>. Resolve manually then re-run /speckit.split.` |
+   | 7c.4 | `git push --force-with-lease origin <phase_branch_name>` rejected | `Force-with-lease rejected on <phase_branch_name>: <stderr verbatim>. Reconcile manually then re-run /speckit.split.` |
+   | 7c.5 | `gh pr create` returns non-zero | `gh pr create failed: <stderr verbatim>` |
+   | 7c.5 | `gh pr edit` returns non-zero | `gh pr edit failed: <stderr verbatim>` |
+   | 8c | `gh pr create` or `gh pr edit` returns non-zero (single-phase) | `<gh subcommand> failed: <stderr verbatim>` |
+
+   Pre-flight failures (`git fetch origin main` from Step 4, missing review report from Step 3) are handled separately and produce the single `failed` row described in those steps; they are fail-fast in the same sense (no later phases are processed) but they happen before any phase enumeration.
+
+2. **Fail-fast actions on the first triggering error in phase K**:
+
+   1. Cancel any in-progress git operation for phase K cleanly: `git cherry-pick --abort` if the cherry-pick is mid-flight; otherwise no cleanup is needed (the operation already returned).
+   2. Append a single `failed` row for phase K to the in-memory split-report rows with:
+      - `Phase` = K (or `single` for Step 8c failures)
+      - `Status` = `failed`
+      - `Branch` = `<phase_branch_name>` (or feature branch name for single-phase)
+      - `PR URL` = `-` (the PR was not created or could not be confirmed)
+      - `Reason` = the verbatim wording from the table above (escape pipe characters as `\|`)
+   3. **Skip every phase K+1..N**. Do NOT enumerate, compute, or write rows for later phases. The split-report's last row is the `failed` row.
+   4. Persist `<FEATURE_DIR>/split-report.md` per Step 9 with the rows accumulated so far (every successful phase 1..K-1 in `created`/`updated`/`unchanged`/`skipped-merged`/`gated` plus the single `failed` row for phase K).
+   5. Mirror a final failure summary to stdout per Step 10 and **STOP** — exit the command without proceeding to phase K+1.
+
+3. **Already-completed phases are preserved on the remote**. Phases 1..K-1 that successfully reached `created`, `updated`, `unchanged`, `skipped-merged`, or `gated` before phase K failed remain in their successful state on the remote (their branches and pull requests are not rolled back). The fail-fast rule halts forward progress; it never reverts prior progress within the same run.
+
+4. **Idempotent re-run resumes from phase K**. Because the split step is fully idempotent (per "Idempotent Rebuild Logic" above), re-running `/speckit.split` after the operator resolves the failure cause (e.g., manually resolves the cherry-pick conflict, retries after a transient `gh` error, reconciles a concurrent remote change) produces:
+   - `unchanged` rows for phases 1..K-1 whose remote state still matches the recomputed state (the common case).
+   - A fresh attempt at phase K, which now succeeds and reports `created` or `updated`.
+   - Normal processing of phases K+1..N.
+   The deterministic naming convention `<feature_branch_name>-phaseK` ensures the next run finds and updates the same phase branches without creating duplicates.
+
+5. **No partial rows for the failed phase**. The split-report contains **exactly one row** for phase K when phase K fails: the `failed` row. The split step does NOT write a partial `created`/`updated` row before falling back to `failed` — the row is committed to the in-memory list only after the phase's terminal status is determined.
+
+6. **No retry loop**. The split step does NOT retry the failing operation, sleep, or back off. The author retries by re-running `/speckit.split` after addressing the cause. This keeps the command deterministic and side-effect-free between retries.
+
+This logic is implemented in the per-phase steps 7c.4 and 7c.5 (multi-phase) and Step 8c (single-phase) below. The Failure Handling Summary at the end of this command file enumerates the same failure modes with their actions; that table is the human-readable index, while this section is the consolidated contract that those steps satisfy.
+
 ### Step 7: Multi-Phase Execution
 
 7a. **Resolve feature branch metadata**:
