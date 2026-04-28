@@ -20,21 +20,27 @@ A named step in a phased rollout, declared in `plan.md` under a `## Deploy Phase
 - A `## Deploy Phases` section MUST contain at least one phase entry. A section with zero phases is malformed.
 - Each phase entry MUST contain both a goal and a post-deploy-state description. Missing fields are caught by the plan agent at generation time and flagged by Marge during review.
 
-**Storage**: `plan.md` `## Deploy Phases` section, with phase entries as sub-sections or bullet points (the plan template specifies the exact rendering — see `.specify/templates/plan-template.md` after modification).
+**Storage**: `plan.md` `## Deploy Phases` section. Each phase entry MUST use the canonical machine-parseable format pinned by FR-001: a third-level heading `### Phase K: <title>` followed by two labelled fields `**Goal**: <goal text>` and `**Post-deploy production state**: <post-deploy text>`. The split step parses this format to extract goal and post-deploy text verbatim into the FR-016 PR body sections; the plan template (`.specify/templates/plan-template.md` after T006) MUST render every phase entry in this format.
 
-**Example** (from spec.md illustration):
+**Canonical example** (normative — every multi-phase plan MUST use this format):
 
 ```markdown
 ## Deploy Phases
 
-Phase 1: Add new column (additive, backward-compatible)
-  Goal: Schema in place; old code continues to work unchanged.
-  Prod state after deploy: `users.new_pii` exists, nullable, all rows NULL.
+### Phase 1: Add new column (additive, backward-compatible)
 
-Phase 2: Dual-write + backfill
-  Goal: New writes populate both columns. Historical rows backfilled.
-  Prod state after deploy: `users.new_pii` populated for all rows; reads still use old column.
+**Goal**: Schema in place; old code continues to work unchanged.
+
+**Post-deploy production state**: `users.new_pii` exists, nullable, all rows NULL.
+
+### Phase 2: Dual-write + backfill
+
+**Goal**: New writes populate both columns. Historical rows backfilled.
+
+**Post-deploy production state**: `users.new_pii` populated for all rows; reads still use old column.
 ```
+
+The split step extracts each phase's goal text by locating the line `**Goal**: <text>` inside the corresponding `### Phase K:` block and copying `<text>` verbatim. The post-deploy text is extracted analogously from `**Post-deploy production state**: <text>`. Field values that span multiple paragraphs continue until the next labelled field, the next `### Phase K:` heading, or the end of the `## Deploy Phases` section.
 
 ---
 
