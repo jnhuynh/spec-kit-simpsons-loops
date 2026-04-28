@@ -1,5 +1,5 @@
 ---
-description: Orchestrate the full SpecKit pipeline (specify, homer, plan, tasks, lisa, ralph, marge) from feature description to reviewed implementation.
+description: Orchestrate the full SpecKit pipeline (specify, homer, plan, tasks, lisa, ralph, marge, split) from feature description to reviewed and split implementation.
 ---
 
 ## User Input
@@ -34,7 +34,7 @@ To install it, run the SpecKit setup command:
 Verify that all required agent files exist before starting the pipeline. Check each of these files using the Bash tool:
 
 ```bash
-for f in specify homer plan tasks lisa ralph marge; do
+for f in specify homer plan tasks lisa ralph marge split; do
   test -f ".claude/agents/${f}.md" && echo "${f}.md: EXISTS" || echo "${f}.md: MISSING"
 done
 ```
@@ -55,6 +55,7 @@ the behavior of each pipeline phase. Ensure all agent files are present:
   .claude/agents/lisa.md
   .claude/agents/ralph.md
   .claude/agents/marge.md
+  .claude/agents/split.md
 ```
 
 If **all** agent files exist, proceed to the Overview section below.
@@ -67,7 +68,7 @@ Orchestrate the full SpecKit pipeline directly within this session. Each step sp
 
 **STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Within each loop step, wait for one iteration to finish before starting the next. Between pipeline steps, wait for the entire step to complete before advancing. The pipeline order is non-negotiable:
 
-The pipeline runs these 7 steps in sequence:
+The pipeline runs these 8 steps in sequence:
 
 0. **specify** — Create feature spec from description (optional, auto-detected)
 1. **homer** — Iterative spec clarification & remediation
@@ -76,6 +77,7 @@ The pipeline runs these 7 steps in sequence:
 4. **lisa** — Cross-artifact consistency analysis
 5. **ralph** — Task-by-task implementation with quality gates
 6. **marge** — Iterative code review of the implementation
+7. **split** — Split the feature branch into stacked phase pull requests (multi-phase) or open a single pull request (single-phase)
 
 Between ralph and marge, two **optional polish phases** run automatically **if and only if the corresponding skill is installed** in the environment:
 
@@ -84,14 +86,16 @@ Between ralph and marge, two **optional polish phases** run automatically **if a
 
 If either skill is absent, that phase is silently skipped. These phases are **not** part of the `--from` / `--stop-after` step mapping; they always run between ralph and marge when present, and are skipped when `--stop-after ralph` halts the pipeline.
 
+The split step (step 7) handles both single-phase and multi-phase modes internally by detecting whether `<FEATURE_DIR>/plan.md` contains a `## Deploy Phases` section. The orchestrator MUST NOT introduce a separate flag, environment variable, or command-line switch to indicate multi-phase mode (FR-020) — multi-phase detection is the split step's responsibility.
+
 ## Instructions
 
 ### Step 1: Parse Arguments and Determine the spec directory
 
 Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
 
-- **`--from <step>`**: Starting step override. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. If provided, the pipeline starts from this step instead of auto-detecting.
-- **`--stop-after <step>`**: Stop-after step. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is NOT provided, `STOP_AFTER_STEP` MUST remain empty/unset so that all stop checks are no-ops and the pipeline runs all steps from the starting step through marge — identical to the behavior before `--stop-after` was added (FR-007). If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: specify, homer, plan, tasks, lisa, ralph, marge." and **STOP**.
+- **`--from <step>`**: Starting step override. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`, `split`. If provided, the pipeline starts from this step instead of auto-detecting.
+- **`--stop-after <step>`**: Stop-after step. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`, `split`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is NOT provided, `STOP_AFTER_STEP` MUST remain empty/unset so that all stop checks are no-ops and the pipeline runs all steps from the starting step through split — identical to the behavior before `--stop-after` was added (FR-007). If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: specify, homer, plan, tasks, lisa, ralph, marge, split." and **STOP**.
 - **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 
@@ -118,6 +122,7 @@ If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automaticall
 ### Step 3: Auto-detect starting step (if `--from` not specified)
 
 Check which artifacts exist to determine where to start:
+- `<FEATURE_DIR>/review-report.md` exists AND `tasks.md` has no remaining `- [ ]` → start at **split** (review has produced its persisted report; the only remaining work is to split into a stack of pull requests)
 - `tasks.md` with all `- [x]` complete (no `- [ ]` lines remaining) → start at **marge**
 - `tasks.md` with some `- [x]` complete → start at **ralph**
 - `tasks.md` with none complete → start at **lisa**
@@ -138,6 +143,7 @@ Assign a numeric index to each pipeline step for use in validation and execution
 | lisa | 4 |
 | ralph | 5 |
 | marge | 6 |
+| split | 7 |
 
 Resolve the index for the starting step (from `--from` or auto-detected) into `start_index`. If `STOP_AFTER_STEP` is set, resolve its index into `stop_after_index`. These indices are used in subsequent validation and execution plan steps.
 
@@ -145,10 +151,10 @@ Resolve the index for the starting step (from `--from` or auto-detected) into `s
 
 If `STOP_AFTER_STEP` is set, perform the following validations **before any pipeline steps execute**:
 
-1. **Value validation (FR-006)**: Verify that `STOP_AFTER_STEP` is one of the seven valid step names: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. If the value is not in this list, display the following error and **STOP** — do not execute any pipeline steps:
+1. **Value validation (FR-006)**: Verify that `STOP_AFTER_STEP` is one of the eight valid step names: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`, `split`. If the value is not in this list, display the following error and **STOP** — do not execute any pipeline steps:
 
 ```
-Invalid --stop-after value '<value>'. Valid steps: specify, homer, plan, tasks, lisa, ralph, marge.
+Invalid --stop-after value '<value>'. Valid steps: specify, homer, plan, tasks, lisa, ralph, marge, split.
 ```
 
 (Replace `<value>` with the actual invalid value the user provided.)
@@ -156,7 +162,7 @@ Invalid --stop-after value '<value>'. Valid steps: specify, homer, plan, tasks, 
 2. **Range validation (FR-005)**: If `STOP_AFTER_STEP` is set and its `stop_after_index` is less than the `start_index` (the starting step, whether set via `--from` or auto-detected), display the following error and **STOP** — do not execute any pipeline steps:
 
 ```
-Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the pipeline sequence (specify -> homer -> plan -> tasks -> lisa -> ralph -> marge).
+Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the pipeline sequence (specify -> homer -> plan -> tasks -> lisa -> ralph -> marge -> split).
 ```
 
 (Replace `<stop>` with the actual `STOP_AFTER_STEP` value and `<start>` with the actual starting step name.)
@@ -170,12 +176,12 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 
 ### Step 4b: Execution Plan Announcement
 
-Before executing any steps, output an execution plan announcement listing the steps that will run. Build the list of planned steps from the starting step through either the `STOP_AFTER_STEP` (if set) or `ralph` (if not set), using the step index mapping from Step 3b.
+Before executing any steps, output an execution plan announcement listing the steps that will run. Build the list of planned steps from the starting step through either the `STOP_AFTER_STEP` (if set) or `split` (if not set), using the step index mapping from Step 3b.
 
 **Format**:
 
 - **When `--stop-after` is provided**: `Execution plan: specify -> homer -> plan. Stopping after: plan.`
-- **When `--stop-after` is NOT provided**: `Execution plan: homer -> plan -> tasks -> lisa -> ralph -> marge.`
+- **When `--stop-after` is NOT provided**: `Execution plan: homer -> plan -> tasks -> lisa -> ralph -> marge -> split.`
 
 The step names in the plan are joined with ` -> `. Only include steps from the starting step through the stop step (inclusive). When `--stop-after` is provided, append ` Stopping after: <step>.` to the announcement. When `--stop-after` is not provided, omit the "Stopping after" clause entirely.
 
@@ -202,7 +208,7 @@ Skip if `spec.md` already exists. Otherwise, spawn a sub agent:
 
 **Post-specify re-resolution**: After the specify step completes successfully, if `FEATURE_DIR` is empty or the directory does not exist, re-resolve by running `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root via Bash tool and parsing the JSON output for `FEATURE_DIR`. This is required because the specify step (via `create-new-feature.sh`) creates the feature branch and directory. If re-resolution fails, abort the pipeline with: "Specify step completed but feature directory could not be resolved." The re-resolved `FEATURE_DIR` MUST be used for all subsequent steps.
 
-**Post-step stop check**: After the specify step completes (whether it was executed or skipped because `spec.md` already exists), check if `STOP_AFTER_STEP` is set and equals `specify`. If it does, output: `Pipeline stopped after specify per --stop-after parameter. Skipping: homer, plan, tasks, lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the specify step completes (whether it was executed or skipped because `spec.md` already exists), check if `STOP_AFTER_STEP` is set and equals `specify`. If it does, output: `Pipeline stopped after specify per --stop-after parameter. Skipping: homer, plan, tasks, lisa, ralph, marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Homer (loop step)
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
@@ -221,7 +227,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to homer max), 
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from homer`.
 
-**Post-step stop check**: After the homer step completes, check if `STOP_AFTER_STEP` is set and equals `homer`. If it does, output: `Pipeline stopped after homer per --stop-after parameter. Skipping: plan, tasks, lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the homer step completes, check if `STOP_AFTER_STEP` is set and equals `homer`. If it does, output: `Pipeline stopped after homer per --stop-after parameter. Skipping: plan, tasks, lisa, ralph, marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Plan (single-shot step)
 Skip if `plan.md` already exists. Otherwise, spawn a sub agent:
@@ -230,7 +236,7 @@ Skip if `plan.md` already exists. Otherwise, spawn a sub agent:
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (plan) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from plan`.
 
-**Post-step stop check**: After the plan step completes (whether it was executed or skipped because `plan.md` already exists), check if `STOP_AFTER_STEP` is set and equals `plan`. If it does, output: `Pipeline stopped after plan per --stop-after parameter. Skipping: tasks, lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the plan step completes (whether it was executed or skipped because `plan.md` already exists), check if `STOP_AFTER_STEP` is set and equals `plan`. If it does, output: `Pipeline stopped after plan per --stop-after parameter. Skipping: tasks, lisa, ralph, marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Tasks (single-shot step)
 Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
@@ -239,7 +245,7 @@ Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (tasks) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from tasks`.
 
-**Post-step stop check**: After the tasks step completes (whether it was executed or skipped because `tasks.md` already exists), check if `STOP_AFTER_STEP` is set and equals `tasks`. If it does, output: `Pipeline stopped after tasks per --stop-after parameter. Skipping: lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the tasks step completes (whether it was executed or skipped because `tasks.md` already exists), check if `STOP_AFTER_STEP` is set and equals `tasks`. If it does, output: `Pipeline stopped after tasks per --stop-after parameter. Skipping: lisa, ralph, marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Lisa (loop step)
 Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
@@ -258,7 +264,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), s
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from lisa`.
 
-**Post-step stop check**: After the lisa step completes, check if `STOP_AFTER_STEP` is set and equals `lisa`. If it does, output: `Pipeline stopped after lisa per --stop-after parameter. Skipping: ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the lisa step completes, check if `STOP_AFTER_STEP` is set and equals `lisa`. If it does, output: `Pipeline stopped after lisa per --stop-after parameter. Skipping: ralph, marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Ralph (loop step)
 
@@ -307,7 +313,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), 
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
 
-**Post-step stop check**: After the ralph step completes, check if `STOP_AFTER_STEP` is set and equals `ralph`. If it does, output: `Pipeline stopped after ralph per --stop-after parameter. Skipping: marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Post-step stop check**: After the ralph step completes, check if `STOP_AFTER_STEP` is set and equals `ralph`. If it does, output: `Pipeline stopped after ralph per --stop-after parameter. Skipping: marge, split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Simplify (optional single-shot step — skip if skill absent)
 
@@ -356,7 +362,7 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), 
 - **agent file**: `.claude/agents/marge.md`
 
 **After** each sub agent returns:
-1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, marge is complete — proceed to reporting.
+1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, marge is complete — proceed to the split step.
 2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
 3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
 4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
@@ -364,13 +370,31 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), 
 
 **Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (marge), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from marge`.
 
+**Post-step stop check**: After the marge step completes (whether by reaching `<promise>ALL_FINDINGS_RESOLVED</promise>` or by hitting max iterations), check if `STOP_AFTER_STEP` is set and equals `marge`. If it does, output: `Pipeline stopped after marge per --stop-after parameter. Skipping: split.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the split step.
+
+#### Split (single-shot step)
+
+The split step runs after Marge completes (whether by reaching `<promise>ALL_FINDINGS_RESOLVED</promise>` or by hitting max iterations). The split step itself handles both single-phase and multi-phase modes via the `## Deploy Phases` detection in `<FEATURE_DIR>/plan.md` — the orchestrator MUST NOT introduce a separate flag, environment variable, or command-line switch to indicate multi-phase mode (FR-020).
+
+Spawn a fresh sub agent:
+
+- **subagent_type**: `general-purpose`
+- **agent file**: `.claude/agents/split.md`
+- **prompt**: `Read and follow the instructions in .claude/agents/split.md exactly. When that agent file references the slash command /speckit.split, read .claude/commands/speckit.split.md and follow its instructions directly. Feature directory: <FEATURE_DIR>. Run non-interactively.`
+
+**Verify split-report**: After the sub agent returns, verify that `<FEATURE_DIR>/split-report.md` exists via Bash tool (`test -f "<FEATURE_DIR>/split-report.md" && echo "EXISTS" || echo "MISSING"`). Per FR-019a, absence of the split report after a split-step invocation MUST be treated as a split-step failure. If the file is missing, treat the split step as failed and proceed to Step 6 (Report Results) with completion status `failure`.
+
+**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (split) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from split`.
+
+**Post-step stop check**: After the split step completes, check if `STOP_AFTER_STEP` is set and equals `split`. If it does, output: `Pipeline stopped after split per --stop-after parameter.` and proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — proceed to Step 6 (Report Results) since split is the final pipeline step.
+
 ### Step 6: Report Results
 
 After all steps complete (or after a `--stop-after` early termination), produce a completion report that includes the following sections:
 
 #### 6a: Per-Step Status Table
 
-List **all seven pipeline steps** in order, each with a status. Determine the status for each step as follows:
+List **all eight pipeline steps** in order, each with a status. Determine the status for each step as follows:
 
 - **`executed`**: The step ran during this pipeline invocation (either a sub-agent was spawned or, for loop steps, iterations were performed).
 - **`skipped`**: The step was NOT executed. This applies when:
@@ -389,13 +413,14 @@ Pipeline Step Status:
   lisa ...... stopped-by-param
   ralph ..... stopped-by-param
   marge ..... stopped-by-param
+  split ..... stopped-by-param
 ```
 
 When the pipeline was stopped early by `--stop-after`, add a line after the table: `Last executed step: <step>` indicating which step was the final one to complete (whether it was actually executed or skipped-because-artifact-existed).
 
 #### 6b: Iteration Counts
 
-For loop steps (homer, lisa, ralph, marge) that were executed, report the total number of iterations run.
+For loop steps (homer, lisa, ralph, marge) that were executed, report the total number of iterations run. The split step is single-shot (not a loop) and is reported only by its status in 6a.
 
 #### 6c: Completion Status
 
@@ -404,11 +429,11 @@ Report one of:
 - **max iterations reached** — a loop step hit its iteration limit
 - **stuck** — 2 consecutive iterations with no file changes and no completion signal
 - **failure** — a sub agent crashed or errored
-- **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before marge due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
+- **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before split due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
 
 #### 6d: Resume Suggestion
 
-If the pipeline did not complete all seven steps (whether due to `--stop-after`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`.
+If the pipeline did not complete all eight steps (whether due to `--stop-after`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`.
 
 ## Examples
 
@@ -421,5 +446,7 @@ If the pipeline did not complete all seven steps (whether due to `--stop-after`,
 - `/speckit.pipeline --stop-after plan` — Run through plan step only
 - `/speckit.pipeline --from homer --stop-after tasks` — Run homer through tasks
 - `/speckit.pipeline --stop-after homer --from specify --description "Add feature X"` — Specify and homer only
-- `/speckit.pipeline --from marge` — Review-only; assumes ralph has already landed the implementation
-- `/speckit.pipeline --stop-after ralph` — Implement but skip the review loop
+- `/speckit.pipeline --from marge` — Review and split; assumes ralph has already landed the implementation
+- `/speckit.pipeline --stop-after ralph` — Implement but skip the review and split steps
+- `/speckit.pipeline --from split` — Re-run only the split step (idempotent; updates existing stacked branches and PRs in place)
+- `/speckit.pipeline --stop-after marge` — Run through review but skip the split step (no PR stack created)
