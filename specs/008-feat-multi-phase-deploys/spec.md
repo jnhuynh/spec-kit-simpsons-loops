@@ -11,6 +11,7 @@
 
 - Q: When the split step fails partway through opening a stack of pull requests (for example, `gh pr create` succeeds for phase 1 but errors on phase 2 because of a network or API failure), what should the split step do? → A: Fail fast on first error, leave successfully-created branches and pull requests in place, and rely on idempotent re-runs to complete the stack.
 - Q: How does the split step discover review findings so it can enforce the per-phase gating rule in FR-018, given that today's review step prints findings to stdout only and does not persist them? → A: The review step persists its report to `<FEATURE_DIR>/review-report.md` on every run; the split step reads that file to identify unresolved high-severity findings and their phase tags. Absence of the file means the split step refuses to run and instructs the author to run review first.
+- Q: What concrete values are valid for the severity, phase tag, and resolution status of each finding in the persisted review report (FR-012a), so that the split step can deterministically interpret it? → A: severity is one of `high|medium|low|informational`; phase tag is the integer phase number when multi-phase and omitted when single-phase; resolution status is one of `open|resolved`, with new findings emitted as `open` and only marked `resolved` by a subsequent review pass against the same branch state. The split step treats anything other than `resolved` as gating.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -115,7 +116,12 @@ When the split step runs more than once on the same feature branch — because t
 - **FR-010**: The migration-safety check pack MUST cover at minimum: NOT NULL column adds without default; column drops while prior-phase code still reads them; renames executed in a single phase rather than the four-step expand-contract pattern; long-transaction backfills on hot tables; missing index for a new read path; phases containing both a schema change and code that depends on the new schema; removed function or endpoint while prior-phase callers still exist; per-phase deployability (each phase must be deployable on top of `main + earlier phases` while previous-phase code is still running).
 - **FR-011**: When the feature is multi-phase, every review finding MUST be tagged with the phase that introduced the issue.
 - **FR-012**: The review step MUST run once on the whole integrated feature branch before the split step runs. Per-phase review MUST be expressed as findings tagged by phase, not as separate per-phase review passes.
-- **FR-012a**: The review step MUST persist its findings report to `<FEATURE_DIR>/review-report.md` on every run, overwriting any prior copy. The persisted report MUST include each finding's severity, phase tag (when the feature is multi-phase), and resolution status, so downstream steps can read it deterministically.
+- **FR-012a**: The review step MUST persist its findings report to `<FEATURE_DIR>/review-report.md` on every run, overwriting any prior copy. For each finding, the persisted report MUST include:
+  - **severity**: one of `high`, `medium`, `low`, `informational`.
+  - **phase tag**: the integer phase number that introduced the finding when the feature is multi-phase; omitted entirely when the feature is single-phase.
+  - **resolution status**: one of `open` (the finding has not been addressed in the current branch state) or `resolved` (the finding was addressed in a subsequent review pass against the same branch state). New findings are emitted as `open`; the review step marks a previously-recorded finding as `resolved` only when a subsequent run confirms the underlying issue is gone.
+
+  The split step MUST treat any finding whose resolution status is anything other than `resolved` as gating per FR-018. The persisted report MUST be machine-readable enough that the split step can extract `(severity, phase tag, resolution status)` for every finding without re-running the review agent.
 
 #### Splitting
 
