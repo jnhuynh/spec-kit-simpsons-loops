@@ -120,11 +120,7 @@ Rule: For each phase K in 1..N, the state `main + phases 1..K` must be a valid p
 
 **Severity:** HIGH.
 
-Signal: a holistic check that combines M1-M7 outputs. If any of M1, M2, M6, M7 fires for phase K, M8 also fires for phase K (the per-phase deployability invariant is violated). M8 also catches patterns the other rules miss: a phase that simultaneously requires the old contract (in unchanged code) and the new contract (in same-phase code) without a dual-write/dual-read shim.
-
-**Severity:** HIGH.
-
-Signal: traverse phases in deploy order, simulating the running code at each phase boundary. For phase K, the running code is the union of unchanged code + all phase 1..K-1 changes. The new code being deployed is phase K. Flag when phase K's changes break a behavior the running code depends on.
+Signal: a holistic check that combines M1-M7 outputs and adds a deploy-order simulation. Traverse phases in deploy order, simulating the running code at each phase boundary — for phase K, the running code is the union of unchanged code + all phase 1..K-1 changes, and the new code being deployed is phase K. If any of M1, M2, M6, M7 fires for phase K, M8 also fires for phase K (the per-phase deployability invariant is violated). M8 also catches patterns the other rules miss: a phase that simultaneously requires the old contract (in unchanged code) and the new contract (in same-phase code) without a dual-write/dual-read shim, or any other change that breaks a behavior the running code depends on at the phase K boundary.
 
 Fix suggestion: split phase K into two or more phases such that each phase boundary preserves the running code's contract. Cite the specific behavior that breaks at the phase K boundary.
 

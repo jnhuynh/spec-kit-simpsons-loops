@@ -1,0 +1,10 @@
+# Code Review Report — 008-feat-multi-phase-deploys
+
+Marge ran the baseline and project-specific review packs against the integrated feature branch. The report below reflects the post-remediation finding set: the just-fixed finding transitions to `resolved`; remaining mechanical findings remain `open` for subsequent iterations.
+
+This is a single-phase feature for the spec-kit repository itself (`plan.md` has no `## Deploy Phases` section); every finding's `Phase` column is the literal `-` per FR-012a.
+
+| ID | Severity | Phase | Status | Check Pack | Summary |
+| --- | -------- | ----- | -------- | ---------------- | ------- |
+| F001 | low | - | resolved | architecture.md | M8 entry in `.specify/marge/checks/migrations.md` had a duplicated `**Severity:** HIGH.` marker and two consecutive `Signal:` paragraphs (A6 / A7); consolidated into one severity marker and one merged signal description. |
+| F002 | low | - | open | architecture.md | `CLAUDE.md` Active Technologies entry for 008-feat-multi-phase-deploys lists `Claude CLI (\`claude\` command)` twice (A7 copy-paste duplication) — leave the trailing duplicate to be removed in a subsequent iteration. |
