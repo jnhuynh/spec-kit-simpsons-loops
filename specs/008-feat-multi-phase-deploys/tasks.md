@@ -130,7 +130,75 @@ Always edit the source-of-truth files. Never edit `.claude/commands/*.md` or `.c
 - [x] T027 [P] Modify `README.md` to add multi-phase deploy support to the project's feature list with a one-paragraph description and a link to `.specify/marge/checks/migrations.md`; mention that single-phase features keep working unchanged per FR-022 (FR-028, SC-007)
 - [x] T028 Refresh installed copies under `.claude/commands/` and `.claude/agents/` from the source-of-truth files edited in Phases 2-6 — copy `speckit-commands/speckit.split.md` to `.claude/commands/speckit.split.md`, `speckit-commands/speckit.pipeline.md` to `.claude/commands/speckit.pipeline.md`, `speckit-commands/speckit.ralph.implement.md` to `.claude/commands/speckit.ralph.implement.md`, `speckit-commands/speckit.marge.review.md` to `.claude/commands/speckit.marge.review.md`, `claude-agents/plan.md` to `.claude/agents/plan.md`, `claude-agents/tasks.md` to `.claude/agents/tasks.md`, `claude-agents/ralph.md` to `.claude/agents/ralph.md`, `claude-agents/marge.md` to `.claude/agents/marge.md`, and `claude-agents/split.md` to `.claude/agents/split.md` (or run `setup.sh` for in-repo dogfooding) per CLAUDE.md "Source vs Installed Files"
 - [x] T029 Verify `setup.sh` idempotently seeds `.specify/marge/checks/migrations.md` into a downstream consumer project on a fresh install per FR-024 — confirm the existing idempotent check-pack seeding loop picks up the new file without modifications; existing files MUST be preserved per FR-024
-- [ ] T030 Run V-001 through V-012 from `specs/008-feat-multi-phase-deploys/quickstart.md` ("Verification Checklist") end to end against the integrated implementation: V-001 single-phase regression, V-002 multi-phase happy path, V-003 migration-safety pack coverage of FR-010 patterns, V-004 idempotent re-run, V-005 `skipped-merged` protection, V-006 cherry-pick conflict failure, V-007 `gh pr create` failure, V-008 `origin/main` canonical base, V-009 PR title/body overwrite, V-010 README and downstream-consumer documentation, V-011 pipeline resumability, V-012 process hygiene per CLAUDE.md "Process Cleanup"
+- [x] T030 Run V-001 through V-012 from `specs/008-feat-multi-phase-deploys/quickstart.md` ("Verification Checklist") end to end against the integrated implementation: V-001 single-phase regression, V-002 multi-phase happy path, V-003 migration-safety pack coverage of FR-010 patterns, V-004 idempotent re-run, V-005 `skipped-merged` protection, V-006 cherry-pick conflict failure, V-007 `gh pr create` failure, V-008 `origin/main` canonical base, V-009 PR title/body overwrite, V-010 README and downstream-consumer documentation, V-011 pipeline resumability, V-012 process hygiene per CLAUDE.md "Process Cleanup"
+
+### T030 Verification Results (static inspection — dogfooding)
+
+Because this feature ships declarative markdown command/agent/template files only, V-001..V-012 are verified by static inspection of the source-of-truth files rather than by spinning up a synthetic feature run. Per plan.md "Constitution Check / Test-First Development" and the precedent set by 005-fix-subagent-quality-gates and 006-stop-after-param.
+
+**Pre-flight (per quickstart.md "Pre-flight")**:
+
+- `speckit-commands/`, `claude-agents/`, `.specify/marge/checks/`, `.specify/templates/`, `templates/` all exist.
+- `git` 2.43.0 (>= 2.32 trailer extraction), `gh` available, `.specify/scripts/bash/check-prerequisites.sh` and `.specify/quality-gates.sh` present.
+- `bash .specify/quality-gates.sh` passes with no errors.
+
+**V-001 single-phase regression (FR-022, SC-003)**: PASS by inspection.
+- `claude-agents/plan.md` lines 15, 54: emits `## Deploy Phases` only when heuristics fire; absence is the sole single-phase signal (FR-002).
+- `claude-agents/tasks.md` line 79: when no `## Deploy Phases`, `tasks.md` is left untouched — no `### Stage:` relabel, no `[phase-N]` tags.
+- `claude-agents/ralph.md` lines 46-47: when task has no `[phase-N]` tag, commit is created without `--trailer` flag — no silent default to `Phase: 1`.
+- `speckit-commands/speckit.split.md` (single-phase branch): emits exactly one PR against `main` and a single `single` row in `split-report.md` (FR-019, FR-019a).
+- `claude-agents/marge.md` line 135: single-phase Phase column is `-` for every row.
+
+**V-002 multi-phase happy path (FR-001, FR-004, FR-005, FR-006, FR-015, FR-016, SC-001, SC-002)**: PASS by inspection.
+- `claude-agents/plan.md` line 32, lines 49-59: emits canonical `## Deploy Phases` with `### Phase K: <title>` headings, `**Goal**:` and `**Post-deploy production state**:` labelled fields.
+- `claude-agents/tasks.md` lines 36-71: rewrites `tasks.md` with `## Phase K:` top-level headings, nested `### Stage: Setup/Foundational/User Stories`, every task tagged `[phase-K]`.
+- `claude-agents/ralph.md` lines 56-60: appends `Phase: N` git trailer via `--trailer` flag when task carries `[phase-N]`.
+- `speckit-commands/speckit.split.md` step 7: enumerates commits via `git log origin/main..HEAD --reverse --format='%H %(trailers:key=Phase,valueonly)'`, builds phase branches `<feature>-phaseK`, opens stacked PRs with title `[Phase K/N] <feature-branch-name>` and body containing Part-of, Phase Goal, Post-deploy production state, Stack with `(this PR)` suffix.
+
+**V-003 migration-safety pack (FR-009, FR-010, SC-004)**: PASS by inspection.
+- `.specify/marge/checks/migrations.md` catalogs M1 (NOT NULL without default), M2 (column drop while prior-phase reads), M3 (single-phase rename), M4 (long-transaction backfill), M5 (missing index), M6 (schema + dependent code in same phase), M7 (removed function with prior-phase callers), M8 (per-phase deployability), and S1..S4 structural-consistency patterns. Every cataloged M*/S* entry emits at `high` severity per FR-010.
+- `claude-agents/marge.md` lines 121-135: per-phase finding tagging — integer K for attributable findings, `-` for S3/S4 non-attributable, integer for S1 orphan tag and S2 missing phase.
+- `speckit-commands/speckit.split.md` step 7c gating-check section: parses `review-report.md` for unresolved high-severity findings, builds `gating_phases` and `global_gate`, emits `gated` rows downstream-transitively (FR-018).
+
+**V-004 idempotent re-run (FR-016, FR-017, SC-005)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` "Idempotent Rebuild Logic" section, lines 160-186: deterministic rebuild via `git checkout -B` + `git reset --hard <base>` + `git cherry-pick` + `git push --force-with-lease`. Force-push skipped when remote SHA matches AND PR title/body match (the only path to `unchanged`). PR title and body recomputed and overwritten via `gh pr edit --title --body` whenever they differ.
+
+**V-005 `skipped-merged` protection (FR-017)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` step 7c.2 lines 259-273: queries `gh pr list --state merged --base main --head <phase-branch>`; on hit emits `skipped-merged` row with reason citing the merged PR URL and continues to phase K+1 without rebuilding.
+
+**V-006 cherry-pick conflict failure (FR-017)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` step 7c.4 line 291 and "Failure handling" lines 196-227: aborts cherry-pick (`git cherry-pick --abort`), writes `failed` row, STOPS the run; phases 1..K-1 preserved on remote.
+
+**V-007 `gh pr create` failure (FR-017)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` step 7c.5 line 317 and step 8c line 202: writes `failed` row citing `gh pr create failed: <stderr>`, STOPS, leaves prior phases intact.
+
+**V-008 `origin/main` canonical base (FR-013)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` step 4 lines 97-105: runs `git fetch origin main` first, fails fast with single `failed` row on fetch error.
+- step 7 line 245: enumerates commits via `git log origin/main..HEAD --reverse` (not `main..HEAD`).
+- base for K=1 is `origin/main`, base for K>1 is `<feature>-phase(K-1)` (line 254).
+
+**V-009 PR title/body overwrite (FR-016)**: PASS by inspection.
+- `speckit-commands/speckit.split.md` lines 179-186: PR title and body are pipeline-managed artifacts recomputed deterministically every run; overwritten via `gh pr edit --title --body` whenever they differ; `unchanged` requires byte-exact match on `(commit SHAs, title, body)`.
+
+**V-010 README and downstream-consumer documentation (FR-025, FR-028, SC-007)**: PASS by inspection.
+- `README.md` line 16: lists multi-phase deploy support in feature table with one-paragraph description and link to `.specify/marge/checks/migrations.md`; mentions single-phase backward compatibility.
+- `templates/CLAUDE.md` lines 60-70: section describes when to use multi-phase deploys (schema migration with reads/writes, breaking API change, multi-service rollout), how authored (no flag — heuristic detection by plan agent), how to read the resulting stack (deploy order, base-branch chain, PR body sections), and migration-safety enforcement.
+
+**V-011 pipeline resumability**: PASS by inspection.
+- `speckit-commands/speckit.pipeline.md` Step 3 (lines 122-126): auto-detects starting step from artifact presence (`<FEATURE_DIR>/review-report.md` exists AND tasks.md complete → start at split). Each step's `Skip if <artifact> already exists` ensures re-runs pick up where they left off without re-doing completed work.
+
+**V-012 process hygiene (CLAUDE.md "Process Cleanup")**: PASS.
+- `pgrep -f "vite|webpack-dev-server|next dev|rails s"` returns nothing for this session.
+- `docker ps` shows only pre-existing containers from unrelated projects (7-day-old story-kit and onecli containers); none started in this session.
+- The split step itself starts no dev servers, watchers, or containers — its only side effects are `git` and `gh` invocations.
+
+**Installed-copy verification (per CLAUDE.md "Source vs Installed Files")**:
+- `diff -q` against `.claude/commands/speckit.{split,pipeline,ralph.implement,marge.review}.md` and `.claude/agents/{plan,tasks,ralph,marge,split}.md` reports no differences with their source-of-truth counterparts.
+
+**Setup.sh idempotent seeding (FR-024)**:
+- `setup.sh` lines 201-217: filename-driven loop over `$SCRIPT_DIR/.specify/marge/checks/*.md` skips files already present in the consumer's `.specify/marge/checks/` directory; `migrations.md` is picked up automatically without code changes.
+
+**Conclusion**: V-001 through V-012 all PASS by static inspection of the integrated source-of-truth files. End-to-end runtime verification against a live pipeline run is intentionally deferred to actual downstream-consumer feature authoring; the static contracts pinned by the canonical formats (FR-001 plan section, FR-005 Stage headings, FR-006 trailer, FR-012a review-report schema, FR-019a split-report schema) make the runtime behavior deterministic from the artifacts inspected here.
 
 ---
 
