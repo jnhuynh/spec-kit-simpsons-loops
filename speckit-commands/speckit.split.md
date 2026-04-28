@@ -155,6 +155,38 @@ Build two structures from the `GATE` lines:
 
 Per FR-018 and the review-report contract, the split step does **not** independently re-verify any structural invariant from FR-010; the persisted review report is the single source of truth for gating decisions.
 
+### Idempotent Rebuild Logic (FR-016, FR-017)
+
+The split step is fully idempotent: re-running with the same `(feature branch commit SHAs, plan.md, review-report.md, origin/main)` inputs produces zero remote state changes. Re-running after the feature branch has changed produces deterministic per-phase rebuilds. The contract is:
+
+1. **Phase branches are identified by the deterministic naming convention `<feature-branch-name>-phaseK`** (per FR-015): a remote branch matching that name is treated as an existing phase branch to update; absence of a remote branch with that name means a new phase branch must be created. The split step never consults metadata other than the branch name to identify a phase branch.
+
+2. **Phase branch rebuild is deterministic**:
+
+   ```bash
+   git checkout -B <phase-branch-name>
+   git reset --hard <base>                  # origin/main for K=1; <feature>-phase(K-1) for K>1
+   git cherry-pick <phase_commits...>       # in deploy order, from `git log origin/main..HEAD --reverse`
+   ```
+
+   Every run starts from `<base>` and re-applies the current phase commits — there is no incremental diff. The recomputed branch SHA depends only on `(base SHA, phase commit set, deploy order)`.
+
+3. **Force-push is skipped when the remote branch's SHA already matches the recomputed SHA** AND the existing PR title and body already match the recomputed values per FR-016. This is the only path to an `unchanged` row. Otherwise:
+   - If the remote branch does not exist: `git push origin <phase-branch-name>`.
+   - If the remote SHA differs from the recomputed SHA: `git push --force-with-lease origin <phase-branch-name>`.
+   - If the remote SHA matches but the PR title or body differs: skip the push, but proceed to `gh pr edit` in the PR step.
+
+4. **PR title and body are pipeline-managed artifacts** (per FR-016) — they are recomputed deterministically on every run from `(feature_branch_name, K, N, plan.md goal text, plan.md post-deploy text)` and overwritten via `gh pr edit --title --body` whenever they differ from the existing PR's fields. Human edits to a phase pull request's title or body **WILL be overwritten** on the next run; reviewers requesting changes MUST use pull-request review comments rather than editing the description. This makes title and body fully reproducible from the plan artifact and the feature branch name.
+
+5. **The `unchanged` terminal status is deterministically computable** from the tuple `(commit SHAs, title, body)`:
+   - `unchanged` if and only if the recomputed branch SHA equals `git rev-parse origin/<phase-branch-name>` AND the recomputed title equals the existing PR title AND the recomputed body equals the existing PR body.
+   - `updated` if any of the three components differ (force-push performed, or `gh pr edit` performed, or both).
+   - `created` if the remote branch did not exist and no PR existed for it before this run.
+
+6. **Comparison uses `gh pr view --json title,body`** (or equivalently `gh pr list ... --json title,body` from step 7c.5) to fetch the existing PR's fields; the comparison is byte-exact (no whitespace normalization, no trailing-newline tolerance) so the deterministic body composition in step 7d MUST be reproduced exactly on every run.
+
+This logic is implemented step-by-step in Step 7 (multi-phase) and Step 8 (single-phase) below; this section is the consolidated contract that those steps satisfy.
+
 ### Step 7: Multi-Phase Execution
 
 7a. **Resolve feature branch metadata**:
