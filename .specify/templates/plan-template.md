@@ -33,6 +33,72 @@
 
 [Gates determined based on constitution file]
 
+## Deploy Phases
+
+<!--
+  OPTIONAL SECTION — include only when the feature requires phased rollout
+  (schema migration combined with reads/writes on the same data, breaking API
+  change with live callers, multi-service rollout coordination). For
+  single-phase features, OMIT this entire section. The presence or absence of
+  the `## Deploy Phases` heading is the sole signal that distinguishes
+  multi-phase from single-phase mode (FR-002) — no flag, environment variable,
+  or command-line switch is involved.
+
+  When present, this section MUST use the canonical machine-parseable format
+  pinned by FR-001 so the split step (`/speckit.split`) can deterministically
+  extract the goal text and post-deploy text into each phase pull request's
+  body per FR-016. The canonical format is:
+
+    - A level-2 heading exactly `## Deploy Phases` (no trailing punctuation).
+    - One level-3 heading per phase of the form `### Phase K: <title>` where
+      `K` is the integer phase number starting at 1 and `<title>` is a short
+      human-readable title.
+    - Inside each phase heading, two labelled fields rendered exactly as
+      `**Goal**: <single-paragraph goal text>` and
+      `**Post-deploy production state**: <single-paragraph post-deploy text>`,
+      each starting on its own line.
+    - Phase numbers MUST start at 1 and be contiguous (no gaps). Non-contiguous
+      phases are flagged by the migration-safety check pack as `high` severity.
+
+  The split step parses this format directly — no alternative rendering is
+  accepted. Field values that span multiple paragraphs continue until the next
+  labelled field, the next `### Phase K:` heading, or the end of the section.
+-->
+
+### Phase 1: Add new column (additive, backward-compatible)
+
+**Goal**: Schema in place; old code continues to work unchanged.
+
+**Post-deploy production state**: `users.email` exists, nullable, all rows NULL. `users.email_address` remains the source of truth for reads and writes.
+
+### Phase 2: Dual-write + backfill
+
+**Goal**: New writes populate both columns. Historical rows backfilled in a non-blocking job.
+
+**Post-deploy production state**: `users.email` populated for all rows; reads still use `users.email_address`.
+
+### Phase 3: Switch reads
+
+**Goal**: Reader code switched to `users.email`. Both columns continue to be written.
+
+**Post-deploy production state**: `users.email` is the read source of truth; `users.email_address` is still written but no longer read.
+
+### Phase 4: Drop old column
+
+**Goal**: Stop writing `users.email_address`; drop it.
+
+**Post-deploy production state**: `users.email_address` is gone; `users.email` is the sole column.
+
+<!--
+  The four-phase pattern above is the default template for column-rename
+  features (expand-contract). Adapt the count and titles for other migration
+  shapes — for example, adding a NOT NULL column typically needs three phases:
+  add nullable, backfill, alter to NOT NULL. For a non-migration multi-phase
+  feature (such as a breaking API change), use phases that mirror the
+  expand-contract shape: introduce the new contract, migrate callers, retire
+  the old contract.
+-->
+
 ## Project Structure
 
 ### Documentation (this feature)
