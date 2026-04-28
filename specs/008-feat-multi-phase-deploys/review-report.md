@@ -1,6 +1,6 @@
 # Code Review Report — 008-feat-multi-phase-deploys
 
-Marge ran the baseline and project-specific review packs against the integrated feature branch. The report below reflects the post-remediation finding set: the just-fixed finding transitions to `resolved`; remaining mechanical findings remain `open` for subsequent iterations.
+Marge ran the baseline and project-specific review packs against the integrated feature branch. No new mechanical findings detected on this iteration; all prior findings remain `resolved`. The remaining concerns about the split step's `gh pr list --base main --head <phase_branch_name> --state merged` query for K>1 phases (where a stacked PR's base is the previous phase branch, not main) are design-judgment territory and tagged `NEEDS_HUMAN`; they are not represented as table rows because Marge persists only mechanical findings here.
 
 This is a single-phase feature for the spec-kit repository itself (`plan.md` has no `## Deploy Phases` section); every finding's `Phase` column is the literal `-` per FR-012a.
 
