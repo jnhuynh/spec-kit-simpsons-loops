@@ -11,7 +11,7 @@ The implementation surface:
 - One new check pack: `.specify/marge/checks/migrations.md`.
 - One new command file: `speckit-commands/speckit.split.md`.
 - One new agent file: `claude-agents/split.md`.
-- Targeted modifications to four existing command files (`speckit.pipeline.md`, `speckit.ralph.implement.md`, `speckit.marge.review.md`) and four existing agent files (`plan.md`, `tasks.md`, `ralph.md`, `marge.md`).
+- Targeted modifications to three existing command files (`speckit.pipeline.md`, `speckit.ralph.implement.md`, `speckit.marge.review.md`) and four existing agent files (`plan.md`, `tasks.md`, `ralph.md`, `marge.md`).
 - Template updates to `.specify/templates/plan-template.md`, `.specify/templates/tasks-template.md`, and `templates/CLAUDE.md`.
 - A README mention.
 
