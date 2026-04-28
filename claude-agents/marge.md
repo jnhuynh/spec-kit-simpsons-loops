@@ -112,6 +112,32 @@ Marge ran the baseline and project-specific review packs against the feature bra
 
 See `specs/008-feat-multi-phase-deploys/contracts/review-report.md` for the canonical examples (empty findings, multi-phase with two open and one resolved, single-phase, global-gate case).
 
+### Per-phase finding tagging (multi-phase features)
+
+When the feature is multi-phase (`plan.md` contains a `## Deploy Phases` section), every finding row's `Phase` column MUST be set per the rules below per FR-011 and FR-012. Marge runs **once** on the integrated feature branch — per-phase scope is expressed entirely via finding tags, never as separate per-phase review passes. Do not run Marge once per phase; do not branch the review loop on phase number.
+
+Determine the `Phase` value as follows:
+
+1. **Findings attributable to a specific phase** (M1-M8 production-breaking patterns from `migrations.md`, plus any check-pack finding whose offending diff lines belong to a single phase): set `Phase` to the **integer phase number** that introduced the issue. Determine the phase that introduced an issue by:
+   - Locating the offending file/line in the feature-branch diff.
+   - Identifying the commit that introduced that line via `git log origin/main..HEAD --reverse --format='%H %(trailers:key=Phase,valueonly)' -- <file>` and finding the first commit whose patch contains the offending line.
+   - Reading the `Phase:` trailer of that commit. If the trailer is present and parses as a positive integer, use that integer.
+   - If the commit has no `Phase:` trailer, the commit defaults to phase 1 per FR-014; set `Phase` to `1`.
+
+2. **S1 (orphan phase tag)** — a `[phase-N]` tag in `tasks.md` or a `Phase: N` trailer references a phase number not declared in `plan.md`'s `## Deploy Phases` section: set `Phase` to the **integer of the offending tag** (e.g., `5` for `[phase-5]` when only phases 1-4 are declared). This is per data-model.md "Review Report" and the spec.md clarification on FR-010 structural-consistency tagging.
+
+3. **S2 (non-contiguous phases)** — the union of `[phase-N]` tags and `Phase: N` trailers contains a gap (e.g., phases 1 and 3 present with no phase 2): set `Phase` to the **integer of the missing phase** (e.g., `2` for the gap above).
+
+4. **S3 (malformed `Phase:` trailer)** — a commit carries a `Phase:` trailer whose value cannot be parsed as a positive integer (empty value, non-numeric, zero, negative): set `Phase` to the literal `-`. This triggers the global-gate semantics of FR-018 (the split step gates every phase in the run on this finding).
+
+5. **S4 (phase-trailer-without-deploy-phases)** — `plan.md` has no `## Deploy Phases` section but the feature branch carries one or more commits with a `Phase:` trailer: set `Phase` to the literal `-`. This is also a global gate.
+
+For single-phase features (no `## Deploy Phases` section in `plan.md`), every finding's `Phase` column is `-` per FR-012a. Single-phase gating per FR-019 applies uniformly to every unresolved high-severity finding.
+
+### Single review pass on the integrated branch
+
+Marge MUST run exactly **one review pass** on the integrated feature branch, regardless of how many phases the feature has. Per-phase findings are emitted by tagging rows in the single `review-report.md`, not by running Marge multiple times. The split step (FR-018) consumes the persisted report to gate per-phase pull-request creation; it does not re-run review and it does not expect multiple review reports.
+
 ## Migration-Safety Check Pack
 
 The migration-safety check pack at `.specify/marge/checks/migrations.md` is loaded automatically by the existing check-pack discovery loop (which scans `.specify/marge/checks/*.md` by filename). No agent-side discovery code changes are required to pick it up. The pack covers the eight production-breaking patterns M1-M8 and the four structural-consistency patterns S1-S4 per FR-009 and FR-010.
