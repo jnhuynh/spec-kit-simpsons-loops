@@ -13,7 +13,8 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
-| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                                 |
+| Split    | Multi-phase deploy support. Detects a `## Deploy Phases` section in `plan.md`, slices the feature branch into a stack of independently-deployable phase branches by `Phase: N` git trailer, and opens or updates a stack of pull requests with the base-branch chain `main <- phase1 <- phase2 <- ... <- phaseN`. Single-phase features keep working unchanged — one branch, one PR, no phase trailers required. Migration-safety is enforced by Marge's [`migrations.md`](.specify/marge/checks/migrations.md) check pack. |
+| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge -> split. Auto-detects where to start based on existing artifacts.                                                        |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
