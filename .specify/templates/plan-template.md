@@ -33,21 +33,25 @@
 
 [Gates determined based on constitution file]
 
-## Deploy Phases
-
 <!--
-  OPTIONAL SECTION — include only when the feature requires phased rollout
-  (schema migration combined with reads/writes on the same data, breaking API
-  change with live callers, multi-service rollout coordination). For
-  single-phase features, OMIT this entire section. The presence or absence of
-  the `## Deploy Phases` heading is the sole signal that distinguishes
-  multi-phase from single-phase mode (FR-002) — no flag, environment variable,
-  or command-line switch is involved.
+  OPTIONAL `## Deploy Phases` SECTION — the plan agent appends this section
+  here only when the feature requires phased rollout (schema migration
+  combined with reads/writes on the same data, breaking API change with live
+  callers, multi-service rollout coordination). For single-phase features,
+  the plan agent leaves this template comment untouched and emits NO
+  `## Deploy Phases` heading. The presence or absence of the
+  `## Deploy Phases` heading in the rendered plan.md is the sole signal
+  that distinguishes multi-phase from single-phase mode (FR-002) — no flag,
+  environment variable, or command-line switch is involved. Because the
+  template ships without the heading rendered, a verbatim copy of this
+  template into plan.md is single-phase by default, preserving FR-022
+  backward compatibility for every existing feature.
 
-  When present, this section MUST use the canonical machine-parseable format
-  pinned by FR-001 so the split step (`/speckit.split`) can deterministically
-  extract the goal text and post-deploy text into each phase pull request's
-  body per FR-016. The canonical format is:
+  When the plan agent renders this section (multi-phase features only), it
+  MUST use the canonical machine-parseable format pinned by FR-001 so the
+  split step (`/speckit.split`) can deterministically extract the goal text
+  and post-deploy text into each phase pull request's body per FR-016. The
+  canonical format is:
 
     - A level-2 heading exactly `## Deploy Phases` (no trailing punctuation).
     - One level-3 heading per phase of the form `### Phase K: <title>` where
@@ -61,42 +65,52 @@
       phases are flagged by the migration-safety check pack as `high` severity.
 
   The split step parses this format directly — no alternative rendering is
-  accepted. Field values that span multiple paragraphs continue until the next
-  labelled field, the next `### Phase K:` heading, or the end of the section.
--->
+  accepted. Field values that span multiple paragraphs continue until the
+  next labelled field, the next `### Phase K:` heading, or the end of the
+  section.
 
-### Phase 1: Add new column (additive, backward-compatible)
+  Worked four-phase example (column rename — expand-contract):
 
-**Goal**: Schema in place; old code continues to work unchanged.
+    ## Deploy Phases
 
-**Post-deploy production state**: `users.email` exists, nullable, all rows NULL. `users.email_address` remains the source of truth for reads and writes.
+    ### Phase 1: Add new column (additive, backward-compatible)
 
-### Phase 2: Dual-write + backfill
+    **Goal**: Schema in place; old code continues to work unchanged.
 
-**Goal**: New writes populate both columns. Historical rows backfilled in a non-blocking job.
+    **Post-deploy production state**: `users.email` exists, nullable, all rows
+    NULL. `users.email_address` remains the source of truth for reads and
+    writes.
 
-**Post-deploy production state**: `users.email` populated for all rows; reads still use `users.email_address`.
+    ### Phase 2: Dual-write + backfill
 
-### Phase 3: Switch reads
+    **Goal**: New writes populate both columns. Historical rows backfilled in
+    a non-blocking job.
 
-**Goal**: Reader code switched to `users.email`. Both columns continue to be written.
+    **Post-deploy production state**: `users.email` populated for all rows;
+    reads still use `users.email_address`.
 
-**Post-deploy production state**: `users.email` is the read source of truth; `users.email_address` is still written but no longer read.
+    ### Phase 3: Switch reads
 
-### Phase 4: Drop old column
+    **Goal**: Reader code switched to `users.email`. Both columns continue to
+    be written.
 
-**Goal**: Stop writing `users.email_address`; drop it.
+    **Post-deploy production state**: `users.email` is the read source of
+    truth; `users.email_address` is still written but no longer read.
 
-**Post-deploy production state**: `users.email_address` is gone; `users.email` is the sole column.
+    ### Phase 4: Drop old column
 
-<!--
+    **Goal**: Stop writing `users.email_address`; drop it.
+
+    **Post-deploy production state**: `users.email_address` is gone;
+    `users.email` is the sole column.
+
   The four-phase pattern above is the default template for column-rename
   features (expand-contract). Adapt the count and titles for other migration
-  shapes — for example, adding a NOT NULL column typically needs three phases:
-  add nullable, backfill, alter to NOT NULL. For a non-migration multi-phase
-  feature (such as a breaking API change), use phases that mirror the
-  expand-contract shape: introduce the new contract, migrate callers, retire
-  the old contract.
+  shapes — for example, adding a NOT NULL column typically needs three
+  phases: add nullable, backfill, alter to NOT NULL. For a non-migration
+  multi-phase feature (such as a breaking API change), use phases that
+  mirror the expand-contract shape: introduce the new contract, migrate
+  callers, retire the old contract.
 -->
 
 ## Project Structure
