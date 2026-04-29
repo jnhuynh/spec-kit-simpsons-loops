@@ -16,6 +16,7 @@ description: "Task list template for feature implementation"
 
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- **[phase-K]** (multi-phase features only): Which deploy phase this task belongs to — see "Multi-Phase Tasks Structure" below
 - Include exact file paths in descriptions
 
 ## Path Conventions
@@ -24,6 +25,74 @@ description: "Task list template for feature implementation"
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
+
+## Multi-Phase Tasks Structure
+
+When `plan.md` contains a `## Deploy Phases` section, the feature is **multi-phase** and `tasks.md` MUST be organized so that **deploy phases are the sole top-level (`##`) organizing structure** of the body, listed in deploy order starting at Phase 1. The Setup / Foundational / User-Stories structure is preserved as **second-level (`###`) "Stage" headings nested inside each deploy-phase section** (relabeled with the literal `Stage:` prefix to disambiguate from deploy phases). Every task under any stage within deploy-phase K MUST carry the `[phase-K]` tag in its bracketed metadata, alongside any existing `[P]` or `[USk]` tags.
+
+When `plan.md` does NOT contain a `## Deploy Phases` section, the feature is **single-phase** — the template below is used unchanged: Setup / Foundational / User-Stories remain at the top level (`##`), no `### Stage:` relabel is applied, and no `[phase-N]` tags are added. Today's single-phase template is preserved as a strict subset of multi-phase behavior (FR-022).
+
+### Multi-phase skeleton
+
+```markdown
+# Tasks: <Feature Title>
+
+<preamble — Input, Prerequisites, Tests, Organization, Format, Path Conventions>
+
+---
+
+## Phase 1: Add new column (additive, backward-compatible)
+
+### Stage: Setup
+
+- [ ] T001 [phase-1] Pre-flight checks for the additive-column phase
+
+### Stage: Foundational
+
+- [ ] T002 [phase-1] Create migration scaffolding for the new nullable column
+
+### Stage: User Stories
+
+- [ ] T003 [phase-1] [US1] Add `users.email` as nullable in the schema migration
+
+---
+
+## Phase 2: Dual-write + backfill
+
+### Stage: User Stories
+
+- [ ] T004 [phase-2] [US1] Dual-write `users.email` alongside `users.email_address`
+- [ ] T005 [P] [phase-2] [US1] Backfill `users.email` from `users.email_address`
+
+---
+
+## Phase 3: Switch reads
+
+### Stage: User Stories
+
+- [ ] T006 [phase-3] [US1] Switch reader code to `users.email`
+
+---
+
+## Phase 4: Drop old column
+
+### Stage: User Stories
+
+- [ ] T007 [phase-4] [US1] Stop writing `users.email_address` and drop the column
+
+---
+
+<trailer — Dependencies & Execution Order, Implementation Strategy, Notes>
+```
+
+Rules:
+
+1. **Deploy phases as top-level sections (FR-004)** — every `##` heading in the body MUST correspond to a deploy phase from `plan.md`'s `## Deploy Phases` section, in deploy order. Heading form: `## Phase K: <title>` where `K` is the integer phase number and `<title>` is the title from the plan's `### Phase K: <title>` heading. No other `##` sections appear in the body.
+2. **Stages as second-level headings (FR-005)** — within each deploy-phase section, the existing Setup / Foundational / User-Stories structure is preserved as `###` headings with the literal form `### Stage: Setup`, `### Stage: Foundational`, and `### Stage: User Stories`.
+3. **Omit empty stages** — a `### Stage:` heading MUST be emitted only when that stage actually contains one or more tasks for the enclosing deploy phase.
+4. **Tag every task with `[phase-K]` (FR-004)** — every task entry under any stage within deploy-phase K MUST carry the `[phase-K]` tag, e.g., `- [ ] T012 [P] [phase-2] [US1] <description>`.
+5. **Allocate work across phases** — distribute Setup, Foundational, and User-Story tasks into the deploy phases that need them. The same kind of work MAY appear in multiple deploy phases when each phase has its own distinct needs.
+6. **Single-phase template is unchanged (FR-022, FR-027)** — when `plan.md` has no `## Deploy Phases` section, the template below is used verbatim with the existing top-level Setup / Foundational / User-Stories structure and no phase tagging.
 
 <!-- 
   ============================================================================

@@ -52,3 +52,19 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
 - Exit after each iteration — restart with fresh context
+
+## Multi-Phase Deploys
+
+Some features cannot ship in a single pull request without breaking production — the canonical example is renaming a database column that a running service still reads. SpecKit supports authoring such features as a stack of independently-deployable pull requests.
+
+**When to use multi-phase deploys**:
+
+- Schema migrations combined with reads/writes on the same data (e.g., column rename, column type change, table split/merge)
+- Breaking API changes where prior-phase callers must be migrated before the old surface is removed
+- Multi-service rollout coordination where one service's contract change requires deploys to land in a specific order
+
+**How a multi-phase feature is authored**: there is no flag, environment variable, or command-line switch. The plan agent emits a `## Deploy Phases` section in `plan.md` automatically when the heuristics above fire. The presence of that section is the sole signal that the feature is multi-phase; absence means single-phase. Single-phase features keep working unchanged — no phase trailers required on commits, no per-phase findings, exactly one pull request opened by the split step.
+
+**How to read the resulting pull request stack**: when the split step runs on a multi-phase feature, it produces a stack of pull requests named `[Phase K/N] <feature-branch-name>` with the base-branch chain `main <- phase1 <- phase2 <- ... <- phaseN`. Each PR body contains a `## Phase Goal` section, a `## Post-deploy production state` section, and a `## Stack` section listing every phase in deploy order. Read the stack in deploy order (phase 1 first), merge in deploy order (do not merge phase K+1 before phase K), and confirm each phase's post-deploy production state before merging the next.
+
+**Migration-safety enforcement**: the migration-safety check pack at `.specify/marge/checks/migrations.md` is loaded automatically by Marge's check-pack discovery when present. It catalogs eight production-breaking patterns (NOT NULL without default, column drop while prior-phase reads, single-phase rename, long-transaction backfill on hot table, missing index for new read path, schema-plus-dependent-code in same phase, removed function with prior-phase callers, per-phase deployability) and four structural-consistency patterns (orphan phase tag, non-contiguous phases, malformed `Phase:` trailer, phase-trailer-without-deploy-phases). Every cataloged pattern is emitted at `high` severity. The split step refuses to open or update a pull request for any phase with an unresolved high-severity finding against it.

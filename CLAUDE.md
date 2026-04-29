@@ -78,6 +78,8 @@ The **source of truth** for SpecKit command and agent files lives in the repo ro
 - Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `jq`) (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`) (006-stop-after-param)
+- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, Bash tool, `git` (with trailer support — Git 2.32+ for `--format='%(trailers:key=Phase,valueonly)'`), `gh` CLI (authenticated for the repository), standard Unix utilities (`grep`, `sed`, `awk`, `test`) (008-feat-multi-phase-deploys)
+- Filesystem only — `.md` command files, `.md` agent files, `.md` check pack files, `.md` template files, `.sh` scripts. Two new persisted artifacts per feature directory: `review-report.md` and `split-report.md`. No databases, no network state beyond Git remote refs and GitHub pull requests opened by `gh`. (008-feat-multi-phase-deploys)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)

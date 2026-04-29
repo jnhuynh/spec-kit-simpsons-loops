@@ -132,6 +132,8 @@ Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn 
      - Provide: `Feature directory: <FEATURE_DIR>. Quality gates: bash .specify/quality-gates.sh`
    - Each sub agent gets a fresh context window, preventing hallucination drift
 
+**Multi-phase commit trailers**: The Ralph agent appends a `Phase: N` git trailer (RFC 5322) to commit messages when the just-completed task in `tasks.md` carries a `[phase-N]` tag, so `git interpret-trailers` and `git log --format='%(trailers:key=Phase,valueonly)'` parse them deterministically (FR-006). When the task has no `[phase-N]` tag, the commit is created without a `Phase:` trailer — Ralph does NOT silently default to `Phase: 1` in the commit text (FR-007). All implementation work for a multi-phase feature stays on the single feature branch end to end; pull requests are not opened by Ralph (FR-008). The trailer logic itself is fully owned by `.claude/agents/ralph.md` (Phase 3, "Detect the task's phase tag" and the conditional `git commit --trailer` block); this command file does not duplicate that logic.
+
 **After** each sub agent returns:
 1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_TASKS_COMPLETE</promise>`. If found, report success and stop looping.
 2. If not found: also verify tasks.md directly — if no `- [ ]` remain and at least one `- [x]` exists, treat as complete.
