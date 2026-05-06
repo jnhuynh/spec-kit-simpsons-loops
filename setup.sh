@@ -172,6 +172,7 @@ cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.claude/commands/speckit.marge.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
 cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
+cp "$SCRIPT_DIR/speckit-commands/speckit.brainstorm.md"        "$PROJECT_DIR/.claude/commands/speckit.brainstorm.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
@@ -187,6 +188,7 @@ echo "    .claude/commands/speckit.homer.clarify.md"
 echo "    .claude/commands/speckit.marge.review.md"
 echo "    .claude/commands/speckit.review.md"
 echo "    .claude/commands/speckit.pipeline.md"
+echo "    .claude/commands/speckit.brainstorm.md"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship with the template. Copy each baseline file to

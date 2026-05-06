@@ -15,6 +15,12 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
 | Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                                 |
 
+**Pre-pipeline:**
+
+| Command     | What it does                                                                                                                                                                                        |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.         |
+
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
 
@@ -72,7 +78,7 @@ flowchart TD
 
 ## Recommended workflow
 
-Before kicking off the pipeline or any loop, refine your specs manually. Run `/speckit.specify` to draft the initial spec, then use `/speckit.clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
+Before kicking off the pipeline or any loop, refine your specs manually. Start with `/speckit.brainstorm` if your idea is still vague — it will challenge you to sharpen it. Then run `/speckit.specify` to draft the initial spec, and `/speckit.clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
 
 You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
@@ -128,6 +134,7 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.homer.clarify.md     .claud
 cp <path-to-simpsons-loops>/speckit-commands/speckit.marge.review.md      .claude/commands/speckit.marge.review.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claude/commands/speckit.review.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
 
 # Marge review packs -> .specify/marge/checks/
 mkdir -p .specify/marge/checks
@@ -183,6 +190,16 @@ The file must exit 0 for quality gates to pass. This file is required for the Ra
 ## Usage
 
 Each loop has a corresponding slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your session. Each iteration gets a fresh context window.
+
+### Brainstorm (pre-spec)
+
+Sharpen a vague idea before writing a spec:
+
+```
+/speckit.brainstorm I want to add some kind of caching layer
+```
+
+Asks 4-7 targeted questions that challenge your assumptions, then produces a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.
 
 ### Homer (clarification)
 
