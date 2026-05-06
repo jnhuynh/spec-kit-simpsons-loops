@@ -48,6 +48,7 @@ Run `/speckit.review Remediate only the single highest-severity finding without 
 | 996 | **Validate after remediation** — Re-read modified files AND pass quality gates before committing    |
 | 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW            |
 | 994 | **Mechanical fixes only** — Skip `NEEDS_HUMAN` findings; they require human judgment                |
+| 993 | **Coordinated multi-file fixes** — When the highest-severity finding requires changes across multiple files (e.g., extracting a duplicated helper into a shared module and updating all call sites), make ALL related changes in this iteration. One finding = one logical finding, not one file edit. |
 
 ## File Paths
 
