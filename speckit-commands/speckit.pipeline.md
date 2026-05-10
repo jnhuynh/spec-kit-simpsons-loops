@@ -372,6 +372,32 @@ Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeli
 
 **Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from marge`.
 
+#### PR Review (optional single-shot step — skip if no open PR or skill absent)
+
+Detect whether the `/speckit.review.pr` skill is installed. Run via Bash tool:
+
+```bash
+if test -f ".claude/commands/speckit.review.pr.md"; then echo "PRESENT"; else echo "ABSENT"; fi
+```
+
+If **ABSENT**, log `speckit.review.pr not installed — skipping PR review` and proceed to Step 6.
+
+If **PRESENT**, check for an open PR:
+
+```bash
+gh pr view --json number --jq '.number' 2>/dev/null
+```
+
+If no PR exists, log `No open PR for current branch — skipping PR review` and proceed to Step 6.
+
+If both conditions pass, spawn a sub agent:
+- **subagent_type**: `general-purpose`
+- **prompt**: `Read and follow the instructions in .claude/commands/speckit.review.pr.md. Run non-interactively — auto-detect the PR from the current branch.`
+
+**Failure handling**: If the sub agent fails, log `PR review phase failed — continuing pipeline`. Do NOT abort — PR review is informational, not a gate.
+
+This phase is not an independent step in the `--stop-after` mapping; it runs implicitly after marge when its skill is present and an open PR exists.
+
 ### Step 6: Report Results
 
 After all steps complete (or after a `--stop-after` early termination), produce a completion report that includes the following sections:

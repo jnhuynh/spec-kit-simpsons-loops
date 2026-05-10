@@ -135,6 +135,7 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.marge.review.md      .claud
 cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claude/commands/speckit.review.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/commands/speckit.review.pr.md
 
 # Marge review packs -> .specify/marge/checks/
 mkdir -p .specify/marge/checks
@@ -240,6 +241,30 @@ After Ralph has implemented the feature:
 Marge reviews the feature branch's diff against baseline and project-specific review packs in `.specify/marge/checks/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
 
 For a single-pass report (no auto-fix), run `/speckit.review` instead.
+
+### PR Review (human-judgment findings)
+
+After Marge finishes (or independently on any branch with an open PR), post inline comments for findings that need human attention:
+
+```
+/speckit.review.pr
+```
+
+Or target a specific PR:
+
+```
+/speckit.review.pr pr:42
+```
+
+Or preview findings without posting:
+
+```
+/speckit.review.pr --dry-run
+```
+
+Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), concurrency risks (WARNING), architectural decisions (WARNING), and project-specific patterns (INFO). Uses `COMMENT` event type — informational, not a merge gate. Idempotent: won't double-post on the same commit.
+
+When the pipeline runs and an open PR exists, this step runs automatically after Marge.
 
 ### Pipeline (end-to-end)
 
