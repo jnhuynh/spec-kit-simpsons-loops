@@ -10,50 +10,7 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Pre-Flight Check
-
-Before doing anything else, verify that the required utility scripts are installed:
-
-1. Check if `.specify/scripts/bash/check-prerequisites.sh` exists (use the Bash tool: `test -f .specify/scripts/bash/check-prerequisites.sh && echo "EXISTS" || echo "MISSING"`)
-2. If **MISSING**, display this error and **STOP** — do not proceed with any execution:
-
-```
-ERROR: Required utility script not found.
-
-Missing: .specify/scripts/bash/check-prerequisites.sh
-
-This script is required for feature directory resolution and prerequisite validation.
-To install it, run the SpecKit setup command:
-
-  /speckit.setup
-
-```
-
-3. If **EXISTS**, proceed to the agent file check below.
-
-## Agent File Check
-
-Verify that the required agent file exists before starting the loop. Check using the Bash tool:
-
-```bash
-test -f ".claude/agents/marge.md" && echo "marge.md: EXISTS" || echo "marge.md: MISSING"
-```
-
-If **MISSING**, display this error and **STOP** — do not proceed with execution:
-
-```
-ERROR: Required agent file not found.
-
-Missing: .claude/agents/marge.md
-
-This agent file is required for Marge loop sub-agents to execute. It defines
-the behavior of each review iteration. Ensure the file is present at:
-  .claude/agents/marge.md
-```
-
-If **EXISTS**, proceed to the review command check below.
-
-## Review Command Check
+## Pre-Flight: Review Command Check
 
 Verify that the single-pass review command exists. Marge's Phase 0 delegates to it:
 
@@ -73,86 +30,99 @@ Ensure the file is present at:
   .claude/commands/speckit.review.md
 ```
 
-If **EXISTS**, proceed to the Goal section below.
+## Pre-Loop: Diff Existence Check
 
-## Goal
+After resolving FEATURE_DIR (the orchestrator handles this), confirm there is a diff to review:
 
-Orchestrate the Marge loop directly within this session. Each iteration spawns a fresh sub agent (via the Agent tool) that reviews the feature branch's diff against baseline and project-specific review packs, fixes the single highest-severity finding, commits, and exits. The loop continues until zero findings remain or max iterations is reached.
+```bash
+git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD
+```
 
-**AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (all findings resolved, max iterations reached, or stuck detection triggers).
+If the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review — run /speckit.ralph.implement first."
 
-**STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Wait for one iteration to finish before starting the next.
+## Pre-Loop: Quality Gates Validation
 
-## Execution Steps
+Marge uses two gates: an optional **fast** scoped gate (`.specify/quality-gates-fast.sh`) per iteration (invoked from `.claude/agents/marge.md`) and the **full** gate (`.specify/quality-gates.sh`) once after the loop terminates.
 
-### Step 1: Parse Arguments
+Validate that the full gate file exists and contains executable content. Run via Bash tool:
 
-Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
+```bash
+test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
+```
 
-- **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
-- **`max-iterations`**: A numeric value (e.g., `5`). If provided, use it as the max iteration count instead of the default.
+If the file is missing or contains only comments/whitespace (the command produces no output), **STOP** with this error:
 
-**Parsing rules**:
-- A token that looks like a directory path (contains `/` or matches a known `specs/` pattern) is treated as `spec-dir`
-- A standalone numeric token (e.g., `5`, `10`) is treated as `max-iterations`
-- If neither is provided, use defaults for both
+```
+ERROR: Quality gates file is missing or empty.
 
-### Step 2: Resolve Feature Directory
+Expected: .specify/quality-gates.sh with executable commands.
 
-- If `spec-dir` was parsed from `$ARGUMENTS`, use it as `FEATURE_DIR`
-- Otherwise, run `bash .specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON output for `FEATURE_DIR`. **Error handling**: If the script exits with a non-zero status (e.g., missing feature dir, invalid branch), display the script's stderr/stdout output to the user and **STOP** — do not proceed with execution.
+The full quality gates file is required for Marge to validate review fixes.
+Create or update .specify/quality-gates.sh with your project's quality gate
+commands (e.g., npm test && npm run lint). The file must exit 0 for gates to pass.
+```
 
-### Step 3: Verify Artifacts
+Also check for the optional fast gate:
 
-Confirm all three artifacts exist in `FEATURE_DIR`:
+```bash
+test -f .specify/quality-gates-fast.sh && echo "EXISTS" || echo "MISSING"
+```
 
-- `spec.md`
-- `plan.md`
-- `tasks.md`
+If the fast gate exists, note this — the marge agent will use it per iteration. If missing, the agent falls back to the full gate per iteration.
 
-If any are missing, abort with guidance:
+## Loop Configuration
 
-- Missing `spec.md` → "Run /speckit.specify first"
-- Missing `plan.md` → "Run /speckit.plan first"
-- Missing `tasks.md` → "Run /speckit.tasks first"
+Set the following LOOP_CONFIG values for this execution:
 
-Also confirm there is a diff to review. Run `git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD` via Bash tool; if the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review — run /speckit.ralph.implement first."
+- **AGENT_NAME**: marge
+- **AGENT_DISPLAY_NAME**: Marge
+- **AGENT_FILE**: .claude/agents/marge.md
+- **SLASH_COMMAND_REF**: /speckit.review
+- **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
+- **PREREQ_FLAGS**: --json --require-tasks --include-tasks
+- **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
+- **MAX_ITERATIONS**: 30
+- **EXTRA_PROMPT_SUFFIX**: (none)
+- **REPORT_MODE**: needs_human
 
-### Step 4: Configuration
+## Execute
 
-- If `max-iterations` was parsed from `$ARGUMENTS`, use that value
-- Otherwise, default max iterations: **30**
+Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using the LOOP_CONFIG values above. Pass `$ARGUMENTS` through for argument parsing.
 
-### Step 5: Run Marge Loop
+## Post-Loop: End-of-Loop Full Quality Gate
 
-Initialize `consecutive_stuck_count = 0`. For each iteration (up to max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Run only when the loop exited via the **success** path (`<promise>ALL_FINDINGS_RESOLVED</promise>` observed). Skip on max-iterations, stuck, or failure exits.
 
-**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+Run via Bash tool:
 
-1. Spawn a fresh-context sub agent using the **Agent tool**:
-   - **subagent_type**: `general-purpose`
-   - **prompt**: Compose a prompt containing:
-     - Instruct the agent to read and follow `.claude/agents/marge.md`
-     - When those instructions reference a slash command (e.g., `/speckit.review`), read the corresponding file from `.claude/commands/` and follow its instructions directly
-     - Provide: `Feature directory: <FEATURE_DIR>`
-   - Each sub agent gets a fresh context window, preventing hallucination drift
+```bash
+bash .specify/quality-gates.sh
+```
 
-**After** each sub agent returns:
-1. Check the sub agent's returned output for the completion promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, report success and stop looping.
-2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
-3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
-5. Otherwise, continue to the next iteration.
+If it exits non-zero, treat the loop as **incomplete**: the fast gate missed a regression in files outside the per-iteration scope. Set the completion status to **failure** with reason "end-of-loop full quality gates failed", surface the failing output in the report, and suggest rerunning marge or fixing the issue manually before re-running this command.
 
-**Failure handling**: If the sub agent fails (crash, timeout, or error), abort the loop immediately. Log failure context: iteration number, agent type (marge), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review.
+If it exits zero, proceed to review report verification.
 
-### Step 6: Report Results
+## Post-Loop: Review Report Verification
 
-After the loop completes, report:
-- Total iterations run
-- Completion status (one of: **success** — all findings resolved; **max iterations reached** — limit hit without resolution; **stuck** — 2 consecutive iterations with no file changes and no completion signal; **failure** — sub agent crashed or errored)
-- Count of findings that remain flagged `NEEDS_HUMAN` (extract from the last sub agent's report) — these require manual review
-- Suggestion to rerun if not fully resolved
+After the loop completes, confirm `<FEATURE_DIR>/review-report.md` exists and was written by the final sub agent — the persisted review report is the contract the split step (`/speckit.split`) reads to enforce gating per FR-018. If the file is absent after the loop completes, surface this as a failure and instruct the user to re-run `/speckit.marge.review` before invoking `/speckit.split`.
+
+## Persisted Review Report (FR-012a)
+
+Every iteration of this loop spawns a Marge sub agent (per `.claude/agents/marge.md`) that MUST overwrite `<FEATURE_DIR>/review-report.md` before exiting. This command does NOT write the file directly; it relies on the agent's persistence contract documented in the **Persisted Review Report** section of `.claude/agents/marge.md` (sourced from `claude-agents/marge.md`).
+
+The persisted report is the single source of truth the split step consumes for per-phase gating decisions. It MUST conform to the contract specified at `specs/008-feat-multi-phase-deploys/contracts/review-report.md`:
+
+- A single GitHub Flavored Markdown table with the **exact** header row `| ID | Severity | Phase | Status | Check Pack | Summary |` in that order.
+- Stable per-finding `ID` values reused across runs against the same branch state.
+- `Severity` is one of `high`, `medium`, `low`, `informational`.
+- `Phase` is the integer phase number for multi-phase findings attributable to a single phase, or the literal `-` for single-phase findings or multi-phase non-attributable structural inconsistencies.
+- `Status` is `open` for new findings; transitions to `resolved` only when a subsequent run confirms the issue is gone.
+- `Check Pack` is the source check pack filename (informational; not used for gating).
+- `Summary` is a single-sentence human-readable description; pipe characters in cell values MUST be escaped as `\|` so `awk -F '|'` parses cleanly.
+- The file is overwritten in full on every Marge run (never appended to).
+
+The orchestrator MUST treat absence of `<FEATURE_DIR>/review-report.md` after the loop completes as a Marge failure, since downstream commands (`/speckit.split`) refuse to run without it.
 
 ## Examples
 

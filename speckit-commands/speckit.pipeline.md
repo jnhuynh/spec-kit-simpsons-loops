@@ -97,7 +97,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 
 If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically:
 
-1. **Determine if on a feature branch**: Run `git rev-parse --abbrev-ref HEAD` via Bash tool. If the branch matches the pattern `^[0-9]{3}-` (e.g., `004-fix-prereq-bootstrap`), it is a feature branch.
+1. **Determine if on a feature branch**: Run `git rev-parse --abbrev-ref HEAD` via Bash tool. If the branch matches the pattern `^[a-z0-9]{4}-` (e.g., `c078-feat-user-auth`), it is a feature branch.
 
 2. **Feature branch resolution**: Run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root via Bash tool. This resolves paths without validating artifact existence. Parse the JSON output for `FEATURE_DIR`.
 
@@ -264,13 +264,14 @@ Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeli
 
 #### Ralph (loop step)
 
-**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` exists and contains executable content. Run the following via Bash tool:
+**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` (full gate, required) exists and contains executable content, and check for `.specify/quality-gates-fast.sh` (fast gate, optional). Run the following via Bash tool:
 
 ```bash
 test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
+test -f .specify/quality-gates-fast.sh && echo "FAST_GATE_EXISTS" || echo "FAST_GATE_MISSING"
 ```
 
-If the file does not exist or contains only comments/whitespace (the command above produces no output), **STOP** the pipeline with this error:
+If the full gate file does not exist or contains only comments/whitespace (the first command produces no output), **STOP** the pipeline with this error:
 
 ```
 ERROR: Quality gates file is missing or empty.
@@ -280,8 +281,13 @@ Expected: .specify/quality-gates.sh with executable commands.
 Create the file with your project's quality gate commands, e.g.:
   echo 'npm test && npm run lint' > .specify/quality-gates.sh
 
-The ralph phase requires quality gates to validate implementation work.
+The ralph and marge phases require quality gates to validate implementation work.
+
+Optionally, also create .specify/quality-gates-fast.sh with scoped commands
+that check only changed files for faster per-iteration feedback.
 ```
+
+Determine the per-iteration gate command: if `.specify/quality-gates-fast.sh` exists and is non-empty, use `bash .specify/quality-gates-fast.sh`; otherwise fall back to `bash .specify/quality-gates.sh`.
 
 **Calculate ralph max iterations**: Count incomplete tasks in tasks.md and add 10:
 
@@ -302,12 +308,20 @@ Execute the Ralph loop using the shared loop orchestrator. Read and follow `.cla
 - **PREREQ_FLAGS**: --json --require-tasks --include-tasks
 - **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
 - **MAX_ITERATIONS**: (use `ralph_max_iterations` calculated above)
-- **EXTRA_PROMPT_SUFFIX**: Quality gates: bash .specify/quality-gates.sh
+- **EXTRA_PROMPT_SUFFIX**: Quality gates: (use the per-iteration gate command determined above)
 - **REPORT_MODE**: tasks
 
 Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
 
 **Post-loop verification**: After the orchestrator reports completion via promise tag, also verify tasks.md directly — if any `- [ ]` tasks remain, report the discrepancy.
+
+**End-of-loop full quality gate**: When the ralph loop exits via the success path (all tasks complete), run the full gate once via Bash tool:
+
+```bash
+bash .specify/quality-gates.sh
+```
+
+If it exits non-zero, abort the pipeline with completion status **failure** and reason "ralph end-of-loop full quality gates failed". Surface the failing output in the report and suggest resuming with `--from ralph`. Skip the simplify, security-review, and marge steps. Do NOT run this gate on max-iterations, stuck, or failure exits — those already terminate the pipeline.
 
 **Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from ralph`.
 
@@ -369,6 +383,14 @@ Execute the Marge loop using the shared loop orchestrator. Read and follow `.cla
 - **REPORT_MODE**: needs_human
 
 Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
+
+**End-of-loop full quality gate**: When the marge loop exits via the success path (all findings resolved), run the full gate once via Bash tool:
+
+```bash
+bash .specify/quality-gates.sh
+```
+
+If it exits non-zero, set the pipeline completion status to **failure** with reason "marge end-of-loop full quality gates failed", surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run this gate on max-iterations, stuck, or failure exits.
 
 **Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from marge`.
 

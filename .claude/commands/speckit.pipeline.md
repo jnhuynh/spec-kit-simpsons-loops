@@ -97,7 +97,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 
 If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically:
 
-1. **Determine if on a feature branch**: Run `git rev-parse --abbrev-ref HEAD` via Bash tool. If the branch matches the pattern `^[0-9]{3}-` (e.g., `004-fix-prereq-bootstrap`), it is a feature branch.
+1. **Determine if on a feature branch**: Run `git rev-parse --abbrev-ref HEAD` via Bash tool. If the branch matches the pattern `^[a-z0-9]{4}-` (e.g., `c078-feat-user-auth`), it is a feature branch.
 
 2. **Feature branch resolution**: Run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root via Bash tool. This resolves paths without validating artifact existence. Parse the JSON output for `FEATURE_DIR`.
 
@@ -205,21 +205,22 @@ Skip if `spec.md` already exists. Otherwise, spawn a sub agent:
 **Post-step stop check**: After the specify step completes (whether it was executed or skipped because `spec.md` already exists), check if `STOP_AFTER_STEP` is set and equals `specify`. If it does, output: `Pipeline stopped after specify per --stop-after parameter. Skipping: homer, plan, tasks, lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Homer (loop step)
-Initialize `consecutive_stuck_count = 0`. For each iteration (up to homer max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Execute the Homer loop using the shared loop orchestrator. Read and follow `.claude/agents/loop-orchestrator.md` with this LOOP_CONFIG:
 
-**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+- **AGENT_NAME**: homer
+- **AGENT_DISPLAY_NAME**: Homer
+- **AGENT_FILE**: .claude/agents/homer.md
+- **SLASH_COMMAND_REF**: /speckit.clarify
+- **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
+- **PREREQ_FLAGS**: --json --paths-only
+- **REQUIRED_ARTIFACTS**: spec.md
+- **MAX_ITERATIONS**: 30 (or homer max from Step 4)
+- **EXTRA_PROMPT_SUFFIX**: (none)
+- **REPORT_MODE**: standard
 
-- **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/homer.md`
+Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
 
-**After** each sub agent returns:
-1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, homer is complete — proceed to the next pipeline step.
-2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
-3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the homer loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
-5. Otherwise, continue to the next iteration.
-
-**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (homer), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from homer`.
+**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from homer`.
 
 **Post-step stop check**: After the homer step completes, check if `STOP_AFTER_STEP` is set and equals `homer`. If it does, output: `Pipeline stopped after homer per --stop-after parameter. Skipping: plan, tasks, lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
@@ -242,33 +243,35 @@ Skip if `tasks.md` already exists. Otherwise, spawn a sub agent:
 **Post-step stop check**: After the tasks step completes (whether it was executed or skipped because `tasks.md` already exists), check if `STOP_AFTER_STEP` is set and equals `tasks`. If it does, output: `Pipeline stopped after tasks per --stop-after parameter. Skipping: lisa, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Lisa (loop step)
-Initialize `consecutive_stuck_count = 0`. For each iteration (up to lisa max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Execute the Lisa loop using the shared loop orchestrator. Read and follow `.claude/agents/loop-orchestrator.md` with this LOOP_CONFIG:
 
-**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+- **AGENT_NAME**: lisa
+- **AGENT_DISPLAY_NAME**: Lisa
+- **AGENT_FILE**: .claude/agents/lisa.md
+- **SLASH_COMMAND_REF**: /speckit.analyze
+- **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
+- **PREREQ_FLAGS**: --json --require-tasks --include-tasks
+- **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
+- **MAX_ITERATIONS**: 30 (or lisa max from Step 4)
+- **EXTRA_PROMPT_SUFFIX**: (none)
+- **REPORT_MODE**: standard
 
-- **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/lisa.md`
+Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
 
-**After** each sub agent returns:
-1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, lisa is complete — proceed to the next pipeline step.
-2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
-3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the lisa loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
-5. Otherwise, continue to the next iteration.
-
-**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (lisa), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from lisa`.
+**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from lisa`.
 
 **Post-step stop check**: After the lisa step completes, check if `STOP_AFTER_STEP` is set and equals `lisa`. If it does, output: `Pipeline stopped after lisa per --stop-after parameter. Skipping: ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
 #### Ralph (loop step)
 
-**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` exists and contains executable content. Run the following via Bash tool:
+**Quality gate validation**: Before starting the ralph loop, validate that `.specify/quality-gates.sh` (full gate, required) exists and contains executable content, and check for `.specify/quality-gates-fast.sh` (fast gate, optional). Run the following via Bash tool:
 
 ```bash
 test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
+test -f .specify/quality-gates-fast.sh && echo "FAST_GATE_EXISTS" || echo "FAST_GATE_MISSING"
 ```
 
-If the file does not exist or contains only comments/whitespace (the command above produces no output), **STOP** the pipeline with this error:
+If the full gate file does not exist or contains only comments/whitespace (the first command produces no output), **STOP** the pipeline with this error:
 
 ```
 ERROR: Quality gates file is missing or empty.
@@ -278,8 +281,13 @@ Expected: .specify/quality-gates.sh with executable commands.
 Create the file with your project's quality gate commands, e.g.:
   echo 'npm test && npm run lint' > .specify/quality-gates.sh
 
-The ralph phase requires quality gates to validate implementation work.
+The ralph and marge phases require quality gates to validate implementation work.
+
+Optionally, also create .specify/quality-gates-fast.sh with scoped commands
+that check only changed files for faster per-iteration feedback.
 ```
+
+Determine the per-iteration gate command: if `.specify/quality-gates-fast.sh` exists and is non-empty, use `bash .specify/quality-gates-fast.sh`; otherwise fall back to `bash .specify/quality-gates.sh`.
 
 **Calculate ralph max iterations**: Count incomplete tasks in tasks.md and add 10:
 
@@ -290,22 +298,32 @@ echo $((incomplete_count + 10))
 
 Use the resulting number as `ralph_max_iterations`.
 
-Initialize `consecutive_stuck_count = 0`. For each iteration (up to ralph max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
+Execute the Ralph loop using the shared loop orchestrator. Read and follow `.claude/agents/loop-orchestrator.md` with this LOOP_CONFIG:
 
-**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+- **AGENT_NAME**: ralph
+- **AGENT_DISPLAY_NAME**: Ralph
+- **AGENT_FILE**: .claude/agents/ralph.md
+- **SLASH_COMMAND_REF**: /speckit.implement
+- **PROMISE_TAG**: ALL_TASKS_COMPLETE
+- **PREREQ_FLAGS**: --json --require-tasks --include-tasks
+- **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
+- **MAX_ITERATIONS**: (use `ralph_max_iterations` calculated above)
+- **EXTRA_PROMPT_SUFFIX**: Quality gates: (use the per-iteration gate command determined above)
+- **REPORT_MODE**: tasks
 
-- **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/ralph.md`
-- **prompt** (additional): Include quality gates: `Quality gates: bash .specify/quality-gates.sh`
+Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
 
-**After** each sub agent returns:
-1. Check output for `<promise>ALL_TASKS_COMPLETE</promise>`. Also verify tasks.md directly (check if any `- [ ]` tasks remain). If all tasks are complete, ralph is done — proceed to reporting.
-2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
-3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the ralph loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
-5. Otherwise, continue to the next iteration.
+**Post-loop verification**: After the orchestrator reports completion via promise tag, also verify tasks.md directly — if any `- [ ]` tasks remain, report the discrepancy.
 
-**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (ralph), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from ralph`.
+**End-of-loop full quality gate**: When the ralph loop exits via the success path (all tasks complete), run the full gate once via Bash tool:
+
+```bash
+bash .specify/quality-gates.sh
+```
+
+If it exits non-zero, abort the pipeline with completion status **failure** and reason "ralph end-of-loop full quality gates failed". Surface the failing output in the report and suggest resuming with `--from ralph`. Skip the simplify, security-review, and marge steps. Do NOT run this gate on max-iterations, stuck, or failure exits — those already terminate the pipeline.
+
+**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from ralph`.
 
 **Post-step stop check**: After the ralph step completes, check if `STOP_AFTER_STEP` is set and equals `ralph`. If it does, output: `Pipeline stopped after ralph per --stop-after parameter. Skipping: marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
 
@@ -348,21 +366,59 @@ If **PRESENT**, spawn a sub agent:
 This phase is not an independent step in the `--stop-after` mapping; it runs implicitly between ralph and marge when its skill is present.
 
 #### Marge (loop step)
-Initialize `consecutive_stuck_count = 0`. For each iteration (up to marge max), spawn ONE sub agent at a time (wait for it to return before spawning the next):
 
-**Before** each sub agent: record `PRE_ITERATION_SHA=$(git rev-parse HEAD)` via Bash tool.
+**Diff existence check**: Confirm there is a diff to review. Run `git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD` via Bash tool; if the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review."
 
+Execute the Marge loop using the shared loop orchestrator. Read and follow `.claude/agents/loop-orchestrator.md` with this LOOP_CONFIG:
+
+- **AGENT_NAME**: marge
+- **AGENT_DISPLAY_NAME**: Marge
+- **AGENT_FILE**: .claude/agents/marge.md
+- **SLASH_COMMAND_REF**: /speckit.review
+- **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
+- **PREREQ_FLAGS**: --json --require-tasks --include-tasks
+- **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
+- **MAX_ITERATIONS**: 30 (or marge max from Step 4)
+- **EXTRA_PROMPT_SUFFIX**: (none)
+- **REPORT_MODE**: needs_human
+
+Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
+
+**End-of-loop full quality gate**: When the marge loop exits via the success path (all findings resolved), run the full gate once via Bash tool:
+
+```bash
+bash .specify/quality-gates.sh
+```
+
+If it exits non-zero, set the pipeline completion status to **failure** with reason "marge end-of-loop full quality gates failed", surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run this gate on max-iterations, stuck, or failure exits.
+
+**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from marge`.
+
+#### PR Review (optional single-shot step — skip if no open PR or skill absent)
+
+Detect whether the `/speckit.review.pr` skill is installed. Run via Bash tool:
+
+```bash
+if test -f ".claude/commands/speckit.review.pr.md"; then echo "PRESENT"; else echo "ABSENT"; fi
+```
+
+If **ABSENT**, log `speckit.review.pr not installed — skipping PR review` and proceed to Step 6.
+
+If **PRESENT**, check for an open PR:
+
+```bash
+gh pr view --json number --jq '.number' 2>/dev/null
+```
+
+If no PR exists, log `No open PR for current branch — skipping PR review` and proceed to Step 6.
+
+If both conditions pass, spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/marge.md`
+- **prompt**: `Read and follow the instructions in .claude/commands/speckit.review.pr.md. Run non-interactively — auto-detect the PR from the current branch.`
 
-**After** each sub agent returns:
-1. Check output for `<promise>ALL_FINDINGS_RESOLVED</promise>`. If found, marge is complete — proceed to reporting.
-2. Check `git diff $PRE_ITERATION_SHA --stat` via Bash tool for file changes.
-3. **Stuck detection**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`.
-4. If `consecutive_stuck_count >= 2`, abort the marge loop — report "stuck: 2 consecutive iterations with no file changes and no completion signal".
-5. Otherwise, continue to the next iteration.
+**Failure handling**: If the sub agent fails, log `PR review phase failed — continuing pipeline`. Do NOT abort — PR review is informational, not a gate.
 
-**Failure handling**: If a sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: iteration number, agent type (marge), and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from marge`.
+This phase is not an independent step in the `--stop-after` mapping; it runs implicitly after marge when its skill is present and an open PR exists.
 
 ### Step 6: Report Results
 
@@ -403,6 +459,8 @@ Report one of:
 - **success** — all steps in the execution range completed successfully
 - **max iterations reached** — a loop step hit its iteration limit
 - **stuck** — 2 consecutive iterations with no file changes and no completion signal
+- **stalled** — 3 consecutive iterations without reducing work count
+- **oscillating** — work count alternating between two values
 - **failure** — a sub agent crashed or errored
 - **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before marge due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
 

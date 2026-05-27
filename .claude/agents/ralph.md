@@ -8,7 +8,7 @@ Execute **one task** from tasks.md per iteration. Each iteration runs with FRESH
 
 The feature directory and quality gates are provided via the `-p` prompt when this agent is invoked. Extract:
 - **Feature directory**: the path (e.g., "Feature directory: specs/a1b2-feat-foo")
-- **Quality gates**: the commands to run for validation (e.g., "Quality gates: npm test && npm run lint")
+- **Quality gates**: the per-iteration command to run for validation. The orchestrator passes the **fast** gate (`bash .specify/quality-gates-fast.sh`) when available, which scopes checks to changed files for quick feedback. If only the full gate exists, it passes that instead. The orchestrator runs the **full** gate (`bash .specify/quality-gates.sh`) once after the loop terminates — do not run it yourself per iteration.
 
 ## Phase 0: Orient
 

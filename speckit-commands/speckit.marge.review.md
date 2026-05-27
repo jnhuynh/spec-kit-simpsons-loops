@@ -40,6 +40,36 @@ git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base
 
 If the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review — run /speckit.ralph.implement first."
 
+## Pre-Loop: Quality Gates Validation
+
+Marge uses two gates: an optional **fast** scoped gate (`.specify/quality-gates-fast.sh`) per iteration (invoked from `.claude/agents/marge.md`) and the **full** gate (`.specify/quality-gates.sh`) once after the loop terminates.
+
+Validate that the full gate file exists and contains executable content. Run via Bash tool:
+
+```bash
+test -f .specify/quality-gates.sh && grep -v '^\s*#' .specify/quality-gates.sh | grep -v '^\s*$' | head -1
+```
+
+If the file is missing or contains only comments/whitespace (the command produces no output), **STOP** with this error:
+
+```
+ERROR: Quality gates file is missing or empty.
+
+Expected: .specify/quality-gates.sh with executable commands.
+
+The full quality gates file is required for Marge to validate review fixes.
+Create or update .specify/quality-gates.sh with your project's quality gate
+commands (e.g., npm test && npm run lint). The file must exit 0 for gates to pass.
+```
+
+Also check for the optional fast gate:
+
+```bash
+test -f .specify/quality-gates-fast.sh && echo "EXISTS" || echo "MISSING"
+```
+
+If the fast gate exists, note this — the marge agent will use it per iteration. If missing, the agent falls back to the full gate per iteration.
+
 ## Loop Configuration
 
 Set the following LOOP_CONFIG values for this execution:
@@ -58,6 +88,20 @@ Set the following LOOP_CONFIG values for this execution:
 ## Execute
 
 Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using the LOOP_CONFIG values above. Pass `$ARGUMENTS` through for argument parsing.
+
+## Post-Loop: End-of-Loop Full Quality Gate
+
+Run only when the loop exited via the **success** path (`<promise>ALL_FINDINGS_RESOLVED</promise>` observed). Skip on max-iterations, stuck, or failure exits.
+
+Run via Bash tool:
+
+```bash
+bash .specify/quality-gates.sh
+```
+
+If it exits non-zero, treat the loop as **incomplete**: the fast gate missed a regression in files outside the per-iteration scope. Set the completion status to **failure** with reason "end-of-loop full quality gates failed", surface the failing output in the report, and suggest rerunning marge or fixing the issue manually before re-running this command.
+
+If it exits zero, proceed to review report verification.
 
 ## Post-Loop: Review Report Verification
 

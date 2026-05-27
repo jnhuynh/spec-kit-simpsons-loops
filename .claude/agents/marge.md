@@ -27,7 +27,7 @@ Run `/speckit.review Remediate only the single highest-severity finding without 
 1. Re-read all modified files
 2. Verify the fix resolved its finding
 3. Check no new same-or-higher severity issues were introduced
-4. Run `bash .specify/quality-gates.sh` — if it exits non-zero, treat as a failed fix and revert
+4. Run `bash .specify/quality-gates-fast.sh` (or `bash .specify/quality-gates.sh` if the fast gate does not exist) — if it exits non-zero, treat as a failed fix and revert. The fast gate scopes checks to changed files for quick per-iteration feedback; the orchestrator runs the full gate (`.specify/quality-gates.sh`) once after the loop terminates.
 
 ## Phase 3: Commit & Exit
 
@@ -48,6 +48,7 @@ Run `/speckit.review Remediate only the single highest-severity finding without 
 | 996 | **Validate after remediation** — Re-read modified files AND pass quality gates before committing    |
 | 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW            |
 | 994 | **Mechanical fixes only** — Skip `NEEDS_HUMAN` findings; they require human judgment                |
+| 993 | **Coordinated multi-file fixes** — When the highest-severity finding requires changes across multiple files (e.g., extracting a duplicated helper into a shared module and updating all call sites), make ALL related changes in this iteration. One finding = one logical finding, not one file edit. |
 
 ## File Paths
 
@@ -57,4 +58,5 @@ Run `/speckit.review Remediate only the single highest-severity finding without 
 - Constitution: `.specify/memory/constitution.md`
 - Review packs: `.specify/marge/checks/*.md`
 - Project guidelines: `CLAUDE.md` (repo root)
-- Quality gates: `.specify/quality-gates.sh`
+- Quality gates (fast, per-iteration): `.specify/quality-gates-fast.sh`
+- Quality gates (full, end-of-loop): `.specify/quality-gates.sh`
