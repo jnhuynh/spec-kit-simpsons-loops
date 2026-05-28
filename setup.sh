@@ -4,7 +4,18 @@ set -euo pipefail
 # ─── Simpsons Loops installer ───────────────────────────────────────
 # Run from the ROOT of your target project:
 #   bash <path-to-simpsons-loops>/setup.sh
+#
+# To install into itself for dogfooding:
+#   bash setup.sh --self
 # ─────────────────────────────────────────────────────────────────────
+
+SELF_INSTALL=false
+while [[ $# -gt 0 && "$1" == --* ]]; do
+  case "$1" in
+    --self) SELF_INSTALL=true; shift ;;
+    *) echo "Unknown option: $1"; exit 1 ;;
+  esac
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(pwd)"
@@ -23,10 +34,13 @@ if [[ ! -d "$PROJECT_DIR/.specify" ]]; then
   exit 1
 fi
 
-if [[ "$SCRIPT_DIR" == "$PROJECT_DIR" ]]; then
+if [[ "$SCRIPT_DIR" == "$PROJECT_DIR" && "$SELF_INSTALL" != true ]]; then
   echo "ERROR: You are running setup.sh from inside the simpsons-loops repo itself."
   echo "       cd into your target project first, then run:"
   echo "         bash $SCRIPT_DIR/setup.sh"
+  echo ""
+  echo "       To install into itself for dogfooding, use:"
+  echo "         bash setup.sh --self"
   exit 1
 fi
 
@@ -34,7 +48,10 @@ echo "Installing Simpsons Loops into: $PROJECT_DIR"
 echo ""
 
 # ── 0b. Deploy CLAUDE.md and constitution.md ─────────────────────────
-"$SCRIPT_DIR/templates/setup.sh" init "$PROJECT_DIR"
+# Skip for self-install — the repo has its own CLAUDE.md and constitution
+if [[ "$SELF_INSTALL" != true ]]; then
+  "$SCRIPT_DIR/templates/setup.sh" init "$PROJECT_DIR"
+fi
 
 # ── 0. Quality gate file (never overwrite) ──────────────────────────
 # MUST run before file copies so we can inspect the target's existing
