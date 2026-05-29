@@ -67,15 +67,53 @@ Given that feature description, do this:
        - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
     4. Fill User Scenarios & Testing section
        If no clear user flow: ERROR "Cannot determine user scenarios"
-    5. Generate Functional Requirements
+    5. **Phase Detection and Grouping** (after User Scenarios, before Requirements):
+       Analyze the generated user stories for natural deployment boundaries and group them into ordered phases.
+
+       a. **Detect deployment boundary signals** across all user stories:
+          - **Migration signals**: schema change, migration, expand-and-contract, alter table, new columns, database restructuring
+          - **Integration signals**: API key, webhook, OAuth, payment provider, external service, third-party dependency
+          - **Infrastructure signals**: shared service, middleware, message queue, cache invalidation, infrastructure provisioning
+          - **Scope signals**: 4+ user stories with distinct concern areas (e.g., backend data, external integration, user-facing UI)
+
+       b. **Assign each story to exactly one phase**:
+          - Group stories by deployment dependency order: foundational changes first (migrations, infrastructure), dependent features second (integrations, services), user-facing reveals last (UI, endpoints)
+          - Stories within the same concern area that share deployment risk belong in the same phase
+          - Each user story is assigned to exactly one phase -- no story appears in multiple phases
+
+       c. **Determine release strategy per phase**:
+          - **"dark launch with gradual reveal"**: for phases containing stories with migration signals, integration signals, or infrastructure signals (high-risk changes touching shared systems)
+          - **"direct release"**: for phases containing only low-risk additive work (new endpoints, UI additions, documentation) with no migration, integration, or infrastructure signals
+
+       d. **Single-concern features**: If **none** of the signals above are detected (all stories are low-risk additive work), generate a single phase containing all stories with release strategy "direct release". Do not artificially split straightforward work into multiple phases.
+
+       e. **Generate the `## Phases` section** using the results from steps a-d. Place this section between User Scenarios and Requirements. Format each phase as a subsection:
+
+          ```markdown
+          ## Phases
+
+          ### Phase {N}: {slug}
+          **Stories**: {comma-separated story references, e.g., "User Story 1, User Story 3"}
+          **Release Strategy**: {dark launch with gradual reveal | direct release}
+          **Rationale**: {explanation of why this phase boundary exists}
+          ```
+
+          **Constraints**:
+          - Phase numbers MUST be sequential starting from 1 with no gaps
+          - Maximum 10 phases per spec -- if the analysis produces more than 10, consolidate related phases until the count is 10 or fewer
+          - Each user story MUST be assigned to exactly one phase -- no story appears in multiple phases and no story is omitted
+          - Phase slugs MUST be valid kebab-case (lowercase alphanumeric and hyphens, e.g., `expand-schema`, `payment-integration`)
+          - Single-concern features produce exactly one phase, not zero phases
+
+    6. Generate Functional Requirements
        Each requirement must be testable
        Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
-    6. Define Success Criteria
+    7. Define Success Criteria
        Create measurable, technology-agnostic outcomes
        Include both quantitative metrics (time, performance, volume) and qualitative measures (user satisfaction, task completion)
        Each criterion must be verifiable without implementation details
-    7. Identify Key Entities (if data involved)
-    8. Return: SUCCESS (spec ready for planning)
+    8. Identify Key Entities (if data involved)
+    9. Return: SUCCESS (spec ready for planning)
 
 5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
 
