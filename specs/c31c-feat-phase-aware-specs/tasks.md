@@ -86,7 +86,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T009 [US4] Extend `speckit-commands/speckit.split.md` with status transition validation: (a) on re-run, read existing status values from the manifest; (b) validate that any status changes follow the forward-only state machine: Draft -> In Progress -> Complete, with any active state (Draft, In Progress) allowing transition to Cancelled; (c) reject invalid backward transitions (In Progress -> Draft, Complete -> Draft, Complete -> In Progress, Complete -> Cancelled, Cancelled -> Draft/In Progress/Complete) with an error message identifying the phase and the invalid transition -- note that Complete is NOT an active state per FR-019, so Complete -> Cancelled is also invalid; (d) preserve manually-set status values during re-runs
+- [x] T009 [US4] Extend `speckit-commands/speckit.split.md` with status transition validation: (a) on re-run, read existing status values from the manifest; (b) validate that any status changes follow the forward-only state machine: Draft -> In Progress -> Complete, with any active state (Draft, In Progress) allowing transition to Cancelled; (c) reject invalid backward transitions (In Progress -> Draft, Complete -> Draft, Complete -> In Progress, Complete -> Cancelled, Cancelled -> Draft/In Progress/Complete) with an error message identifying the phase and the invalid transition -- note that Complete is NOT an active state per FR-019, so Complete -> Cancelled is also invalid; (d) preserve manually-set status values during re-runs
 
 **Checkpoint**: User Story 4 complete -- developers can track multi-phase feature progress via the parent manifest
 

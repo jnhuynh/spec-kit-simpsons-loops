@@ -162,7 +162,35 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    d. **Status preservation**: If a manifest already exists from a previous run, preserve manually-set status values for existing phases. New phases get status "Draft".
 
-   e. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
+   e. **Status transition validation**: When a manifest already exists, validate that any status values in the existing manifest are consistent with the forward-only state machine before writing the updated manifest. For each phase present in both the old and new manifest:
+
+      **Valid transitions** (allowed):
+      - Draft -> In Progress
+      - In Progress -> Complete
+      - Draft -> Cancelled
+      - In Progress -> Cancelled
+      - Any status -> same status (no change)
+
+      **Invalid transitions** (rejected):
+      - In Progress -> Draft
+      - Complete -> Draft
+      - Complete -> In Progress
+      - Complete -> Cancelled
+      - Cancelled -> Draft
+      - Cancelled -> In Progress
+      - Cancelled -> Complete
+
+      **Note**: Complete is NOT an active state. Both Complete -> Cancelled and Cancelled -> Complete are invalid.
+
+      If the splitting skill would set a status that requires an invalid transition (e.g., a phase marked "Complete" by the developer would be overwritten with "Draft" by a fresh re-run), report an error and **STOP**:
+      ```
+      ERROR: Invalid status transition for Phase {N} ({slug}): {old status} -> {new status}.
+      Status transitions must be forward-only: Draft -> In Progress -> Complete. Active states (Draft, In Progress) may transition to Cancelled. Backward transitions and transitions from terminal states (Complete, Cancelled) are not permitted.
+      ```
+
+      **Implementation detail**: The splitting skill itself only ever sets status to "Draft" (for new phases) or preserves existing values (per step 7d). Invalid transitions arise when a developer manually sets a status value in the manifest and then the splitting skill re-runs. The validation catches cases where the developer set an invalid transition (e.g., moving a Complete phase back to Draft) before the manifest is written, providing an early error rather than silently accepting an invalid state.
+
+   f. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
 
 8. **Report results**:
    - List each child spec directory created or updated
@@ -186,3 +214,4 @@ Running `/speckit.split` multiple times on the same unchanged parent spec and ch
 | Directory name exceeds 200 characters | WARNING: truncate slug, create directory, warn developer |
 | Phase numbers not sequential | ERROR: report which numbers are missing or out of order |
 | Duplicate story assignments | ERROR: report which stories appear in multiple phases |
+| Invalid status transition | ERROR: report the phase, current status, and attempted new status; explain allowed transitions |
