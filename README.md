@@ -13,7 +13,7 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
-| Pipeline | End-to-end orchestrator: specify -> homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                      |
+| Pipeline | End-to-end orchestrator: specify -> phase -> homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                             |
 
 **Pre-pipeline:**
 
@@ -40,7 +40,8 @@ The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each
 flowchart TD
     A["/speckit.pipeline"] --> B{Auto-detect\nstarting step}
     B --> C["Specify\n(sub agent)"]
-    C --> D["Homer Loop"]
+    C --> P["Phase\n(sub agent)"]
+    P --> D["Homer Loop"]
     D --> D1["Iteration 1\n(sub agent)"]
     D1 --> D2["Iteration 2\n(sub agent)"]
     D2 --> D3["... until resolved\nor max iterations"]
@@ -92,7 +93,7 @@ You can also run each loop individually and review between stages instead of run
 
 When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
 
-1. **Specify with phase awareness** — `/speckit.specify` now detects deployment boundaries (migrations, integrations, infrastructure changes, scope) and groups user stories into ordered phases with release strategy recommendations (dark launch vs direct release).
+1. **Specify, then detect phases** — Run `/speckit.specify` as usual, then `/speckit.phase` to detect deployment boundaries (migrations, integrations, infrastructure changes, scope) and group user stories into ordered phases with release strategy recommendations (dark launch vs direct release). The pipeline runs this automatically between specify and homer.
 
 2. **Split into child specs** — Run `/speckit.split` on the phase-annotated parent spec. This generates independent child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. Each child spec has the standard SpecKit structure and can run through the full pipeline independently.
 
@@ -144,6 +145,7 @@ cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
 cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
+cp <path-to-simpsons-loops>/claude-agents/phase.md   .claude/agents/phase.md
 cp <path-to-simpsons-loops>/claude-agents/split.md  .claude/agents/split.md
 
 # Loop commands -> .claude/commands/
@@ -155,7 +157,7 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claud
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/commands/speckit.review.pr.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.specify.md        .claude/commands/speckit.specify.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.phase.md         .claude/commands/speckit.phase.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/commands/speckit.split.md
 
 # Marge review packs -> .specify/marge/checks/
@@ -352,13 +354,14 @@ Or bootstrap end-to-end from a feature description:
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
 - No `spec.md` but `--description` provided -> **specify**
-- `spec.md` exists -> **homer**
+- `spec.md` exists but no `## Phases` section populated -> **phase**
+- `spec.md` exists with `## Phases` populated -> **homer**
 - `plan.md` exists -> **tasks**
 - `tasks.md` with no tasks started -> **lisa**
 - `tasks.md` with some tasks completed -> **ralph**
 - `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
 
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `phase`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
 

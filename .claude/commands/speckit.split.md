@@ -21,7 +21,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    a. Locate the `## Phases` section. If no `## Phases` section exists, report this error and **STOP**:
       ```
       ERROR: No phase annotations found in spec.md.
-      Run `/speckit.specify` to generate phase annotations before splitting.
+      Run `/speckit.phase` to generate phase annotations before splitting.
       ```
 
    b. Parse each phase subsection (`### Phase {N}: {slug}`) and extract:
@@ -226,7 +226,7 @@ Running `/speckit.split` multiple times on the same unchanged parent spec and ch
 
 | Condition | Behavior |
 |-----------|----------|
-| No `## Phases` section in spec.md | ERROR: suggest running `/speckit.specify` |
+| No `## Phases` section in spec.md | ERROR: suggest running `/speckit.phase` |
 | More than 10 phases | ERROR: suggest consolidating phases |
 | Directory name exceeds 200 characters | WARNING: truncate slug, create directory, warn developer |
 | Phase numbers not sequential | ERROR: report which numbers are missing or out of order |
