@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/c31c-feat-phase-aware-specs/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Not explicitly requested in the feature specification. Test tasks are omitted.
+**Tests**: Test-first development is N/A for this feature -- all changes are to markdown command files and shell script configuration with no testable application logic (per plan.md constitution check). Functional validation via the testing checklist in quickstart.md covers behavior verification.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
