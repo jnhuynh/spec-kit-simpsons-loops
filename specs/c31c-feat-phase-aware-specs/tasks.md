@@ -100,7 +100,7 @@
 
 ### Implementation for User Story 5
 
-- [ ] T010 [US5] Extend `speckit-commands/speckit.split.md` with phase management for adds and removes: (a) detect added phases: phases present in parent annotations but not in existing manifest -- create new child spec directories in the correct phase-order position; (b) detect removed phases: phases present in existing manifest but not in parent annotations -- preserve directory on disk, mark status as "Cancelled" in manifest; (c) maintain correct phase ordering in manifest after adds/removes; (d) for cancelled phases, preserve the child directory untouched on subsequent re-runs
+- [x] T010 [US5] Extend `speckit-commands/speckit.split.md` with phase management for adds and removes: (a) detect added phases: phases present in parent annotations but not in existing manifest -- create new child spec directories in the correct phase-order position; (b) detect removed phases: phases present in existing manifest but not in parent annotations -- preserve directory on disk, mark status as "Cancelled" in manifest; (c) maintain correct phase ordering in manifest after adds/removes; (d) for cancelled phases, preserve the child directory untouched on subsequent re-runs
 
 **Checkpoint**: User Story 5 complete -- flexible phase management supports evolving multi-phase plans
 

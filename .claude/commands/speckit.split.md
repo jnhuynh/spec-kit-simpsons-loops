@@ -48,7 +48,17 @@ You **MUST** consider the user input before proceeding (if not empty).
    - If a manifest exists, parse the existing status values for each phase entry
    - Check which child directories already exist under `specs/`
 
-6. **For each phase, create or update the child spec directory**:
+   **Detect added and removed phases** (when a manifest exists from a previous split):
+
+   a. **Added phases**: Phases present in the current parent `## Phases` annotations (from step 3) but absent from the existing manifest. These are new phases the developer added to the parent spec after the initial split. They will receive new child spec directories in step 6 and appear in the manifest with status "Draft" in step 7.
+
+   b. **Removed phases**: Phases present in the existing manifest but absent from the current parent `## Phases` annotations. These are phases the developer removed from the parent spec. Their child directories are **preserved on disk** (never deleted). They will be marked as "Cancelled" in the manifest in step 7.
+
+   c. **Continuing phases**: Phases present in both the current annotations and the existing manifest. These proceed through the normal create-or-update logic in step 6.
+
+6. **For each phase, create or update the child spec directory** (skip removed/cancelled phases):
+
+   **Important**: Only process phases that are present in the current parent `## Phases` annotations (continuing phases and added phases). Do NOT create, update, or reconcile child specs for removed phases -- their directories remain on disk untouched, and they are handled solely through the manifest in step 7.
 
    a. Compute the child directory name: `{parent-directory-name}--p{N}-{phase-slug}`
       - If the total directory name exceeds 200 characters, truncate the slug portion to fit within 200 characters while preserving `{parent-directory-name}--p{N}-`, and warn the developer about the truncation
@@ -160,9 +170,14 @@ You **MUST** consider the user input before proceeding (if not empty).
       | P2: {slug} | {parent}--p2-{slug} | {brief description from rationale} | Draft | {strategy} |
       ```
 
-   d. **Status preservation**: If a manifest already exists from a previous run, preserve manually-set status values for existing phases. New phases get status "Draft".
+   d. **Status preservation and phase management**: If a manifest already exists from a previous run:
+      - **Continuing phases**: Preserve manually-set status values for phases present in both the old manifest and the current annotations.
+      - **Added phases**: Phases present in the current annotations but absent from the old manifest get status "Draft".
+      - **Removed phases**: Phases present in the old manifest but absent from the current annotations are marked "Cancelled" in the updated manifest. Their child directories remain on disk untouched (never deleted). If a removed phase was already "Cancelled" in the old manifest, its status remains "Cancelled". If a removed phase had status "Complete", report an error per the status transition validation in step 7e (Complete -> Cancelled is invalid).
 
-   e. **Status transition validation**: When a manifest already exists, validate that any status values in the existing manifest are consistent with the forward-only state machine before writing the updated manifest. For each phase present in both the old and new manifest:
+   e. **Manifest ordering**: The manifest table lists all phases in phase-number order. Continuing and added phases appear at their position from the current annotations. Removed phases retain their original phase number from the old manifest and appear in order alongside the current phases. This provides a complete view of all phases -- active and cancelled -- in a single table.
+
+   f. **Status transition validation**: When a manifest already exists, validate that any status values in the existing manifest are consistent with the forward-only state machine before writing the updated manifest. For each phase present in both the old and new manifest:
 
       **Valid transitions** (allowed):
       - Draft -> In Progress
@@ -190,13 +205,15 @@ You **MUST** consider the user input before proceeding (if not empty).
 
       **Implementation detail**: The splitting skill itself only ever sets status to "Draft" (for new phases) or preserves existing values (per step 7d). Invalid transitions arise when a developer manually sets a status value in the manifest and then the splitting skill re-runs. The validation catches cases where the developer set an invalid transition (e.g., moving a Complete phase back to Draft) before the manifest is written, providing an early error rather than silently accepting an invalid state.
 
-   f. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
+   g. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
 
 8. **Report results**:
    - List each child spec directory created or updated
    - Show the manifest table
    - If any directory names were truncated, repeat the truncation warnings
    - If this was a re-run, note which phases were unchanged vs updated
+   - If phases were added, list the new child spec directories created
+   - If phases were removed, list the phases marked as "Cancelled" and confirm their directories were preserved on disk
 
 ## Idempotency
 
@@ -215,3 +232,6 @@ Running `/speckit.split` multiple times on the same unchanged parent spec and ch
 | Phase numbers not sequential | ERROR: report which numbers are missing or out of order |
 | Duplicate story assignments | ERROR: report which stories appear in multiple phases |
 | Invalid status transition | ERROR: report the phase, current status, and attempted new status; explain allowed transitions |
+| Removed phase with Complete status | ERROR: invalid transition Complete -> Cancelled; explain that completed phases cannot be cancelled |
+| Removed phase (active status) | Mark as Cancelled in manifest, preserve child directory on disk |
+| Added phase (not in manifest) | Create new child spec directory, add to manifest with status Draft |
