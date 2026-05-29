@@ -46,6 +46,7 @@ In Progress -> Cancelled    (phase abandoned during work)
 ### Invalid Transitions
 
 All backward transitions are rejected:
+- In Progress -> Draft
 - Complete -> Draft
 - Complete -> In Progress
 - Cancelled -> Draft

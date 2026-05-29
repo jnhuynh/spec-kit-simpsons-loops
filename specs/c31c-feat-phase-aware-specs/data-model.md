@@ -87,6 +87,7 @@
 ```
 
 **Invalid transitions** (rejected by splitting skill on re-run):
+- In Progress -> Draft (no rollback)
 - Complete -> Draft (no rollback)
 - Complete -> In Progress (no reopening)
 - Cancelled -> Draft (no resurrection)
