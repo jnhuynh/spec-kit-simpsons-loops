@@ -111,7 +111,7 @@
 **Purpose**: Validation and cleanup across all user stories
 
 - [x] T011 Run `setup.sh` and verify all new files are copied to installed locations (`.claude/commands/speckit.split.md`, `.claude/agents/split.md`)
-- [ ] T012 [P] Run shellcheck on any modified shell scripts (`setup.sh`)
+- [x] T012 [P] Run shellcheck on any modified shell scripts (`setup.sh`)
 - [ ] T013 Run quickstart.md testing checklist to validate end-to-end behavior
 
 ---
