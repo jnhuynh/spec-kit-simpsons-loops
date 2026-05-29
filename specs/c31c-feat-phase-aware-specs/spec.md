@@ -102,6 +102,7 @@ After shipping the first phase and gathering production feedback, the developer 
 - Q: What valid status transitions are allowed for child specs? → A: Forward-only: Draft → In Progress → Complete. Any active state → Cancelled. No backward transitions.
 - Q: What happens when a manual edit in a child spec conflicts with a change propagated from an earlier phase during reconciliation? → A: Flag conflicts with inline markers for developer resolution rather than auto-resolving.
 - Q: What is explicitly out of scope for this feature? → A: Branch automation, CI/CD infrastructure, non-linear phase dependencies, cross-repo splitting, automatic status detection, and phase-level diffing.
+- Q: What is the maximum number of phases a spec can have? → A: Maximum 10 phases per parent spec. Splitting skill rejects specs exceeding this limit.
 
 ## Out of Scope
 
@@ -135,6 +136,7 @@ The following are explicitly excluded from this feature:
 - **FR-010**: Each child spec MUST be independently executable through the full SpecKit pipeline (plan, tasks, homer, lisa, ralph, marge).
 - **FR-011**: The splitting skill MUST update the parent spec with a manifest section listing all child specs in phase order with their current status.
 - **FR-012**: The splitting skill MUST be idempotent -- re-running it on an already-split spec updates existing children rather than creating duplicates.
+- **FR-012a**: A parent spec MUST NOT contain more than 10 phases. The splitting skill MUST reject specs exceeding this limit with an error message indicating the maximum and suggesting the developer consolidate phases.
 
 #### Child Spec Chain and Reconciliation
 
@@ -176,3 +178,4 @@ The following are explicitly excluded from this feature:
 - Child specs do not need their own Git branches at creation time. The splitting skill creates spec directories only. Branch creation happens when a developer starts working on a specific phase and runs the standard SpecKit pipeline entry point for that child spec.
 - The reconciliation logic (updating later phases when earlier ones diverge) is content-aware but not automatic rewriting. The splitting skill identifies what changed in earlier phases and flags sections in later child specs that may need updating, rather than silently rewriting spec content.
 - Status transitions are manually set by the developer following a forward-only state machine (Draft → In Progress → Complete, with any active state allowing Cancelled). SpecKit does not auto-detect phase completion or enforce transitions at runtime; the constraint is documented for tooling and developer guidance.
+- A parent spec supports a maximum of 10 phases. Features requiring more than 10 deployment stages should be decomposed into separate top-level features rather than a single deeply-phased spec. This keeps reconciliation manageable and child directory naming practical.
