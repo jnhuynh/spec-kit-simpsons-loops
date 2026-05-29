@@ -151,6 +151,10 @@ The following are explicitly excluded from this feature:
 - **FR-018**: The status view MUST be human-readable directly in the parent spec's manifest section, showing phase order, child directory name, description, and status.
 - **FR-019**: Status transitions MUST follow a forward-only state machine: Draft → In Progress → Complete. Any active state (Draft, In Progress) MAY transition to Cancelled. Backward transitions (e.g., Complete → Draft, Cancelled → In Progress) are NOT permitted.
 
+### Non-Functional Requirements
+
+No non-functional requirements apply to this feature. All deliverables are developer-time markdown command files and shell script configuration with no runtime, performance, scalability, or security constraints. The splitting skill and phase-aware specify step operate on local filesystem spec files with no network, concurrency, or latency considerations.
+
 ### Key Entities
 
 - **Parent Spec**: A phase-annotated specification that describes an overall feature with multiple deployment phases. Contains the feature vision, phase annotations with release strategies, and a manifest tracking child specs. Lives in a standard spec directory (e.g., `specs/c31c-feat-billing-overhaul/`).
