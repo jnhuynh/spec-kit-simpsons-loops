@@ -57,7 +57,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    c. **Generate or update the child `spec.md`**:
       - If the child spec does not exist (first run), generate it fresh
-      - If the child spec already exists (re-run), preserve it unchanged for now (reconciliation logic is added in a later task)
+      - If the child spec already exists (re-run), run the **reconciliation logic** described in step 6e below
 
    d. **Child spec content** (for new child specs): Generate a standard SpecKit spec structure populated with the content relevant to this phase. The child spec must be independently processable through the full SpecKit pipeline.
 
@@ -108,6 +108,35 @@ You **MUST** consider the user input before proceeding (if not empty).
       ```
 
       **Independence requirement**: Each child spec must be self-contained. Do not include references to sibling specs that would block pipeline execution. Do not use phrases like "after Phase 1 is complete" in requirements -- instead, state the prerequisite condition directly (e.g., "Given the schema has been expanded with X columns" rather than "After Phase 1 deploys the schema changes").
+
+   e. **Reconciliation logic** (for existing child specs on re-run):
+
+      When a child spec already exists on disk, reconcile it with the current state of the parent spec and earlier child specs. Process phases in order (P1 first, then P2, etc.) so that earlier-phase changes are available when reconciling later phases.
+
+      **Step 1 -- Generate the baseline**: For each child spec, regenerate what the child spec *would* contain if generated fresh from the current parent spec's phase annotations using the same generation logic as step 6d. This regenerated content is the "baseline" -- it represents the expected content without any manual edits.
+
+      **Step 2 -- Detect manual edits**: Compare the baseline (from Step 1) section-by-section against the actual child spec on disk. Use markdown heading boundaries (`##` and `###` level headings) to identify sections. A section where the disk content differs from the baseline has been manually edited by the developer.
+
+      **Step 3 -- Generate updated content for later phases**: For child specs at phase 2 and above, regenerate the child spec content using the **actual content from earlier child specs on disk** (not the baseline). This "updated content" reflects what the child spec should contain given the current state of earlier phases. Compare this updated content against the baseline from Step 1 to identify which sections are affected by earlier-phase changes.
+
+      **Step 4 -- Apply reconciliation per section**:
+      - If a section has **no manual edits** (disk matches baseline) AND the updated content differs from the baseline (earlier-phase changes affect this section): **update the section in place** with the updated content from Step 3.
+      - If a section has **no manual edits** AND the updated content matches the baseline (no earlier-phase changes): **leave the section unchanged**.
+      - If a section has **manual edits** (disk differs from baseline) AND the updated content also differs from the baseline (conflict between manual edits and propagated changes): **insert conflict markers** around the section using the format:
+        ```markdown
+        <!-- CONFLICT: {description of what changed in the earlier phase that affects this section} -->
+        {the existing section content from disk, preserved as-is}
+        <!-- END CONFLICT -->
+        ```
+        The description in the CONFLICT marker must identify which earlier phase changed and what the change affects, so the developer has context for resolution.
+      - If a section has **manual edits** AND the updated content matches the baseline (no earlier-phase changes): **leave the section unchanged** (manual edits are preserved, nothing to propagate).
+
+      **Step 5 -- Report conflicts**: After reconciliation, report any conflicts to the developer. For each conflict, include:
+      - The child spec file path
+      - The section heading where the conflict was inserted
+      - A brief description of the conflict (what changed in the earlier phase vs what the developer edited)
+
+      **Phase 1 child specs**: Phase 1 has no earlier phases, so Steps 3-4 simplify to: detect manual edits (Step 2), and preserve the child spec as-is. Phase 1 child specs are never updated by reconciliation -- they serve as input to later phases.
 
 7. **Create or update the `## Manifest` section in the parent spec**:
 
