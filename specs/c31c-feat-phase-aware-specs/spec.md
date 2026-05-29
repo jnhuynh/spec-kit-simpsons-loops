@@ -94,6 +94,12 @@ After shipping the first phase and gathering production feedback, the developer 
 - What happens when two phases have stories with overlapping concerns? The specify step assigns each story to exactly one phase and documents cross-phase dependencies in the phase annotations.
 - What happens when a developer tries to run the pipeline on a parent spec that has been split? The parent spec serves as a coordination document only -- pipeline steps like `/speckit.plan` operate on individual child specs, not the parent.
 
+## Clarifications
+
+### Session 2026-05-28
+
+- Q: What valid status transitions are allowed for child specs? → A: Forward-only: Draft → In Progress → Complete. Any active state → Cancelled. No backward transitions.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -127,6 +133,7 @@ After shipping the first phase and gathering production feedback, the developer 
 
 - **FR-017**: The parent spec manifest MUST track each child spec's status as one of: Draft, In Progress, Complete, or Cancelled.
 - **FR-018**: The status view MUST be human-readable directly in the parent spec's manifest section, showing phase order, child directory name, description, and status.
+- **FR-019**: Status transitions MUST follow a forward-only state machine: Draft → In Progress → Complete. Any active state (Draft, In Progress) MAY transition to Cancelled. Backward transitions (e.g., Complete → Draft, Cancelled → In Progress) are NOT permitted.
 
 ### Key Entities
 
@@ -154,4 +161,4 @@ After shipping the first phase and gathering production feedback, the developer 
 - "Dark launch with gradual reveal" and "direct release" are the two release strategy categories. This is intentionally coarse-grained -- teams map these to their own deployment practices (feature flags, canary releases, etc.).
 - Child specs do not need their own Git branches at creation time. The splitting skill creates spec directories only. Branch creation happens when a developer starts working on a specific phase and runs the standard SpecKit pipeline entry point for that child spec.
 - The reconciliation logic (updating later phases when earlier ones diverge) is content-aware but not automatic rewriting. The splitting skill identifies what changed in earlier phases and flags sections in later child specs that may need updating, rather than silently rewriting spec content.
-- Status transitions (Draft -> In Progress -> Complete) are manually set by the developer. SpecKit does not auto-detect phase completion.
+- Status transitions are manually set by the developer following a forward-only state machine (Draft → In Progress → Complete, with any active state allowing Cancelled). SpecKit does not auto-detect phase completion or enforce transitions at runtime; the constraint is documented for tooling and developer guidance.
