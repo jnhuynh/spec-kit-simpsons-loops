@@ -13,13 +13,19 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
-| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                                 |
+| Pipeline | End-to-end orchestrator: specify -> homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                      |
 
 **Pre-pipeline:**
 
 | Command     | What it does                                                                                                                                                                                        |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.         |
+
+**Post-pipeline:**
+
+| Command     | What it does                                                                                                                                                                                        |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Split       | Phase decomposition. Takes a phase-annotated parent spec and generates independent child specs — one per phase — that can each run through the full pipeline independently.                         |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
@@ -82,6 +88,18 @@ Before kicking off the pipeline or any loop, refine your specs manually. Start w
 
 You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
+### Large features: phased delivery
+
+When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
+
+1. **Specify with phase awareness** — `/speckit.specify` now detects deployment boundaries (migrations, integrations, infrastructure changes, scope) and groups user stories into ordered phases with release strategy recommendations (dark launch vs direct release).
+
+2. **Split into child specs** — Run `/speckit.split` on the phase-annotated parent spec. This generates independent child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. Each child spec has the standard SpecKit structure and can run through the full pipeline independently.
+
+3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The parent spec maintains a manifest tracking each phase's status (Draft, In Progress, Complete, Cancelled).
+
+4. **Reconcile as you learn** — Re-run `/speckit.split` after earlier phases ship. The splitting skill detects manual edits in child specs, propagates changes from earlier phases to later ones, and inserts conflict markers where manual edits and propagated changes collide. Phases can be added or removed as requirements shift.
+
 ## API key vs. Claude subscription
 
 If `ANTHROPIC_API_KEY` is set, every iteration will consume API credits from that key. To use your **Claude subscription** (Pro/Max) instead:
@@ -94,7 +112,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, which is installed by `setup.sh`.
+- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, and the splitting skill relies on `speckit.split.md` — both are installed by `setup.sh`.
 
 ## Setup
 
@@ -126,6 +144,7 @@ cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
 cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
+cp <path-to-simpsons-loops>/claude-agents/split.md  .claude/agents/split.md
 
 # Loop commands -> .claude/commands/
 cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
@@ -136,6 +155,8 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claud
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/commands/speckit.review.pr.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.specify.md        .claude/commands/speckit.specify.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/commands/speckit.split.md
 
 # Marge review packs -> .specify/marge/checks/
 mkdir -p .specify/marge/checks
@@ -265,6 +286,30 @@ Or preview findings without posting:
 Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), concurrency risks (WARNING), architectural decisions (WARNING), and project-specific patterns (INFO). Uses `COMMENT` event type — informational, not a merge gate. Idempotent: won't double-post on the same commit.
 
 When the pipeline runs and an open PR exists, this step runs automatically after Marge.
+
+### Split (phase decomposition)
+
+After running the pipeline (or at least `/speckit.specify`) on a feature that produced a `## Phases` section in the spec:
+
+```
+/speckit.split
+```
+
+This reads the phase annotations from the parent spec and generates child spec directories:
+
+```
+specs/
+  c31c-feat-phase-aware-specs/          # parent spec (with manifest)
+  c31c-feat-phase-aware-specs--p1-expand-schema/   # phase 1 child
+  c31c-feat-phase-aware-specs--p2-integration/     # phase 2 child
+  c31c-feat-phase-aware-specs--p3-ui-reveal/       # phase 3 child
+```
+
+Each child spec is standalone — run `/speckit.pipeline` on any child to take it through the full loop. The parent spec's `## Manifest` section tracks status across all phases.
+
+Re-running `/speckit.split` after changes is safe (idempotent). It detects manual edits, propagates changes from earlier phases, and flags conflicts with `<!-- CONFLICT: ... -->` markers for human resolution.
+
+Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state. Backward transitions are rejected.
 
 ### Pipeline (end-to-end)
 
