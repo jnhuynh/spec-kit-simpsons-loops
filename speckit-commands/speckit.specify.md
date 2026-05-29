@@ -87,6 +87,24 @@ Given that feature description, do this:
 
        d. **Single-concern features**: If **none** of the signals above are detected (all stories are low-risk additive work), generate a single phase containing all stories with release strategy "direct release". Do not artificially split straightforward work into multiple phases.
 
+       e. **Generate the `## Phases` section** using the results from steps a-d. Place this section between User Scenarios and Requirements. Format each phase as a subsection:
+
+          ```markdown
+          ## Phases
+
+          ### Phase {N}: {slug}
+          **Stories**: {comma-separated story references, e.g., "User Story 1, User Story 3"}
+          **Release Strategy**: {dark launch with gradual reveal | direct release}
+          **Rationale**: {explanation of why this phase boundary exists}
+          ```
+
+          **Constraints**:
+          - Phase numbers MUST be sequential starting from 1 with no gaps
+          - Maximum 10 phases per spec -- if the analysis produces more than 10, consolidate related phases until the count is 10 or fewer
+          - Each user story MUST be assigned to exactly one phase -- no story appears in multiple phases and no story is omitted
+          - Phase slugs MUST be valid kebab-case (lowercase alphanumeric and hyphens, e.g., `expand-schema`, `payment-integration`)
+          - Single-concern features produce exactly one phase, not zero phases
+
     6. Generate Functional Requirements
        Each requirement must be testable
        Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
