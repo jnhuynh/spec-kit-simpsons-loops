@@ -7,19 +7,19 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Phase-Aware Spec Generation (Priority: P1)
+### User Story 1 - Phase Detection and Annotation (Priority: P1)
 
-A developer runs `/speckit.specify` with a large feature description that involves multiple deployment stages -- for example, a billing overhaul requiring schema migration, third-party payment integration, and UI changes. The specify step analyzes the user stories for natural deployment boundaries and groups them into ordered phases within the spec. Each phase includes a recommended release strategy (dark launch or direct release) based on risk assessment. The developer can review the phase groupings and release recommendations directly in the spec before proceeding to planning.
+After running `/speckit.specify` to create a spec, the developer runs `/speckit.phase` to analyze user stories for natural deployment boundaries. The phase step groups stories into ordered phases using vertical-slice grouping by product surface -- each surface's foundational work (migrations, infrastructure) deploys first, followed by that surface's dependent features and UI, completing one product surface before moving to the next. Each phase includes a recommended release strategy (dark launch or direct release) based on risk assessment. The developer can review the phase groupings and release recommendations directly in the spec before proceeding to planning. The pipeline runs this step automatically between specify and homer.
 
-**Why this priority**: Phase annotation within the spec is the foundation that all other capabilities build on. Without phase metadata in the spec, the splitting skill has nothing to work with. This also delivers standalone value -- even without splitting, seeing the recommended phase boundaries helps developers plan their work.
+**Why this priority**: Phase annotation within the spec is the foundation that all other capabilities build on. Without phase metadata in the spec, the splitting skill has nothing to work with. This also delivers standalone value -- even without splitting, seeing the recommended phase boundaries helps developers plan their work. Decoupling phase detection from specify keeps the upstream specify command untouched.
 
-**Independent Test**: Can be fully tested by running `/speckit.specify` with a multi-concern feature description and verifying the resulting spec.md contains a Phases section with ordered phase groupings, story assignments, and release strategy recommendations.
+**Independent Test**: Can be fully tested by running `/speckit.specify` followed by `/speckit.phase` with a multi-concern feature description and verifying the resulting spec.md contains a Phases section with vertical-slice phase groupings, story assignments, and release strategy recommendations.
 
 **Acceptance Scenarios**:
 
-1. **Given** a feature description involving database migration, third-party integration, and UI work, **When** the developer runs `/speckit.specify`, **Then** the spec contains a Phases section grouping stories into ordered phases with rationale for each boundary.
-2. **Given** a feature description where all stories are low-risk additive work, **When** the developer runs `/speckit.specify`, **Then** the spec contains a single phase with a direct release recommendation.
-3. **Given** a feature description with stories touching shared infrastructure, **When** the developer runs `/speckit.specify`, **Then** the stories touching shared infrastructure are grouped into an early phase with a dark launch recommendation.
+1. **Given** a spec with stories involving database migration, third-party integration, and UI work across two product surfaces, **When** the developer runs `/speckit.phase`, **Then** the spec contains phases grouped as vertical slices per product surface -- surface A's foundation then surface A's features, then surface B's foundation then surface B's features.
+2. **Given** a spec where all stories are low-risk additive work, **When** the developer runs `/speckit.phase`, **Then** the spec contains a single phase with a direct release recommendation.
+3. **Given** a spec with stories touching shared infrastructure for a single product surface, **When** the developer runs `/speckit.phase`, **Then** the foundational stories are in an early phase with a dark launch recommendation, followed by the dependent features in a subsequent phase.
 
 ---
 
@@ -88,10 +88,10 @@ After shipping the first phase and gathering production feedback, the developer 
 
 ### Edge Cases
 
-- What happens when a developer runs the splitting skill on a spec that has no phase annotations? The splitting skill reports an error indicating no phases were found and suggests running `/speckit.specify` to generate phase annotations first.
+- What happens when a developer runs the splitting skill on a spec that has no phase annotations? The splitting skill reports an error indicating no phases were found and suggests running `/speckit.phase` to generate phase annotations first.
 - What happens when a child spec directory already exists from a previous split? The splitting skill updates the existing child spec rather than overwriting it, preserving any manual edits the developer made.
 - What happens when the parent spec's naming convention would produce a child directory name exceeding 200 characters? The splitting skill truncates the phase slug portion while preserving the parent prefix and phase number, and warns the developer. The 200-character limit is conservative relative to filesystem maximums (255 bytes on ext4/APFS) and leaves room for nested file paths within child spec directories.
-- What happens when two phases have stories with overlapping concerns? The specify step assigns each story to exactly one phase. When a later phase depends on work completed in an earlier phase, the boundary rationale for the later phase notes this ordered prerequisite relationship.
+- What happens when two phases have stories with overlapping concerns? The phase step assigns each story to exactly one phase using vertical-slice grouping by product surface. When a later surface depends on an earlier surface's work, the earlier surface's phases come first. Within each surface, the boundary rationale notes ordered prerequisite relationships.
 - What happens when a developer tries to run the pipeline on a parent spec that has been split? The parent spec serves as a coordination document only -- pipeline steps like `/speckit.plan` operate on individual child specs, not the parent.
 - What happens when a manual edit in a child spec conflicts with a change propagated from an earlier phase during reconciliation? The splitting skill inserts inline conflict markers (e.g., `<!-- CONFLICT: ... -->`) around the conflicting sections and reports the conflicts to the developer for manual resolution, rather than silently overwriting edits.
 
@@ -119,13 +119,16 @@ The following are explicitly excluded from this feature:
 
 ### Functional Requirements
 
-#### Phase-Aware Specify
+#### Phase Detection (`/speckit.phase`)
 
-- **FR-001**: The specify step MUST analyze user stories for natural deployment boundaries including: database migrations requiring expand-and-contract sequencing, third-party integrations needing production validation, and feature size that would produce unreviewable PRs.
-- **FR-002**: The specify step MUST group user stories into ordered phases within the spec and assign each story to exactly one phase.
-- **FR-003**: For each phase, the specify step MUST recommend a release strategy: "dark launch with gradual reveal" for high-risk changes touching shared infrastructure, integrations, or migrations, or "direct release" for low-risk additive work like new endpoints or UI additions.
-- **FR-004**: Phase grouping and release strategy MUST be recorded as a dedicated section in the spec (not inline with stories), so downstream tools can parse and consume this metadata.
-- **FR-005**: When all stories are low-risk additive work, the specify step MUST produce a single phase with a direct release recommendation rather than artificial multi-phase splitting.
+- **FR-001**: The phase step MUST analyze user stories for natural deployment boundaries including: database migrations requiring expand-and-contract sequencing, third-party integrations needing production validation, and feature size that would produce unreviewable PRs.
+- **FR-002**: The phase step MUST group user stories into ordered phases using vertical-slice grouping by product surface -- each product surface completes its full deployment cycle (foundation then features) before the next surface begins. Each story is assigned to exactly one phase.
+- **FR-002a**: The phase step MUST identify product surfaces by grouping stories based on the domain or concern area they affect, and order surfaces by dependency (dependent surfaces after their prerequisites, independent surfaces by risk).
+- **FR-002b**: Within each product surface, the phase step MUST assign phases in deployment dependency order: foundational changes (migrations, infrastructure) in one phase, then dependent features (integrations, services) and user-facing work (UI, endpoints) in the next phase.
+- **FR-002c**: If a product surface has only one story or its foundational and feature layers are trivially small, the phase step MUST merge them into a single phase rather than creating two phases with one story each.
+- **FR-003**: For each phase, the phase step MUST recommend a release strategy: "dark launch with gradual reveal" for high-risk changes touching shared infrastructure, integrations, or migrations, or "direct release" for low-risk additive work like new endpoints or UI additions.
+- **FR-004**: Phase grouping and release strategy MUST be recorded as a dedicated `## Phases` section in the spec (not inline with stories), so downstream tools can parse and consume this metadata. The phase step runs as a standalone command after `/speckit.specify` and before Homer in the pipeline.
+- **FR-005**: When all stories are low-risk additive work, the phase step MUST produce a single phase with a direct release recommendation rather than artificial multi-phase splitting.
 - **FR-006**: Each phase annotation MUST include: phase number, short descriptive slug, assigned story references, release strategy recommendation, and rationale for the phase boundary.
 
 #### Splitting Skill
@@ -167,9 +170,9 @@ No non-functional requirements apply to this feature. All deliverables are devel
 
 ### Measurable Outcomes
 
-- **SC-001**: A multi-concern feature description (involving migration, integration, and UI work) produces a spec with at least 2 distinct phases when run through the specify step, with each phase having a documented release strategy recommendation.
+- **SC-001**: A multi-concern feature description (involving migration, integration, and UI work across multiple product surfaces) produces a spec with at least 2 distinct phases when run through the phase step, with vertical-slice grouping completing each product surface before starting the next, and each phase having a documented release strategy recommendation.
 - **SC-002**: The splitting skill generates child spec directories that each pass the existing spec quality checklist without modification, confirming they are structurally valid standalone specs.
-- **SC-003**: Each child spec can be independently processed through the full SpecKit pipeline (specify -> homer -> plan -> tasks -> lisa -> ralph -> marge) without errors or references to sibling specs that would block execution.
+- **SC-003**: Each child spec can be independently processed through the full SpecKit pipeline (specify -> phase -> homer -> plan -> tasks -> lisa -> ralph -> marge) without errors or references to sibling specs that would block execution.
 - **SC-004**: Re-running the splitting skill after modifying an earlier child spec produces updated later child specs within one re-run, without requiring manual intervention to propagate changes.
 - **SC-005**: A developer can determine the current state of a multi-phase feature (which phases are complete, in progress, or draft) by reading the parent spec manifest alone, without inspecting individual child directories.
 - **SC-006**: A simple additive feature description produces a single-phase spec with no unnecessary phase splitting, confirming the specify step does not over-segment straightforward work.
@@ -177,7 +180,9 @@ No non-functional requirements apply to this feature. All deliverables are devel
 ## Assumptions
 
 - The `--` double-dash separator in child directory names (e.g., `parent--p1-slug`) will not conflict with existing SpecKit naming conventions or tooling. Current specs use single-dash kebab-case, making `--` a safe delimiter to distinguish parent-child relationships.
-- Phase boundary detection is a best-effort heuristic, not a guarantee. The specify step uses common patterns (migration signals, integration keywords, PR size estimates) to suggest boundaries. Developers are expected to review and adjust phase groupings before splitting.
+- Phase boundary detection is a best-effort heuristic, not a guarantee. The phase step (`/speckit.phase`) uses common patterns (migration signals, integration keywords, PR size estimates) and vertical-slice grouping by product surface to suggest boundaries. Developers are expected to review and adjust phase groupings before splitting.
+- Phase detection is decoupled from the upstream specify command. The `/speckit.phase` command runs as a standalone post-specify step, keeping the upstream `/speckit.specify` command untouched and avoiding fork divergence.
+- Vertical-slice phasing groups stories by product surface, completing each surface's full deployment cycle (foundation then features) before starting the next. This allows each surface to be tested in production before building subsequent surfaces. A feature touching N product surfaces produces up to 2N phases.
 - "Dark launch with gradual reveal" and "direct release" are the two release strategy categories. This is intentionally coarse-grained -- teams map these to their own deployment practices (feature flags, canary releases, etc.).
 - Child specs do not need their own Git branches at creation time. The splitting skill creates spec directories only. Branch creation happens when a developer starts working on a specific phase and runs the standard SpecKit pipeline entry point for that child spec.
 - The reconciliation logic (updating later phases when earlier ones diverge) is content-aware and section-granular. Sections in later child specs that have no manual edits are updated in place to reflect earlier-phase changes. Sections with manual edits that conflict with propagated changes are flagged with conflict markers for developer resolution, rather than silently overwriting the developer's work.

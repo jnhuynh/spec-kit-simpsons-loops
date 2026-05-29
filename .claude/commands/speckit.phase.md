@@ -28,10 +28,17 @@ Analyze the user stories in an existing `spec.md` for natural deployment boundar
    - **Infrastructure signals**: shared service, middleware, message queue, cache invalidation, infrastructure provisioning
    - **Scope signals**: 4+ user stories with distinct concern areas (e.g., backend data, external integration, user-facing UI)
 
-5. **Assign each story to exactly one phase**:
-   - Group stories by deployment dependency order: foundational changes first (migrations, infrastructure), dependent features second (integrations, services), user-facing reveals last (UI, endpoints)
-   - Stories within the same concern area that share deployment risk belong in the same phase
-   - Each user story is assigned to exactly one phase -- no story appears in multiple phases
+5. **Assign each story to exactly one phase** using vertical-slice grouping by product surface:
+
+   a. **Identify product surfaces**: Group stories by the product surface, domain, or concern area they affect (e.g., payments, user profiles, notifications). Use story titles, descriptions, and the entities/data they reference to determine grouping.
+
+   b. **Order surfaces by dependency**: If surface B depends on surface A (e.g., notifications depend on payment events), surface A's phases come first. Independent surfaces are ordered by risk (higher risk first) as a tiebreaker.
+
+   c. **Slice each surface vertically**: Within each product surface, assign phases in deployment dependency order -- foundational changes (migrations, infrastructure) in one phase, then dependent features (integrations, services) and user-facing work (UI, endpoints) in the next phase. Each surface should be fully deployable before the next surface begins.
+
+   d. **Merge thin layers**: If a surface has only one story or its foundational and UI layers are trivially small, merge them into a single phase rather than creating two phases with one story each.
+
+   e. **Result**: A feature touching N product surfaces produces up to 2N phases (foundation + feature per surface), ordered so each surface is complete before the next starts. The collective set of surfaces forms the full feature.
 
 6. **Determine release strategy per phase**:
    - **"dark launch with gradual reveal"**: for phases containing stories with migration signals, integration signals, or infrastructure signals (high-risk changes touching shared systems)
