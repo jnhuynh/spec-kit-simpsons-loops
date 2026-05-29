@@ -30,7 +30,7 @@ Extend SpecKit's specify step to analyze user stories for natural deployment bou
 | III. Maintainability Over Cleverness | **PASS** | Phase detection uses straightforward keyword heuristics, not complex NLP; reconciliation uses section-level comparison, not line-level diffing |
 | IV. Best Practices | **PASS** | Follows existing SpecKit patterns (command file + agent file); child specs use identical structure to standard specs; naming convention extends existing kebab-case pattern |
 | V. Simplicity (KISS & YAGNI) | **PASS** | Two release strategy categories (not a taxonomy); text-based status in manifest (not a state machine engine); conflict markers (not auto-resolution) |
-| Test-First Development | **N/A** | Changes are to markdown command files with no testable application logic; functional validation covers behavior |
+| Test-First Development | **PASS** | Markdown command/agent files have no testable application logic. Shell script changes (setup.sh) are validated by T012 (shellcheck) and T013 (functional testing checklist from quickstart.md). No unit-testable business logic is introduced. |
 | Dev Server Verification | **N/A** | No web UI or API |
 | Process Cleanup | **N/A** | No long-running processes involved |
 
