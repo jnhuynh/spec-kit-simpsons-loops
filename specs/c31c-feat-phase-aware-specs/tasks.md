@@ -17,7 +17,7 @@
 
 **Purpose**: Establish source copies of existing files and project structure needed for all subsequent work
 
-- [ ] T001 Copy `.claude/commands/speckit.specify.md` to `speckit-commands/speckit.specify.md` to create the source copy per project convention (source of truth in `speckit-commands/`, installed copies in `.claude/commands/`)
+- [x] T001 Copy `.claude/commands/speckit.specify.md` to `speckit-commands/speckit.specify.md` to create the source copy per project convention (source of truth in `speckit-commands/`, installed copies in `.claude/commands/`)
 
 ---
 
