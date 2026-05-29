@@ -144,6 +144,8 @@ The **source of truth** for SpecKit command and agent files lives in the repo ro
 - Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `jq`) (005-fix-subagent-quality-gates)
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`) (006-stop-after-param)
+- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Claude Code Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `mkdir`) (c31c-feat-phase-aware-specs)
+- Filesystem only -- `.md` command files, `.sh` scripts, spec directories under `specs/` (c31c-feat-phase-aware-specs)
 
 ## Recent Changes
 - 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)
