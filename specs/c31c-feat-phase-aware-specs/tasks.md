@@ -27,7 +27,7 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 Add `## Phases` section placeholder to `.specify/templates/spec-template.md` between the User Scenarios section and the Requirements section, with an HTML comment explaining the section's purpose and when it is generated
+- [x] T002 Add `## Phases` section placeholder to `.specify/templates/spec-template.md` between the User Scenarios section and the Requirements section, with an HTML comment explaining the section's purpose and when it is generated
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
