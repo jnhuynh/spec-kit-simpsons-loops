@@ -93,12 +93,14 @@ After shipping the first phase and gathering production feedback, the developer 
 - What happens when the parent spec's naming convention would produce a child directory name exceeding filesystem limits? The splitting skill truncates the phase slug portion while preserving the parent prefix and phase number, and warns the developer.
 - What happens when two phases have stories with overlapping concerns? The specify step assigns each story to exactly one phase and documents cross-phase dependencies in the phase annotations.
 - What happens when a developer tries to run the pipeline on a parent spec that has been split? The parent spec serves as a coordination document only -- pipeline steps like `/speckit.plan` operate on individual child specs, not the parent.
+- What happens when a manual edit in a child spec conflicts with a change propagated from an earlier phase during reconciliation? The splitting skill inserts inline conflict markers (e.g., `<!-- CONFLICT: ... -->`) around the conflicting sections and reports the conflicts to the developer for manual resolution, rather than silently overwriting edits.
 
 ## Clarifications
 
 ### Session 2026-05-28
 
 - Q: What valid status transitions are allowed for child specs? → A: Forward-only: Draft → In Progress → Complete. Any active state → Cancelled. No backward transitions.
+- Q: What happens when a manual edit in a child spec conflicts with a change propagated from an earlier phase during reconciliation? → A: Flag conflicts with inline markers for developer resolution rather than auto-resolving.
 
 ## Requirements *(mandatory)*
 
@@ -125,7 +127,7 @@ After shipping the first phase and gathering production feedback, the developer 
 #### Child Spec Chain and Reconciliation
 
 - **FR-013**: When the splitting skill is re-run, later child specs MUST be updated to reflect changes in earlier child specs, so each phase builds on what was actually implemented rather than originally planned.
-- **FR-014**: The splitting skill MUST preserve manual edits in existing child specs when re-running, merging only the changes from updated phase annotations and earlier-phase divergence.
+- **FR-014**: The splitting skill MUST preserve manual edits in existing child specs when re-running, merging only the changes from updated phase annotations and earlier-phase divergence. When a manual edit conflicts with a propagated change, the splitting skill MUST flag the conflict with inline markers (e.g., `<!-- CONFLICT: ... -->`) for developer resolution rather than auto-resolving.
 - **FR-015**: When a phase is removed from the parent spec's annotations, the splitting skill MUST preserve the child directory on disk but mark it as "Cancelled" in the parent manifest.
 - **FR-016**: When a new phase is added to the parent spec's annotations, the splitting skill MUST create a new child spec directory in the correct phase-order position.
 
