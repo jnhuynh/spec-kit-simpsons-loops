@@ -112,7 +112,7 @@
 
 - [x] T011 Run `setup.sh` and verify all new files are copied to installed locations (`.claude/commands/speckit.split.md`, `.claude/agents/split.md`)
 - [x] T012 [P] Run shellcheck on any modified shell scripts (`setup.sh`)
-- [ ] T013 Run quickstart.md testing checklist to validate end-to-end behavior
+- [x] T013 Run quickstart.md testing checklist to validate end-to-end behavior
 
 ---
 
