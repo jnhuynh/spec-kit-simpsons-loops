@@ -101,6 +101,18 @@ After shipping the first phase and gathering production feedback, the developer 
 
 - Q: What valid status transitions are allowed for child specs? → A: Forward-only: Draft → In Progress → Complete. Any active state → Cancelled. No backward transitions.
 - Q: What happens when a manual edit in a child spec conflicts with a change propagated from an earlier phase during reconciliation? → A: Flag conflicts with inline markers for developer resolution rather than auto-resolving.
+- Q: What is explicitly out of scope for this feature? → A: Branch automation, CI/CD infrastructure, non-linear phase dependencies, cross-repo splitting, automatic status detection, and phase-level diffing.
+
+## Out of Scope
+
+The following are explicitly excluded from this feature:
+
+- **Automated branch creation**: The splitting skill creates spec directories only. Git branch creation for child specs is the developer's responsibility when they begin work on a phase.
+- **CI/CD or deployment infrastructure**: Release strategy recommendations ("dark launch" / "direct release") are informational guidance. This feature does not create feature flags, canary configurations, or deployment pipelines.
+- **Non-linear phase dependencies**: Phases are strictly ordered (P1, P2, P3...). DAG-style dependency graphs between phases are not supported.
+- **Cross-repository splitting**: All child specs live under the same `specs/` directory in the same repository. Splitting across multiple repositories is not supported.
+- **Automatic status detection**: Phase status (Draft, In Progress, Complete, Cancelled) is manually set by the developer. SpecKit does not auto-detect completion based on pipeline state or branch activity.
+- **Phase-level diffing or changelog**: The splitting skill does not generate diffs or changelogs between versions of child specs. Conflict markers flag divergence, but detailed change tracking is not provided.
 
 ## Requirements *(mandatory)*
 
