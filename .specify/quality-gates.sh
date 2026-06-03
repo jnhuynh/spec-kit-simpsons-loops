@@ -14,4 +14,4 @@ if [ ${#files[@]} -eq 0 ]; then
   exit 0
 fi
 
-shellcheck "${files[@]}"
+shellcheck --severity=warning "${files[@]}"

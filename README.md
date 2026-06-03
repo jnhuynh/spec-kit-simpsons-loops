@@ -13,7 +13,7 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
-| Pipeline | End-to-end orchestrator: homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                                                 |
+| Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
 
 **Pre-pipeline:**
 
@@ -33,18 +33,23 @@ The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each
 ```mermaid
 flowchart TD
     A["/speckit.pipeline"] --> B{Auto-detect\nstarting step}
-    B --> C["Specify\n(sub agent)"]
+    B --> R["Reconcile\n(child specs only)"]
+    R --> C["Specify\n(sub agent)"]
     C --> D["Homer Loop"]
     D --> D1["Iteration 1\n(sub agent)"]
     D1 --> D2["Iteration 2\n(sub agent)"]
     D2 --> D3["... until resolved\nor max iterations"]
-    D3 --> E["Plan\n(sub agent)"]
+    D3 --> P["Phase\n(sub agent)"]
+    P --> E["Plan\n(sub agent)"]
     E --> F["Tasks\n(sub agent)"]
     F --> G["Lisa Loop"]
     G --> G1["Iteration 1\n(sub agent)"]
     G1 --> G2["Iteration 2\n(sub agent)"]
     G2 --> G3["... until resolved\nor max iterations"]
-    G3 --> H["Ralph Loop"]
+    G3 --> S{"Split\n(multi-phase\nparents only)"}
+    S -->|"Stop & work\non children"| I2["Report Results"]
+    S -->|"Continue as\nmonolith"| H["Ralph Loop"]
+    S -->|"Single phase\nor child spec"| H
     H --> H1["Iteration 1\n(sub agent)"]
     H1 --> H2["Iteration 2\n(sub agent)"]
     H2 --> H3["... until all tasks\ncomplete or max iterations"]
@@ -82,6 +87,20 @@ Before kicking off the pipeline or any loop, refine your specs manually. Start w
 
 You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
+### Large features: phased delivery
+
+When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
+
+1. **Run the pipeline** — `/speckit.pipeline --from specify --description "..."` runs specify, homer (clarify), phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
+
+2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
+
+3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The pipeline enforces phase ordering: phase N cannot start until all earlier phases are marked "Complete" in the parent manifest. Use `--skip-phase-guard` to bypass this when phases are independent.
+
+4. **Auto-status** — The pipeline automatically updates the parent manifest as work progresses. When a child pipeline starts, the phase is marked "In Progress". When Marge (code review) completes successfully, the phase is marked "Complete". After each update, a phase status summary is printed so you can see progress across all phases at a glance.
+
+5. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built. No manual reconciliation needed — each child pipeline is self-healing.
+
 ## API key vs. Claude subscription
 
 If `ANTHROPIC_API_KEY` is set, every iteration will consume API credits from that key. To use your **Claude subscription** (Pro/Max) instead:
@@ -94,7 +113,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, which is installed by `setup.sh`.
+- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, and the splitting skill relies on `speckit.split.md` — both are installed by `setup.sh`.
 
 ## Setup
 
@@ -126,6 +145,9 @@ cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
 cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
+cp <path-to-simpsons-loops>/claude-agents/phase.md       .claude/agents/phase.md
+cp <path-to-simpsons-loops>/claude-agents/split.md      .claude/agents/split.md
+cp <path-to-simpsons-loops>/claude-agents/reconcile.md  .claude/agents/reconcile.md
 
 # Loop commands -> .claude/commands/
 cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
@@ -136,6 +158,8 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claud
 cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/commands/speckit.review.pr.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.phase.md         .claude/commands/speckit.phase.md
+cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/commands/speckit.split.md
 
 # Marge review packs -> .specify/marge/checks/
 mkdir -p .specify/marge/checks
@@ -266,6 +290,26 @@ Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), conc
 
 When the pipeline runs and an open PR exists, this step runs automatically after Marge.
 
+### Split and Reconcile (pipeline steps)
+
+**Split** runs automatically in the pipeline after lisa for multi-phase parent specs. It generates child spec directories:
+
+```
+specs/
+  c31c-feat-billing-overhaul/                      # parent spec (with manifest)
+  c31c-feat-billing-overhaul--p1-expand-schema/    # phase 1 child
+  c31c-feat-billing-overhaul--p2-integration/      # phase 2 child
+  c31c-feat-billing-overhaul--p3-ui-reveal/        # phase 3 child
+```
+
+After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit.split` standalone on any phase-annotated parent spec.
+
+**Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+). It syncs the child spec with what earlier sibling phases actually built, so you always pick up from reality rather than the original plan.
+
+Re-running split is idempotent. It detects manual edits, propagates changes from earlier phases, and flags conflicts with `<!-- CONFLICT: ... -->` markers.
+
+Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state.
+
 ### Pipeline (end-to-end)
 
 After creating a spec with `/speckit.specify`, run the full pipeline:
@@ -306,16 +350,21 @@ Or bootstrap end-to-end from a feature description:
 
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
+- Child spec (phase 2+) with no `plan.md` -> **reconcile**
 - No `spec.md` but `--description` provided -> **specify**
-- `spec.md` exists -> **homer**
+- `spec.md` exists, no populated Phases -> **homer**
+- `spec.md` exists with populated Phases, no `plan.md` -> **plan**
 - `plan.md` exists -> **tasks**
 - `tasks.md` with no tasks started -> **lisa**
+- `spec.md` with Phases and `## Manifest` section -> **ralph** (split already ran)
 - `tasks.md` with some tasks completed -> **ralph**
 - `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
 
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
+
+**`--skip-phase-guard`:** Bypasses the phase order guard for child specs. By default, phase N blocks unless all earlier phases (1..N-1) are "Complete" in the parent manifest. Use this flag when phases are independent or when earlier phases were intentionally cancelled.
 
 **Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
 
