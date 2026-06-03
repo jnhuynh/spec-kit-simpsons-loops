@@ -9,7 +9,7 @@
 
 ### User Story 1 - Phase Detection and Annotation (Priority: P1)
 
-After running `/speckit.specify` to create a spec, the developer runs `/speckit.phase` to analyze user stories for natural deployment boundaries. The phase step groups stories into ordered phases using vertical-slice grouping by product surface -- each surface's foundational work (migrations, infrastructure) deploys first, followed by that surface's dependent features and UI, completing one product surface before moving to the next. Each phase includes a recommended release strategy (dark launch or direct release) based on risk assessment. The developer can review the phase groupings and release recommendations directly in the spec before proceeding to planning. The pipeline runs this step automatically between specify and homer.
+After running `/speckit.specify` to create a spec, the developer runs `/speckit.phase` to analyze user stories for natural deployment boundaries. The phase step groups stories into ordered phases using vertical-slice grouping by product surface -- each surface's foundational work (migrations, infrastructure) deploys first, followed by that surface's dependent features and UI, completing one product surface before moving to the next. Each phase includes a recommended release strategy (dark launch or direct release) based on risk assessment. The developer can review the phase groupings and release recommendations directly in the spec before proceeding to planning. The pipeline runs this step automatically after homer (spec clarification) and before plan.
 
 **Why this priority**: Phase annotation within the spec is the foundation that all other capabilities build on. Without phase metadata in the spec, the splitting skill has nothing to work with. This also delivers standalone value -- even without splitting, seeing the recommended phase boundaries helps developers plan their work. Decoupling phase detection from specify keeps the upstream specify command untouched.
 
@@ -42,16 +42,17 @@ After reviewing a phase-annotated spec, the developer runs the new splitting ski
 
 ### User Story 3 - Child Spec Chain Awareness (Priority: P2)
 
-When implementation of an earlier phase diverges from its original spec, the developer edits the earlier child spec to match what was actually built. The developer then uses the splitting skill to reconcile later child specs with the updated reality. Later child specs are updated to pick up from where things actually stand rather than from the original plan. This keeps the chain grounded in reality rather than drifting from what was implemented.
+When implementation of an earlier phase diverges from its original spec, the developer edits the earlier child spec to match what was actually built. When the developer runs the pipeline on a later child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built — no manual reconciliation needed. Later child specs are updated to pick up from where things actually stand rather than from the original plan. This keeps the chain grounded in reality rather than drifting from what was implemented.
 
 **Why this priority**: Chain awareness is what makes multi-phase delivery practical over time. Without it, later phases would plan against outdated assumptions. However, the basic split-and-execute flow (Stories 1 and 2) delivers value even without reconciliation.
 
-**Independent Test**: Can be fully tested by splitting a spec into phases, modifying the first child spec to simulate implementation divergence, re-running the splitting skill, and verifying later child specs reflect the updated content from the first phase.
+**Independent Test**: Can be fully tested by splitting a spec into phases, modifying the first child spec to simulate implementation divergence, running the pipeline on the second child spec, and verifying the reconcile step updates it to reflect the changes from the first phase.
 
 **Acceptance Scenarios**:
 
-1. **Given** a parent with three child specs where the P1 child spec has been edited to reflect implementation reality, **When** the developer re-runs the splitting skill, **Then** the P2 and P3 child specs are updated to account for changes in P1.
-2. **Given** a parent with three child specs where the P1 child spec is unchanged, **When** the developer re-runs the splitting skill, **Then** the P2 and P3 child specs remain unchanged.
+1. **Given** a parent with three child specs where the P1 child spec has been edited to reflect implementation reality, **When** the developer runs `/speckit.pipeline` on the P2 child spec, **Then** the reconcile step automatically updates P2 and P3 to account for changes in P1.
+2. **Given** a parent with three child specs where the P1 child spec is unchanged, **When** the developer runs `/speckit.pipeline` on the P2 child spec, **Then** the reconcile step detects no changes and P2/P3 remain unchanged.
+3. **Given** a parent spec (not a child), **When** the developer runs the pipeline, **Then** the reconcile step is skipped.
 
 ---
 
@@ -127,7 +128,7 @@ The following are explicitly excluded from this feature:
 - **FR-002b**: Within each product surface, the phase step MUST assign phases in deployment dependency order: foundational changes (migrations, infrastructure) in one phase, then dependent features (integrations, services) and user-facing work (UI, endpoints) in the next phase.
 - **FR-002c**: If a product surface has only one story or its foundational and feature layers are trivially small, the phase step MUST merge them into a single phase rather than creating two phases with one story each.
 - **FR-003**: For each phase, the phase step MUST recommend a release strategy: "dark launch with gradual reveal" for high-risk changes touching shared infrastructure, integrations, or migrations, or "direct release" for low-risk additive work like new endpoints or UI additions.
-- **FR-004**: Phase grouping and release strategy MUST be recorded as a dedicated `## Phases` section in the spec (not inline with stories), so downstream tools can parse and consume this metadata. The phase step runs as a standalone command after `/speckit.specify` and before Homer in the pipeline.
+- **FR-004**: Phase grouping and release strategy MUST be recorded as a dedicated `## Phases` section in the spec (not inline with stories), so downstream tools can parse and consume this metadata. The phase step runs as a standalone command after Homer (spec clarification) and before Plan in the pipeline.
 - **FR-005**: When all stories are low-risk additive work, the phase step MUST produce a single phase with a direct release recommendation rather than artificial multi-phase splitting.
 - **FR-006**: Each phase annotation MUST include: phase number, short descriptive slug, assigned story references, release strategy recommendation, and rationale for the phase boundary.
 
@@ -147,6 +148,12 @@ The following are explicitly excluded from this feature:
 - **FR-014**: The splitting skill MUST preserve manual edits in existing child specs when re-running, merging only the changes from updated phase annotations and earlier-phase divergence. When a manual edit conflicts with a propagated change, the splitting skill MUST flag the conflict with inline markers (e.g., `<!-- CONFLICT: ... -->`) for developer resolution rather than auto-resolving.
 - **FR-015**: When a phase is removed from the parent spec's annotations, the splitting skill MUST preserve the child directory on disk but mark it as "Cancelled" in the parent manifest.
 - **FR-016**: When a new phase is added to the parent spec's annotations, the splitting skill MUST create a new child spec directory in the correct phase-order position.
+
+#### Pipeline Integration
+
+- **FR-020**: The pipeline MUST include a reconcile step as the first step. For child specs with phase number > 1, the reconcile step MUST automatically run `/speckit.split` on the parent spec to sync all children with earlier-phase reality. For parent specs, standalone specs, and phase-1 child specs, the reconcile step MUST be skipped.
+- **FR-021**: The pipeline MUST include a split step after lisa and before ralph. For multi-phase parent specs (2+ phases), the split step MUST generate child specs and prompt the user to either stop and work on children (recommended default) or continue as a monolith (with warning). For child specs, the split step MUST be skipped — no recursive splitting. For single-phase or no-phase specs, the split step MUST be skipped.
+- **FR-022**: The pipeline step order MUST be: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge.
 
 #### Status Tracking
 
@@ -172,7 +179,7 @@ No non-functional requirements apply to this feature. All deliverables are devel
 
 - **SC-001**: A multi-concern feature description (involving migration, integration, and UI work across multiple product surfaces) produces a spec with at least 2 distinct phases when run through the phase step, with vertical-slice grouping completing each product surface before starting the next, and each phase having a documented release strategy recommendation.
 - **SC-002**: The splitting skill generates child spec directories that each pass the existing spec quality checklist without modification, confirming they are structurally valid standalone specs.
-- **SC-003**: Each child spec can be independently processed through the full SpecKit pipeline (specify -> phase -> homer -> plan -> tasks -> lisa -> ralph -> marge) without errors or references to sibling specs that would block execution.
+- **SC-003**: Each child spec can be independently processed through the full SpecKit pipeline (reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge) without errors or references to sibling specs that would block execution. Child specs with phase 2+ auto-reconcile with earlier siblings at the start of the pipeline.
 - **SC-004**: Re-running the splitting skill after modifying an earlier child spec produces updated later child specs within one re-run, without requiring manual intervention to propagate changes.
 - **SC-005**: A developer can determine the current state of a multi-phase feature (which phases are complete, in progress, or draft) by reading the parent spec manifest alone, without inspecting individual child directories.
 - **SC-006**: A simple additive feature description produces a single-phase spec with no unnecessary phase splitting, confirming the specify step does not over-segment straightforward work.

@@ -13,19 +13,13 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
-| Pipeline | End-to-end orchestrator: specify -> phase -> homer -> plan -> tasks -> lisa -> ralph -> marge. Auto-detects where to start based on existing artifacts.                                             |
+| Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
 
 **Pre-pipeline:**
 
 | Command     | What it does                                                                                                                                                                                        |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.         |
-
-**Post-pipeline:**
-
-| Command     | What it does                                                                                                                                                                                        |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Split       | Phase decomposition. Takes a phase-annotated parent spec and generates independent child specs — one per phase — that can each run through the full pipeline independently.                         |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
@@ -39,19 +33,23 @@ The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each
 ```mermaid
 flowchart TD
     A["/speckit.pipeline"] --> B{Auto-detect\nstarting step}
-    B --> C["Specify\n(sub agent)"]
-    C --> P["Phase\n(sub agent)"]
-    P --> D["Homer Loop"]
+    B --> R["Reconcile\n(child specs only)"]
+    R --> C["Specify\n(sub agent)"]
+    C --> D["Homer Loop"]
     D --> D1["Iteration 1\n(sub agent)"]
     D1 --> D2["Iteration 2\n(sub agent)"]
     D2 --> D3["... until resolved\nor max iterations"]
-    D3 --> E["Plan\n(sub agent)"]
+    D3 --> P["Phase\n(sub agent)"]
+    P --> E["Plan\n(sub agent)"]
     E --> F["Tasks\n(sub agent)"]
     F --> G["Lisa Loop"]
     G --> G1["Iteration 1\n(sub agent)"]
     G1 --> G2["Iteration 2\n(sub agent)"]
     G2 --> G3["... until resolved\nor max iterations"]
-    G3 --> H["Ralph Loop"]
+    G3 --> S{"Split\n(multi-phase\nparents only)"}
+    S -->|"Stop & work\non children"| I2["Report Results"]
+    S -->|"Continue as\nmonolith"| H["Ralph Loop"]
+    S -->|"Single phase\nor child spec"| H
     H --> H1["Iteration 1\n(sub agent)"]
     H1 --> H2["Iteration 2\n(sub agent)"]
     H2 --> H3["... until all tasks\ncomplete or max iterations"]
@@ -93,13 +91,13 @@ You can also run each loop individually and review between stages instead of run
 
 When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
 
-1. **Specify, then detect phases** — Run `/speckit.specify` as usual, then `/speckit.phase` to detect deployment boundaries (migrations, integrations, infrastructure changes, scope) and group user stories into ordered phases with release strategy recommendations (dark launch vs direct release). The pipeline runs this automatically between specify and homer.
+1. **Run the pipeline** — `/speckit.pipeline --from specify --description "..."` runs specify, homer (clarify), phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
 
-2. **Split into child specs** — Run `/speckit.split` on the phase-annotated parent spec. This generates independent child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. Each child spec has the standard SpecKit structure and can run through the full pipeline independently.
+2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
 
 3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The parent spec maintains a manifest tracking each phase's status (Draft, In Progress, Complete, Cancelled).
 
-4. **Reconcile as you learn** — Re-run `/speckit.split` after earlier phases ship. The splitting skill detects manual edits in child specs, propagates changes from earlier phases to later ones, and inserts conflict markers where manual edits and propagated changes collide. Phases can be added or removed as requirements shift.
+4. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built. No manual reconciliation needed — each child pipeline is self-healing.
 
 ## API key vs. Claude subscription
 
@@ -145,8 +143,9 @@ cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
 cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
 cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
-cp <path-to-simpsons-loops>/claude-agents/phase.md   .claude/agents/phase.md
-cp <path-to-simpsons-loops>/claude-agents/split.md  .claude/agents/split.md
+cp <path-to-simpsons-loops>/claude-agents/phase.md       .claude/agents/phase.md
+cp <path-to-simpsons-loops>/claude-agents/split.md      .claude/agents/split.md
+cp <path-to-simpsons-loops>/claude-agents/reconcile.md  .claude/agents/reconcile.md
 
 # Loop commands -> .claude/commands/
 cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
@@ -289,29 +288,25 @@ Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), conc
 
 When the pipeline runs and an open PR exists, this step runs automatically after Marge.
 
-### Split (phase decomposition)
+### Split and Reconcile (pipeline steps)
 
-After running the pipeline (or at least `/speckit.specify`) on a feature that produced a `## Phases` section in the spec:
-
-```
-/speckit.split
-```
-
-This reads the phase annotations from the parent spec and generates child spec directories:
+**Split** runs automatically in the pipeline after lisa for multi-phase parent specs. It generates child spec directories:
 
 ```
 specs/
-  c31c-feat-phase-aware-specs/          # parent spec (with manifest)
-  c31c-feat-phase-aware-specs--p1-expand-schema/   # phase 1 child
-  c31c-feat-phase-aware-specs--p2-integration/     # phase 2 child
-  c31c-feat-phase-aware-specs--p3-ui-reveal/       # phase 3 child
+  c31c-feat-billing-overhaul/                      # parent spec (with manifest)
+  c31c-feat-billing-overhaul--p1-expand-schema/    # phase 1 child
+  c31c-feat-billing-overhaul--p2-integration/      # phase 2 child
+  c31c-feat-billing-overhaul--p3-ui-reveal/        # phase 3 child
 ```
 
-Each child spec is standalone — run `/speckit.pipeline` on any child to take it through the full loop. The parent spec's `## Manifest` section tracks status across all phases.
+After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit.split` standalone on any phase-annotated parent spec.
 
-Re-running `/speckit.split` after changes is safe (idempotent). It detects manual edits, propagates changes from earlier phases, and flags conflicts with `<!-- CONFLICT: ... -->` markers for human resolution.
+**Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+). It syncs the child spec with what earlier sibling phases actually built, so you always pick up from reality rather than the original plan.
 
-Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state. Backward transitions are rejected.
+Re-running split is idempotent. It detects manual edits, propagates changes from earlier phases, and flags conflicts with `<!-- CONFLICT: ... -->` markers.
+
+Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state.
 
 ### Pipeline (end-to-end)
 
@@ -353,15 +348,17 @@ Or bootstrap end-to-end from a feature description:
 
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
+- Child spec (phase 2+) with no `plan.md` -> **reconcile**
 - No `spec.md` but `--description` provided -> **specify**
-- `spec.md` exists but no `## Phases` section populated -> **phase**
-- `spec.md` exists with `## Phases` populated -> **homer**
+- `spec.md` exists, no populated Phases -> **homer**
+- `spec.md` exists with populated Phases, no `plan.md` -> **plan**
 - `plan.md` exists -> **tasks**
 - `tasks.md` with no tasks started -> **lisa**
+- `spec.md` with Phases and `## Manifest` section -> **ralph** (split already ran)
 - `tasks.md` with some tasks completed -> **ralph**
 - `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
 
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `specify`, `phase`, `homer`, `plan`, `tasks`, `lisa`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
 

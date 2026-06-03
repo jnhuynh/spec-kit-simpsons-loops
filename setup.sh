@@ -232,6 +232,7 @@ cp "$SCRIPT_DIR/speckit-commands/speckit.phase.md"            "$PROJECT_DIR/.cla
 cp "$SCRIPT_DIR/speckit-commands/speckit.split.md"            "$PROJECT_DIR/.claude/commands/speckit.split.md"
 cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.claude/agents/phase.md"
 cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
+cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
@@ -254,6 +255,7 @@ echo "    .claude/commands/speckit.phase.md"
 echo "    .claude/commands/speckit.split.md"
 echo "    .claude/agents/phase.md"
 echo "    .claude/agents/split.md"
+echo "    .claude/agents/reconcile.md"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship with the template. Copy each baseline file to
