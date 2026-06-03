@@ -95,9 +95,11 @@ When a feature is too large to implement and deploy as a single unit — databas
 
 2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
 
-3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The parent spec maintains a manifest tracking each phase's status (Draft, In Progress, Complete, Cancelled).
+3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The pipeline enforces phase ordering: phase N cannot start until all earlier phases are marked "Complete" in the parent manifest. Use `--skip-phase-guard` to bypass this when phases are independent.
 
-4. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built. No manual reconciliation needed — each child pipeline is self-healing.
+4. **Auto-status** — The pipeline automatically updates the parent manifest as work progresses. When a child pipeline starts, the phase is marked "In Progress". When Marge (code review) completes successfully, the phase is marked "Complete". After each update, a phase status summary is printed so you can see progress across all phases at a glance.
+
+5. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built. No manual reconciliation needed — each child pipeline is self-healing.
 
 ## API key vs. Claude subscription
 
@@ -361,6 +363,8 @@ Or bootstrap end-to-end from a feature description:
 **`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
+
+**`--skip-phase-guard`:** Bypasses the phase order guard for child specs. By default, phase N blocks unless all earlier phases (1..N-1) are "Complete" in the parent manifest. Use this flag when phases are independent or when earlier phases were intentionally cancelled.
 
 **Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
 

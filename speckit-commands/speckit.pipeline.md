@@ -99,6 +99,7 @@ Parse `$ARGUMENTS` for the following (all are optional, can appear in any order)
 - **`--from <step>`**: Starting step override. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline starts from this step instead of auto-detecting.
 - **`--stop-after <step>`**: Stop-after step. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is NOT provided, `STOP_AFTER_STEP` MUST remain empty/unset so that all stop checks are no-ops and the pipeline runs all steps from the starting step through marge — identical to the behavior before `--stop-after` was added (FR-007). If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: reconcile, specify, homer, phase, plan, tasks, lisa, split, ralph, marge." and **STOP**.
 - **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
+- **`--skip-phase-guard`**: Skip the phase order guard for child specs. When present, the pipeline will not check whether earlier phases are complete before starting this child phase. Use when intentionally working out of order (e.g., phases are independent or earlier phases were cancelled). Store as boolean `SKIP_PHASE_GUARD` (default: false).
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 
 If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically:
@@ -120,6 +121,88 @@ If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automaticall
   - If `--from specify` is set or `--description` is provided, allow the pipeline to continue (the specify step will create spec.md)
   - Otherwise, exit with an error instructing the user to run `/speckit.specify` first or pass `--description`
 - If `--from specify` is set but no `--description` is provided, exit with an error requesting a feature description
+
+### Step 2b: Phase Order Guard (child specs only)
+
+This guard prevents starting a child phase N pipeline when earlier phases 1..N-1 are not complete. It is a no-op for parent specs, standalone specs, phase-1 child specs, or when `--skip-phase-guard` is set.
+
+1. **Check applicability**: If FEATURE_DIR does NOT match the `--p{N}-` pattern (e.g., `specs/c31c-feat-billing--p2-integration`), skip this step entirely — it is not a child spec. If it matches and N = 1, skip — no earlier phases to check. If `SKIP_PHASE_GUARD` is true, skip and log: `Phase order guard skipped per --skip-phase-guard.`
+
+2. **Resolve parent directory**: Strip `--p{N}-{slug}` from the end of FEATURE_DIR to get `PARENT_DIR`. Extract the phase number `N`. (Same logic as the Reconcile step.)
+
+3. **Read parent manifest**: Read `{PARENT_DIR}/spec.md` via the Read tool. Locate the `## Manifest` section. If no spec.md exists or no `## Manifest` section is found, display this error and **STOP**:
+
+```
+ERROR: Cannot verify phase order — parent manifest not found at {PARENT_DIR}/spec.md.
+Ensure the parent spec has been split (/speckit.split) before running child pipelines.
+```
+
+4. **Parse manifest table**: Extract each row from the manifest markdown table. For each row, parse the Phase column (format `P{N}: {slug}`) and the Status column. Build a list of all phases with their numbers and statuses.
+
+5. **Check earlier phases**: For each phase with number < N (i.e., phases 1 through N-1), categorize by status:
+   - **"Complete"**: Passes the guard — this phase is done.
+   - **"Draft" or "In Progress"**: Blocks — this phase is not done yet.
+   - **"Cancelled"**: Blocks — this phase was abandoned, dependencies may be missing.
+
+6. **All earlier phases "Complete"**: Guard passes. Continue to Step 2c.
+
+7. **Any earlier phases "Draft" or "In Progress"**: Display error and **STOP** — do not execute any pipeline steps:
+
+```
+ERROR: Phase {N} cannot start — earlier phases are incomplete.
+
+Blocking phases:
+  P{X}: {slug} — {status}
+  P{Y}: {slug} — {status}
+
+Complete these phases before starting phase {N}, or re-run with --skip-phase-guard to bypass this check.
+```
+
+(List all blocking phases, not just the first one.)
+
+8. **Any earlier phases "Cancelled" (and none are Draft/In Progress)**: Display error and **STOP**:
+
+```
+ERROR: Phase {N} cannot start — earlier phases are cancelled.
+
+Cancelled phases:
+  P{X}: {slug} — Cancelled
+
+If phase {N} does not depend on cancelled phases, re-run with --skip-phase-guard to bypass this check.
+```
+
+### Step 2c: Mark Phase "In Progress" in Parent Manifest (child specs only)
+
+After the phase order guard passes (or is skipped for N=1), update the parent manifest to mark this phase as "In Progress". This is a no-op for parent specs and standalone specs.
+
+1. **Check applicability**: If FEATURE_DIR does NOT match the `--p{N}-` pattern, skip this step (not a child spec). If PARENT_DIR was not resolved in Step 2b (because N=1 and Step 2b was skipped), resolve it now by stripping `--p{N}-{slug}` from FEATURE_DIR.
+
+2. **Read and parse manifest**: Read `{PARENT_DIR}/spec.md`, locate the `## Manifest` section, and parse the table. Find the row where the Directory column matches the basename of FEATURE_DIR (the child directory name without the `specs/` prefix).
+
+3. **Check current status and apply transition**:
+   - If current status is **"Draft"**: Update to **"In Progress"**.
+   - If current status is **"In Progress"**: No-op — already correct. Do not write or commit.
+   - If current status is **"Complete"**: No-op — do not regress. Log: `Phase {N} is already marked Complete in parent manifest. Skipping status update.`
+   - If current status is **"Cancelled"**: Log warning: `Phase {N} is marked Cancelled in the parent manifest. Proceeding with pipeline but not updating status.` Do not update.
+
+4. **Write the update**: If a status change is needed (Draft → In Progress), use the Edit tool to update the Status cell in the specific manifest table row in `{PARENT_DIR}/spec.md`. Replace only the status value in that row — preserve all other content in the file.
+
+5. **Commit the change**:
+
+```bash
+git add {PARENT_DIR}/spec.md && git commit -m "chore: mark phase {N} In Progress in parent manifest"
+```
+
+6. **Output phase status summary**: After updating (or confirming no update needed), output a summary of all phases and their current statuses:
+
+```
+Phase Status Summary (parent: {PARENT_DIR}):
+  P1: {slug} .... {status}
+  P2: {slug} .... In Progress  <-- current
+  P3: {slug} .... {status}
+```
+
+Use dot-padding to align status values. Mark the current phase with `<-- current`.
 
 ### Step 3: Auto-detect starting step (if `--from` not specified)
 
@@ -465,7 +548,38 @@ bash .specify/quality-gates.sh
 
 If it exits non-zero, set the pipeline completion status to **failure** with reason "marge end-of-loop full quality gates failed", surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run this gate on max-iterations, stuck, or failure exits.
 
-**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Suggest manual review and resuming with `--from marge`.
+**Post-marge manifest update (child specs only)**: When the marge loop exits via the success path (all findings resolved) AND the full quality gate passes, update the parent manifest to mark this phase as "Complete". Skip this entirely if FEATURE_DIR does not match the `--p{N}-` pattern (not a child spec).
+
+1. Resolve `PARENT_DIR` by stripping `--p{N}-{slug}` from FEATURE_DIR. Extract the phase number `N`.
+
+2. Read `{PARENT_DIR}/spec.md`, locate the `## Manifest` section, and parse the table. Find the row where the Directory column matches this child's directory name.
+
+3. Check current status and apply transition:
+   - If **"In Progress"**: Update to **"Complete"**.
+   - If **"Draft"**: Update to **"Complete"** (the pipeline ran the full lifecycle, implicitly passing through In Progress).
+   - If **"Complete"**: No-op — already marked. Do not write or commit.
+   - If **"Cancelled"**: Log warning: `Phase {N} is marked Cancelled in the parent manifest. Pipeline completed but not updating status.` Do not update.
+
+4. Write the update using the Edit tool — replace only the Status cell in the matching manifest table row in `{PARENT_DIR}/spec.md`. Preserve all other content.
+
+5. Commit the change:
+
+```bash
+git add {PARENT_DIR}/spec.md && git commit -m "chore: mark phase {N} Complete in parent manifest"
+```
+
+6. Output phase status summary:
+
+```
+Phase Status Summary (parent: {PARENT_DIR}):
+  P1: {slug} .... Complete
+  P2: {slug} .... Complete  <-- complete
+  P3: {slug} .... Draft
+```
+
+Use dot-padding to align status values. Mark the phase that was just completed with `<-- complete`.
+
+**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Do NOT run the manifest update on failure exits — the phase is not complete. Suggest manual review and resuming with `--from marge`.
 
 #### PR Review (optional single-shot step — skip if no open PR or skill absent)
 
@@ -560,3 +674,4 @@ If the pipeline did not complete all ten steps (whether due to `--stop-after`, f
 - `/speckit.pipeline --stop-after ralph` — Implement but skip the review loop
 - `/speckit.pipeline --from split` — Re-split and prompt for child/monolith choice
 - `/speckit.pipeline --stop-after split` — Run through split step only (plan the whole, then decompose)
+- `/speckit.pipeline --skip-phase-guard specs/proj--p3-ui-reveal` — Start phase 3 even if earlier phases aren't complete
