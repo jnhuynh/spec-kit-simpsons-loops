@@ -423,16 +423,29 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 
 All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
 
-### Marge review packs
+### Marge review packs & project gates
 
-Marge's review rules live in `.specify/marge/checks/` as plain markdown files. `setup.sh` seeds four baseline packs:
+Marge's review rules live in `.specify/marge/checks/` as plain markdown files. `setup.sh` seeds six baseline packs:
 
 - `generic-bugs.md` — null handling, off-by-one, race conditions, wrong-argument-order, swallowed exceptions
 - `security.md` — OWASP essentials: secrets, SQLi, command injection, authz, crypto misuse, PII in logs
 - `testing.md` — test-first discipline, coverage for new public functions, fixture hygiene, flaky patterns
 - `architecture.md` — scope creep, duplicated helpers, dead code, layer violations, broken invariants
+- `one-way-doors.md` — irreversible changes (schema destruction, API breaks, data deletion); always `NEEDS_HUMAN`
+- `concurrency.md` — TOCTOU, shared mutable state, lock ordering, transaction boundaries; always `NEEDS_HUMAN`
 
 Add project-specific packs by dropping additional `*.md` files into the same directory. Marge auto-discovers every `*.md`; the filename is the pack name. Baseline files are preserved on re-install — existing pack files are never overwritten.
+
+#### Project gates
+
+Beyond the prose packs, you can enforce **repo-specific continuity rules** — e.g. "these sibling files must change together", "a generated file stays in sync with its source". Two forms:
+
+- **Script gates** — deterministic shell scripts in `.specify/marge/gates/*.sh`. They receive the diff via environment variables and print findings on stdout. Best for mechanical, greppable checks; no LLM.
+- **Config-backed packs** — an ordinary `*.md` pack in `.specify/marge/checks/` that reads data from `.specify/marge/config/` (e.g. a list of sync-groups). Best for data-driven or judgment checks.
+
+Both emit findings tagged `PROJECT_GATE` into the **same review pipeline** as the packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Gates run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage gates, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A gate opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage: planning` line (packs).
+
+The full authoring contract — environment inputs, the stdout findings shape, exit semantics, and templates — is in `.specify/marge/gates/README.md`.
 
 ## References
 

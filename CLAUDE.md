@@ -51,6 +51,7 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
+- **Project gates** → repo-specific continuity checks (e.g. sibling files must change together): script gates in `.specify/marge/gates/*.sh` and config-backed packs (`.specify/marge/checks/` + `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `.specify/marge/gates/README.md`
 - Exit after each iteration — restart with fresh context
 
 ## Karpathy-Inspired Claude Code Guidelines
