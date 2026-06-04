@@ -163,7 +163,7 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/c
 
 # Marge review packs -> .specify/marge/checks/
 mkdir -p .specify/marge/checks
-cp -n <path-to-simpsons-loops>/.specify/marge/checks/*.md .specify/marge/checks/
+cp -n <path-to-simpsons-loops>/specify-marge/checks/*.md .specify/marge/checks/
 ```
 
 #### 2. Update `.gitignore`

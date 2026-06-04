@@ -258,17 +258,17 @@ echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
-# Baseline packs ship with the template. Copy each baseline file to
-# .specify/marge/checks/ only if it does not already exist — this
-# preserves any consumer customizations while still bootstrapping
-# fresh installs. Consumer-added packs (files with different names)
-# are never touched.
+# Baseline packs ship from the non-hidden source dir specify-marge/checks/.
+# Copy each baseline file into the consumer's .specify/marge/checks/ only if
+# it does not already exist — this preserves consumer customizations while
+# bootstrapping fresh installs. Consumer-added packs (other filenames) are
+# never touched. (Source is non-hidden; setup never reads from the hidden .specify tree.)
 
 MARGE_CHECKS_DIR="$PROJECT_DIR/.specify/marge/checks"
 mkdir -p "$MARGE_CHECKS_DIR"
 
 marge_seeded=false
-for pack in "$SCRIPT_DIR/.specify/marge/checks/"*.md; do
+for pack in "$SCRIPT_DIR/specify-marge/checks/"*.md; do
   [[ -f "$pack" ]] || continue
   pack_name=$(basename "$pack")
   target="$MARGE_CHECKS_DIR/$pack_name"
