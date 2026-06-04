@@ -285,6 +285,29 @@ if ! $marge_seeded; then
   echo "  All Marge review packs already present"
 fi
 
+# ── 2c. Seed Marge project-gate scaffolding ─────────────────────────
+# Project gates are repo-specific, so nothing generic ships except the
+# authoring docs. Seed the gates/ and config/ contract READMEs (and any
+# other templates) into the consumer, skip-if-exists; live gates (*.sh)
+# are authored per project and are never shipped. Source is the non-hidden
+# specify-marge/ dir.
+for sub in gates config; do
+  src_dir="$SCRIPT_DIR/specify-marge/$sub"
+  dest_dir="$PROJECT_DIR/.specify/marge/$sub"
+  mkdir -p "$dest_dir"
+  for f in "$src_dir/"*; do
+    [[ -f "$f" ]] || continue
+    name=$(basename "$f")
+    target="$dest_dir/$name"
+    if [[ -f "$target" ]]; then
+      echo "  .specify/marge/$sub/$name already exists — skipped"
+    else
+      cp "$f" "$target"
+      echo "  Seeded .specify/marge/$sub/$name"
+    fi
+  done
+done
+
 # ── 3. Update .gitignore ────────────────────────────────────────────
 
 GITIGNORE="$PROJECT_DIR/.gitignore"
