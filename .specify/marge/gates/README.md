@@ -7,7 +7,7 @@ There are **two forms**. Use whichever fits the rule:
 | Form | Lives in | Best for |
 |------|----------|----------|
 | **Script gate** (`gates/*.sh`) | this directory | Deterministic, mechanical checks (file co-change, generated-file sync, greppable invariants). No LLM. |
-| **Config-backed pack** (`../checks/*.md` + `../config/*.yml`) | `checks/` + `config/` | Data-driven / judgment checks (e.g. a list of sync-groups). LLM-interpreted. |
+| **Config-backed pack** (`../checks/*.md` + `../config/*.yml`) | `checks/` + `config/` | Data-driven / judgment checks (e.g. groups of files that must change together). LLM-interpreted. |
 
 Both forms emit findings tagged `PROJECT_GATE`.
 
@@ -125,7 +125,7 @@ Emit findings tagged [PROJECT_GATE]. If the config file is absent or empty,
 emit zero findings (inert by default).
 ```
 
-This is how a `dsl-sync`-style check works: a `sync-groups.md` pack reads `config/sync-groups.yml` (a list of file groups that must change together) and flags out-of-sync groups — without hard-coding the group list into the rule.
+For example, a `linked-files.md` pack can read `config/linked-files.yml` (groups of files that must change together) and flag when a member changes without its group — keeping the group list in data, not in the rule.
 
 ---
 
