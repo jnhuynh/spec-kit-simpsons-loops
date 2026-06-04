@@ -170,6 +170,10 @@ cp -n <path-to-simpsons-loops>/specify-marge/checks/*.md .specify/marge/checks/
 mkdir -p .specify/marge/gates .specify/marge/config
 cp -n <path-to-simpsons-loops>/specify-marge/gates/*  .specify/marge/gates/
 cp -n <path-to-simpsons-loops>/specify-marge/config/* .specify/marge/config/
+
+# Marge script-gate runner (framework — overwrite, not cp -n) -> .specify/marge/
+cp <path-to-simpsons-loops>/specify-marge/run-gates.sh .specify/marge/run-gates.sh
+chmod +x .specify/marge/run-gates.sh
 ```
 
 #### 2. Update `.gitignore`

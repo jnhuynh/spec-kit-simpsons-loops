@@ -92,34 +92,18 @@ Each sub agent must return findings in this shape (one per finding):
 
 ## Step 4b: Run script gates
 
-Project **script gates** are deterministic continuity checks under `.specify/marge/gates/*.sh` (full contract in `.specify/marge/gates/README.md`). Discover them via Glob. If the directory is missing or empty, skip this step — gates are optional (only `.specify/marge/checks/` is required).
+Project **script gates** are deterministic continuity checks under `.specify/marge/gates/*.sh`, executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/gates/README.md`). The runner discovers the gates, applies the per-gate timeout, exports the contract env, and emits findings — or one `gate-execution` meta-finding per failed gate — on stdout; it never aborts.
 
-Run each gate **after** the packs (so gate findings can corroborate/refute pack findings in Step 5). For each gate, run it once via the Bash tool with the diff context exported:
+Run it **once, after the packs** (so gate findings can corroborate/refute pack findings in Step 5) via the Bash tool. Pass the base ref from Step 1; the runner derives the changed-file list from it:
 
 ```bash
-SPECKIT_DIFF_FILES="<newline-separated list of modified files from Step 1>" \
-SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>" \
-SPECKIT_REPO_ROOT="$(pwd)" \
 SPECKIT_STAGE=review \
-timeout 120 bash .specify/marge/gates/<gate-name>.sh
+SPECKIT_REPO_ROOT="$(pwd)" \
+SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>" \
+bash .specify/marge/run-gates.sh
 ```
 
-Capture stdout and stderr separately, then interpret per the contract:
-
-- **Exit 0** — parse stdout as a findings YAML sequence (same shape as Step 4). Empty stdout means zero findings. If a finding omits `pack:`, set it to `gates/<gate-name>`. Every gate finding carries `PROJECT_GATE` in its `tags` (and may also carry `NEEDS_HUMAN`).
-- **Any non-zero exit, or a timeout** — record ONE meta-finding and continue; never abort the review:
-
-  ```
-  - file: .specify/marge/gates/<gate-name>:0
-    severity: LOW
-    confidence: 100
-    pack: gates/<gate-name>
-    rule: gate-execution
-    issue: gate failed to run (exit <code>): <last line of stderr>
-    tags: [PROJECT_GATE, NEEDS_HUMAN]
-  ```
-
-Append all script-gate findings to the aggregated findings list, then continue to Step 5.
+Treat the runner's stdout as a findings YAML sequence in the same shape as Step 4 — each item already carries `pack: gates/<name>` and `PROJECT_GATE` (a failed gate appears as one LOW `gate-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero gate findings. Append them to the aggregated findings list, then continue to Step 5. If `.specify/marge/gates/` is absent the runner prints nothing — gates are optional (only `.specify/marge/checks/` is required).
 
 ## Step 5: Aggregate
 

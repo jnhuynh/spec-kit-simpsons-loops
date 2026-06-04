@@ -234,6 +234,14 @@ cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.cla
 cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
 cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
+# Framework runner for project script gates (Pattern A: OVERWRITE, like the
+# agent/command copies above). It lives under .specify/marge/ next to the
+# consumer-owned gates/, but is framework code, so it is always refreshed —
+# the gates/*.sh themselves are preserved (seeded skip-if-exists in step 2c).
+mkdir -p "$PROJECT_DIR/.specify/marge"
+cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
+chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
+
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
@@ -256,6 +264,7 @@ echo "    .claude/commands/speckit.split.md"
 echo "    .claude/agents/phase.md"
 echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"
+echo "    .specify/marge/run-gates.sh"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
 # Baseline packs ship from the non-hidden source dir specify-marge/checks/.

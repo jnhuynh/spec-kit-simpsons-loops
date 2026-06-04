@@ -105,17 +105,17 @@ Each sub agent must return findings in this shape:
 
 ## Step 4b: Run script gates
 
-Run project **script gates** (`.specify/marge/gates/*.sh`) exactly as in `/speckit.review` Step 4b (contract: `.specify/marge/gates/README.md`), so deterministic continuity findings reach out-of-band reviewers. Discover via Glob; skip if the directory is missing/empty. For each gate:
+Run project **script gates** via the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/gates/README.md`), so deterministic continuity findings reach out-of-band reviewers. Same runner as `/speckit.review` Step 4b, with PR scope — pass the PR's changed files explicitly (the PR diff comes from `gh`, not local git):
 
 ```bash
-SPECKIT_DIFF_FILES="<files from `gh pr diff $PR_NUMBER --name-only`>" \
-SPECKIT_BASE_REF="$BASE_REF" \
-SPECKIT_REPO_ROOT="$(pwd)" \
 SPECKIT_STAGE=review \
-timeout 120 bash .specify/marge/gates/<gate-name>.sh
+SPECKIT_REPO_ROOT="$(pwd)" \
+SPECKIT_BASE_REF="$BASE_REF" \
+SPECKIT_DIFF_FILES="$(gh pr diff "$PR_NUMBER" --name-only)" \
+bash .specify/marge/run-gates.sh
 ```
 
-Exit 0 → parse stdout findings (default `pack: gates/<gate-name>`; each carries `PROJECT_GATE`). Non-zero/timeout → record one `gate-execution` meta-finding (`tags: [PROJECT_GATE, NEEDS_HUMAN]`) and continue. Append to the aggregated findings, then continue to Step 5.
+Treat stdout as gate findings (same shape as Step 4; each carries `pack: gates/<name>` and `PROJECT_GATE`; a failed gate appears as one `gate-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Append to the aggregated findings, then continue to Step 5.
 
 ## Step 5: Aggregate
 

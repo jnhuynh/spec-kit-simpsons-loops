@@ -21,11 +21,11 @@ Both forms emit findings tagged `PROJECT_GATE`.
 
 ## Script gate contract (`gates/*.sh`)
 
-`/speckit.review` discovers every `*.sh` in this directory and runs it, folding stdout into the findings pipeline. **Findings — not exit codes — drive enforcement.**
+The shipped runner `.specify/marge/run-gates.sh` discovers every `*.sh` in this directory and runs each one, folding stdout into the findings pipeline. **Findings — not exit codes — drive enforcement.** All three venues — Marge (`/speckit.review`), PR review (`/speckit.review.pr`), and Lisa planning — call this one runner.
 
 ### Inputs (environment)
 
-The runner exports these before running each gate:
+`.specify/marge/run-gates.sh` exports these before running each gate:
 
 | Variable | Stage | Meaning |
 |----------|-------|---------|
@@ -36,6 +36,8 @@ The runner exports these before running each gate:
 | `SPECKIT_REPO_ROOT` | both | absolute repo root |
 
 A gate may also call `git` directly.
+
+> For **review**, the runner derives `SPECKIT_DIFF_FILES` from `SPECKIT_BASE_REF` (`git diff --name-only`) when the caller doesn't pass an explicit list, so it is always populated. Parse it with `printf '%s\n' "$SPECKIT_DIFF_FILES" | grep -qxF "<path>"` (see the template).
 
 ### Output (stdout): zero or more findings
 
@@ -54,6 +56,7 @@ Print a YAML sequence; each item EXACTLY:
 
 - **No findings → print nothing** and exit 0. Empty stdout means clean.
 - Write diagnostics to **stderr** (never parsed as findings).
+- **Emit your own `pack:` line** (`gates/<this-file>.sh`). The runner passes your stdout through **verbatim** — it does not parse, rewrite, or backfill YAML; it only ever *adds* the `gate-execution` meta-finding (below) when your gate exits non-zero.
 - Always include `PROJECT_GATE` in `tags`. Add `NEEDS_HUMAN` when resolution needs human judgment — Marge then leaves it for `/speckit.review.pr` instead of auto-fixing.
 
 ### Exit code (decoupled from findings)
