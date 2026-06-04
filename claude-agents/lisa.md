@@ -12,10 +12,29 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 Run `/speckit.analyze Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
 
+## Phase 0b: Run planning-stage project gates
+
+Project gates that opt into the **planning** stage check spec artifacts before code exists (contract: `.specify/marge/gates/README.md`). Run them and fold findings into Phase 1. If none exist, skip silently.
+
+1. **Script gates** — Glob `.specify/marge/gates/*.sh`; select only those whose first ~20 lines contain `# speckit-stage: planning` (diff-scoped gates without that marker do NOT apply here). Run each:
+
+   ```bash
+   SPECKIT_STAGE=planning \
+   SPECKIT_FEATURE_DIR="<FEATURE_DIR>" \
+   SPECKIT_REPO_ROOT="$(pwd)" \
+   timeout 120 bash .specify/marge/gates/<gate-name>.sh
+   ```
+
+   Exit 0 → parse stdout findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`). Non-zero/timeout → record one `gate-execution` meta-finding and continue.
+
+2. **Config-backed packs** — for each `.specify/marge/checks/*.md` whose text contains a `Stage: planning` line, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its `PROJECT_GATE` findings.
+
+`/speckit.analyze` does NOT remediate these. Carry them into Phase 1: if `/speckit.analyze` already remediated a finding this iteration, leave the gate findings for later iterations (one finding per iteration); if `/speckit.analyze` had nothing to remediate but planning-gate findings remain, remediate the single highest-severity non-`NEEDS_HUMAN` gate finding now by editing the spec artifacts.
+
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit.analyze` report
-2. If TOTAL findings = 0, output the following promise tag and exit immediately:
+1. Review the findings from the `/speckit.analyze` report and any Phase 0b planning-gate findings
+2. If TOTAL findings (analyze + planning gates) = 0, output the following promise tag and exit immediately:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
@@ -52,3 +71,4 @@ Run `/speckit.analyze Remediate only the single highest-severity finding without
 - Plan: `<FEATURE_DIR>/plan.md`
 - Tasks: `<FEATURE_DIR>/tasks.md`
 - Constitution: `.specify/memory/constitution.md`
+- Planning-stage gates: `.specify/marge/gates/*.sh` (marked `# speckit-stage: planning`) and `.specify/marge/checks/*.md` (with `Stage: planning`)

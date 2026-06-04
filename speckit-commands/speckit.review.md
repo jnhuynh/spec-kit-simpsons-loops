@@ -46,6 +46,8 @@ Expected baseline packs (installed by `setup.sh`):
 
 Project-specific packs live alongside (any additional `*.md` the consumer dropped in). Run every pack regardless of baseline-vs-specific status — the directory is the API.
 
+Some project packs are **config-backed**: the pack text instructs the sub agent to `Read` a data file under `.specify/marge/config/` and treat it as rule data (e.g. sibling-file sync groups). No special handling is needed here — the sub agent reads that file itself in Step 4. A config-backed pack whose config file is missing or empty emits zero findings, and tags its findings `PROJECT_GATE` (see Step 4b and `.specify/marge/gates/README.md`).
+
 If the directory is empty or missing, abort: "No review packs found at `.specify/marge/checks/`. Run `setup.sh` to install baseline packs."
 
 ## Step 3: Consult rule sources
@@ -88,11 +90,42 @@ Each sub agent must return findings in this shape (one per finding):
 
 **Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
 
+## Step 4b: Run script gates
+
+Project **script gates** are deterministic continuity checks under `.specify/marge/gates/*.sh` (full contract in `.specify/marge/gates/README.md`). Discover them via Glob. If the directory is missing or empty, skip this step — gates are optional (only `.specify/marge/checks/` is required).
+
+Run each gate **after** the packs (so gate findings can corroborate/refute pack findings in Step 5). For each gate, run it once via the Bash tool with the diff context exported:
+
+```bash
+SPECKIT_DIFF_FILES="<newline-separated list of modified files from Step 1>" \
+SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>" \
+SPECKIT_REPO_ROOT="$(pwd)" \
+SPECKIT_STAGE=review \
+timeout 120 bash .specify/marge/gates/<gate-name>.sh
+```
+
+Capture stdout and stderr separately, then interpret per the contract:
+
+- **Exit 0** — parse stdout as a findings YAML sequence (same shape as Step 4). Empty stdout means zero findings. If a finding omits `pack:`, set it to `gates/<gate-name>`. Every gate finding carries `PROJECT_GATE` in its `tags` (and may also carry `NEEDS_HUMAN`).
+- **Any non-zero exit, or a timeout** — record ONE meta-finding and continue; never abort the review:
+
+  ```
+  - file: .specify/marge/gates/<gate-name>:0
+    severity: LOW
+    confidence: 100
+    pack: gates/<gate-name>
+    rule: gate-execution
+    issue: gate failed to run (exit <code>): <last line of stderr>
+    tags: [PROJECT_GATE, NEEDS_HUMAN]
+  ```
+
+Append all script-gate findings to the aggregated findings list, then continue to Step 5.
+
 ## Step 5: Aggregate
 
 1. Apply `corroborates:` — merge into the prior finding, bump its confidence by +10 (cap 100), append the corroborating source to its `pack` line.
 2. Apply `refutes:` — drop the refuted finding; record it in a "Refuted" appendix.
-3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later pack (project-specific wins over baseline).
+3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later source — script gates (`pack: gates/*`) and project-specific packs win over baseline packs.
 4. Filter findings with `confidence < 70` unless `$ARGUMENTS` contains `--strict`.
 5. Sort within each severity bucket by confidence descending.
 
