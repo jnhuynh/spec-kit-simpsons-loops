@@ -16,16 +16,16 @@ Run `/speckit.analyze Remediate only the single highest-severity finding without
 
 Project gates that opt into the **planning** stage check spec artifacts before code exists (contract: `.specify/marge/gates/README.md`). Run them and fold findings into Phase 1. If none exist, skip silently.
 
-1. **Script gates** — Glob `.specify/marge/gates/*.sh`; select only those whose first ~20 lines contain `# speckit-stage: planning` (diff-scoped gates without that marker do NOT apply here). Run each:
+1. **Script gates** — run the shipped runner in planning mode. It discovers `.specify/marge/gates/*.sh` and runs ONLY gates that opt in via `# speckit-stage: planning` (diff-scoped gates are skipped automatically):
 
    ```bash
    SPECKIT_STAGE=planning \
-   SPECKIT_FEATURE_DIR="<FEATURE_DIR>" \
    SPECKIT_REPO_ROOT="$(pwd)" \
-   timeout 120 bash .specify/marge/gates/<gate-name>.sh
+   SPECKIT_FEATURE_DIR="<FEATURE_DIR>" \
+   bash .specify/marge/run-gates.sh
    ```
 
-   Exit 0 → parse stdout findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`). Non-zero/timeout → record one `gate-execution` meta-finding and continue.
+   Treat stdout as findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed gate appears as one `gate-execution` finding). Fold these into Phase 1.
 
 2. **Config-backed packs** — for each `.specify/marge/checks/*.md` whose text contains a `Stage: planning` line, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its `PROJECT_GATE` findings.
 
