@@ -82,8 +82,9 @@ Each sub agent receives:
 > 2. **Race conditions / concurrency** — shared mutable state, TOCTOU, missing transactions, non-atomic operations
 > 3. **Architectural decisions** — new coupling, layer violations, abstraction boundary changes, dependency direction
 > 4. **Project-specific patterns** — violations of constitution or CLAUDE.md principles that require judgment (not mechanical fixes)
+> 5. **Project continuity gates** — findings from config-backed project packs tagged `PROJECT_GATE` (e.g. sibling-file sync). ALWAYS flag these, even if mechanical — they encode repo-specific continuity rules an out-of-band reviewer cannot otherwise see.
 >
-> For packs that contain both mechanical and judgment rules, ONLY flag findings tagged `NEEDS_HUMAN` in the pack's rule definitions. Skip all others.
+> For packs that contain both mechanical and judgment rules, ONLY flag findings tagged `NEEDS_HUMAN` in the pack's rule definitions — EXCEPT `PROJECT_GATE` findings, which are always flagged. Skip all others.
 
 Each sub agent must return findings in this shape:
 
@@ -101,6 +102,20 @@ Each sub agent must return findings in this shape:
 ```
 
 **Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
+
+## Step 4b: Run script gates
+
+Run project **script gates** (`.specify/marge/gates/*.sh`) exactly as in `/speckit.review` Step 4b (contract: `.specify/marge/gates/README.md`), so deterministic continuity findings reach out-of-band reviewers. Discover via Glob; skip if the directory is missing/empty. For each gate:
+
+```bash
+SPECKIT_DIFF_FILES="<files from `gh pr diff $PR_NUMBER --name-only`>" \
+SPECKIT_BASE_REF="$BASE_REF" \
+SPECKIT_REPO_ROOT="$(pwd)" \
+SPECKIT_STAGE=review \
+timeout 120 bash .specify/marge/gates/<gate-name>.sh
+```
+
+Exit 0 → parse stdout findings (default `pack: gates/<gate-name>`; each carries `PROJECT_GATE`). Non-zero/timeout → record one `gate-execution` meta-finding (`tags: [PROJECT_GATE, NEEDS_HUMAN]`) and continue. Append to the aggregated findings, then continue to Step 5.
 
 ## Step 5: Aggregate
 
@@ -120,9 +135,10 @@ Map the pack-native severity to the three-tier PR comment scheme:
 | HIGH + NEEDS_HUMAN | **WARNING** | Concurrency, architecture, testing judgment |
 | MEDIUM + NEEDS_HUMAN | **WARNING** | Architecture, testing judgment |
 | LOW + NEEDS_HUMAN | **INFO** | Project pattern observations |
-| Any severity WITHOUT NEEDS_HUMAN and NOT from one-way-doors/concurrency packs | *Dropped* | Marge handles these |
+| `PROJECT_GATE` (any severity) | CRITICAL→**CRITICAL**, HIGH/MEDIUM→**WARNING**, LOW→**INFO** | Project continuity gates — always surfaced |
+| Any other finding WITHOUT NEEDS_HUMAN, not from a keep-list source | *Dropped* | Marge handles these |
 
-Findings from `one-way-doors.md` and `concurrency.md` packs are always kept regardless of NEEDS_HUMAN tag (those packs are entirely NEEDS_HUMAN by definition).
+Findings from `one-way-doors.md` and `concurrency.md` packs, and ALL findings tagged `PROJECT_GATE` (script gates and config-backed project packs), are always kept regardless of the NEEDS_HUMAN tag — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
 
 ## Step 7: Check idempotency
 
@@ -201,7 +217,7 @@ The payload must conform to the GitHub Reviews API:
 > Source: pack `<pack filename>` rule `<rule ID>`
 ```
 
-Category labels: `One-Way Door`, `Concurrency Risk`, `Architecture Decision`, `Project Pattern`.
+Category labels: `One-Way Door`, `Concurrency Risk`, `Architecture Decision`, `Project Pattern`, `Project Gate` (for `PROJECT_GATE` findings).
 
 ### Submit
 
