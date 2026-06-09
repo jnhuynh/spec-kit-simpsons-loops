@@ -234,6 +234,14 @@ cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.cla
 cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
 cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
+# Framework runner for project script gates (Pattern A: OVERWRITE, like the
+# agent/command copies above). It lives under .specify/marge/ next to the
+# consumer-owned gates/, but is framework code, so it is always refreshed —
+# the gates/*.sh themselves are preserved (seeded skip-if-exists in step 2c).
+mkdir -p "$PROJECT_DIR/.specify/marge"
+cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
+chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
+
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
@@ -256,19 +264,20 @@ echo "    .claude/commands/speckit.split.md"
 echo "    .claude/agents/phase.md"
 echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"
+echo "    .specify/marge/run-gates.sh"
 
 # ── 2b. Seed Marge review packs ─────────────────────────────────────
-# Baseline packs ship with the template. Copy each baseline file to
-# .specify/marge/checks/ only if it does not already exist — this
-# preserves any consumer customizations while still bootstrapping
-# fresh installs. Consumer-added packs (files with different names)
-# are never touched.
+# Baseline packs ship from the non-hidden source dir specify-marge/checks/.
+# Copy each baseline file into the consumer's .specify/marge/checks/ only if
+# it does not already exist — this preserves consumer customizations while
+# bootstrapping fresh installs. Consumer-added packs (other filenames) are
+# never touched. (Source is non-hidden; setup never reads from the hidden .specify tree.)
 
 MARGE_CHECKS_DIR="$PROJECT_DIR/.specify/marge/checks"
 mkdir -p "$MARGE_CHECKS_DIR"
 
 marge_seeded=false
-for pack in "$SCRIPT_DIR/.specify/marge/checks/"*.md; do
+for pack in "$SCRIPT_DIR/specify-marge/checks/"*.md; do
   [[ -f "$pack" ]] || continue
   pack_name=$(basename "$pack")
   target="$MARGE_CHECKS_DIR/$pack_name"
@@ -284,6 +293,29 @@ done
 if ! $marge_seeded; then
   echo "  All Marge review packs already present"
 fi
+
+# ── 2c. Seed Marge project-gate scaffolding ─────────────────────────
+# Project gates are repo-specific, so nothing generic ships except the
+# authoring docs. Seed the gates/ and config/ contract READMEs (and any
+# other templates) into the consumer, skip-if-exists; live gates (*.sh)
+# are authored per project and are never shipped. Source is the non-hidden
+# specify-marge/ dir.
+for sub in gates config; do
+  src_dir="$SCRIPT_DIR/specify-marge/$sub"
+  dest_dir="$PROJECT_DIR/.specify/marge/$sub"
+  mkdir -p "$dest_dir"
+  for f in "$src_dir/"*; do
+    [[ -f "$f" ]] || continue
+    name=$(basename "$f")
+    target="$dest_dir/$name"
+    if [[ -f "$target" ]]; then
+      echo "  .specify/marge/$sub/$name already exists — skipped"
+    else
+      cp "$f" "$target"
+      echo "  Seeded .specify/marge/$sub/$name"
+    fi
+  done
+done
 
 # ── 3. Update .gitignore ────────────────────────────────────────────
 

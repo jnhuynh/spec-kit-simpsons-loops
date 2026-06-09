@@ -46,6 +46,8 @@ Expected baseline packs (installed by `setup.sh`):
 
 Project-specific packs live alongside (any additional `*.md` the consumer dropped in). Run every pack regardless of baseline-vs-specific status — the directory is the API.
 
+Some project packs are **config-backed**: the pack text instructs the sub agent to `Read` a data file under `.specify/marge/config/` and treat it as rule data (e.g. sibling-file sync groups). No special handling is needed here — the sub agent reads that file itself in Step 4. A config-backed pack whose config file is missing or empty emits zero findings, and tags its findings `PROJECT_GATE` (see Step 4b and `.specify/marge/gates/README.md`).
+
 If the directory is empty or missing, abort: "No review packs found at `.specify/marge/checks/`. Run `setup.sh` to install baseline packs."
 
 ## Step 3: Consult rule sources
@@ -88,11 +90,26 @@ Each sub agent must return findings in this shape (one per finding):
 
 **Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
 
+## Step 4b: Run script gates
+
+Project **script gates** are deterministic continuity checks under `.specify/marge/gates/*.sh`, executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/gates/README.md`). The runner discovers the gates, applies the per-gate timeout, exports the contract env, and emits findings — or one `gate-execution` meta-finding per failed gate — on stdout; it never aborts.
+
+Run it **once, after the packs** (so gate findings can corroborate/refute pack findings in Step 5) via the Bash tool. Pass the base ref from Step 1; the runner derives the changed-file list from it:
+
+```bash
+SPECKIT_STAGE=review \
+SPECKIT_REPO_ROOT="$(pwd)" \
+SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>" \
+bash .specify/marge/run-gates.sh
+```
+
+Treat the runner's stdout as a findings YAML sequence in the same shape as Step 4 — each item already carries `pack: gates/<name>` and `PROJECT_GATE` (a failed gate appears as one LOW `gate-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero gate findings. Append them to the aggregated findings list, then continue to Step 5. If `.specify/marge/gates/` is absent the runner prints nothing — gates are optional (only `.specify/marge/checks/` is required).
+
 ## Step 5: Aggregate
 
 1. Apply `corroborates:` — merge into the prior finding, bump its confidence by +10 (cap 100), append the corroborating source to its `pack` line.
 2. Apply `refutes:` — drop the refuted finding; record it in a "Refuted" appendix.
-3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later pack (project-specific wins over baseline).
+3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later source — script gates (`pack: gates/*`) and project-specific packs win over baseline packs.
 4. Filter findings with `confidence < 70` unless `$ARGUMENTS` contains `--strict`.
 5. Sort within each severity bucket by confidence descending.
 

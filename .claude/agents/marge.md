@@ -57,6 +57,8 @@ Run `/speckit.review Remediate only the single highest-severity finding without 
 - Tasks: `<FEATURE_DIR>/tasks.md`
 - Constitution: `.specify/memory/constitution.md`
 - Review packs: `.specify/marge/checks/*.md`
+- Script gates: `.specify/marge/gates/*.sh` (project continuity gates)
+- Gate config data: `.specify/marge/config/`
 - Project guidelines: `CLAUDE.md` (repo root)
 - Quality gates (fast, per-iteration): `.specify/quality-gates-fast.sh`
 - Quality gates (full, end-of-loop): `.specify/quality-gates.sh`
