@@ -21,7 +21,11 @@ base_ref="${SPECKIT_BASE_REF:-}"
 # pass one explicitly (so callers need only supply a single ref, not a marshalled
 # multi-line value). PR supplies its own `gh pr diff` list; planning supplies none.
 if [ -z "$diff_files" ] && [ -n "$base_ref" ] && git -C "$repo_root" rev-parse --git-dir >/dev/null 2>&1; then
-  diff_files="$(git -C "$repo_root" diff --name-only "$base_ref"...HEAD 2>/dev/null || true)"
+  if git -C "$repo_root" rev-parse --verify --quiet "$base_ref^{commit}" >/dev/null; then
+    diff_files="$(git -C "$repo_root" diff --name-only "$base_ref"...HEAD 2>/dev/null || true)"
+  else
+    echo "run-gates.sh: base ref '$base_ref' did not resolve; diff-scoped gates see an empty changed-file list" >&2
+  fi
 fi
 
 # Export the full contract env so each gate (a grandchild process) inherits it.
@@ -33,6 +37,9 @@ export SPECKIT_FEATURE_DIR="${SPECKIT_FEATURE_DIR:-}"
 
 gates_dir="$repo_root/.specify/marge/gates"
 [ -d "$gates_dir" ] || exit 0
+
+# Gates always run with the repo root as working directory, in every venue.
+cd "$repo_root"
 
 run_gate() {  # $1 = gate path; runs under a timeout, degrading where absent
   if command -v timeout >/dev/null 2>&1; then
@@ -66,14 +73,18 @@ for gate in "$gates_dir"/*.sh; do
   if [ "$rc" -eq 0 ]; then
     if [ -n "$out" ]; then printf '%s\n' "$out"; fi
   else
-    last_err="$(tail -n 1 "$errfile" 2>/dev/null | tr -d '\n\r')"
+    # Strip quotes/backslashes so arbitrary stderr text cannot break the
+    # double-quoted YAML scalar below.
+    last_err="$(tail -n 1 "$errfile" 2>/dev/null | tr -d '\n\r"\\')"
+    issue="gate failed to run (exit $rc)"
+    if [ -n "$last_err" ]; then issue="$issue: $last_err"; fi
     cat <<YAML
 - file: .specify/marge/gates/$name:0
   severity: LOW
   confidence: 100
   pack: gates/$name
   rule: gate-execution
-  issue: "gate failed to run (exit $rc): $last_err"
+  issue: "$issue"
   tags: [PROJECT_GATE, NEEDS_HUMAN]
 YAML
   fi
