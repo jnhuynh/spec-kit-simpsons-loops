@@ -448,7 +448,7 @@ Beyond the prose packs, you can enforce **repo-specific continuity rules** — e
 - **Script gates** — deterministic shell scripts in `.specify/marge/gates/*.sh`. They receive the diff via environment variables and print findings on stdout. Best for mechanical, greppable checks; no LLM.
 - **Config-backed packs** — an ordinary `*.md` pack in `.specify/marge/checks/` that reads data from `.specify/marge/config/` (e.g. groups of files that must change together). Best for data-driven or judgment checks.
 
-Both emit findings tagged `PROJECT_GATE` into the **same review pipeline** as the packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Gates run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage gates, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A gate opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage: planning` line (packs).
+Both emit findings tagged `PROJECT_GATE` into the **same review pipeline** as the packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Gates run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage gates, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A gate opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage:` line that includes `planning` (packs).
 
 The full authoring contract — environment inputs, the stdout findings shape, exit semantics, and templates — is in `.specify/marge/gates/README.md`.
 

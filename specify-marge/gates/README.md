@@ -15,7 +15,9 @@ Both forms emit findings tagged `PROJECT_GATE`.
 
 - **Marge** — `/speckit.review` (the review loop) runs every gate against the branch diff. *(default)*
 - **PR review** — `/speckit.review.pr` posts `PROJECT_GATE` findings as inline GitHub comments (they are never dropped, unlike generic mechanical findings that Marge already fixed).
-- **Lisa** — `/speckit.lisa.analyze` (planning) runs only gates that opt in: script gates marked `# speckit-stage: planning`, or packs with a `Stage: planning` line. These run against `spec.md`/`plan.md`/`tasks.md`, before code exists.
+- **Lisa** — `/speckit.lisa.analyze` (planning) runs only gates that opt in: script gates marked `# speckit-stage: planning`, or packs whose `Stage:` line includes `planning`. These run against `spec.md`/`plan.md`/`tasks.md`, before code exists.
+
+Gates are repo-committed shell, executed locally by whoever runs a review. Checking out a branch and reviewing it runs that branch's gates — the same trust model as running its tests. Read gate-script changes in untrusted PRs before invoking the runner.
 
 ---
 
@@ -35,9 +37,9 @@ The shipped runner `.specify/marge/run-gates.sh` discovers every `*.sh` in this 
 | `SPECKIT_STAGE` | both | `review` (default) or `planning` |
 | `SPECKIT_REPO_ROOT` | both | absolute repo root |
 
-A gate may also call `git` directly.
+A gate may also call `git` directly. The runner runs every gate with `SPECKIT_REPO_ROOT` as the working directory.
 
-> For **review**, the runner derives `SPECKIT_DIFF_FILES` from `SPECKIT_BASE_REF` (`git diff --name-only`) when the caller doesn't pass an explicit list, so it is always populated. Parse it with `printf '%s\n' "$SPECKIT_DIFF_FILES" | grep -qxF "<path>"` (see the template).
+> For **review**, the runner derives `SPECKIT_DIFF_FILES` from `SPECKIT_BASE_REF` (`git diff --name-only`) when the caller doesn't pass an explicit list, so it is always populated. Parse it with `printf '%s\n' "${SPECKIT_DIFF_FILES:-}" | grep -qxF "<path>"` (see the template).
 
 ### Output (stdout): zero or more findings
 
@@ -90,13 +92,13 @@ group="app/a.rb app/b.rb app/c.rb"
 # Did any group member change in this diff?
 changed_any=false
 for f in $group; do
-  printf '%s\n' "$SPECKIT_DIFF_FILES" | grep -qxF "$f" && changed_any=true
+  printf '%s\n' "${SPECKIT_DIFF_FILES:-}" | grep -qxF "$f" && changed_any=true
 done
 $changed_any || exit 0          # group untouched → nothing to check, clean
 
 # Flag every member that did NOT change.
 for f in $group; do
-  if ! printf '%s\n' "$SPECKIT_DIFF_FILES" | grep -qxF "$f"; then
+  if ! printf '%s\n' "${SPECKIT_DIFF_FILES:-}" | grep -qxF "$f"; then
     cat <<YAML
 - file: $f:0
   severity: HIGH
@@ -121,7 +123,7 @@ In the pack `.md`, declare the data file and stage, and instruct the sub-agent:
 
 ```markdown
 Config: .specify/marge/config/<name>.yml
-Stage: review            # add `planning` to also run in Lisa
+Stage: review            # to also run in Lisa, include `planning`: e.g. `Stage: review planning`
 
 Read the config file above and treat its contents as this rule's data.
 Emit findings tagged [PROJECT_GATE]. If the config file is absent or empty,
