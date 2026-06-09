@@ -27,7 +27,7 @@ Project gates that opt into the **planning** stage check spec artifacts before c
 
    Treat stdout as findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed gate appears as one `gate-execution` finding). Fold these into Phase 1.
 
-2. **Config-backed packs** — for each `.specify/marge/checks/*.md` whose text contains a `Stage: planning` line, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its `PROJECT_GATE` findings.
+2. **Config-backed packs** — for each `.specify/marge/checks/*.md` whose `Stage:` line includes `planning`, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its `PROJECT_GATE` findings.
 
 `/speckit.analyze` does NOT remediate these. Carry them into Phase 1: if `/speckit.analyze` already remediated a finding this iteration, leave the gate findings for later iterations (one finding per iteration); if `/speckit.analyze` had nothing to remediate but planning-gate findings remain, remediate the single highest-severity non-`NEEDS_HUMAN` gate finding now by editing the spec artifacts.
 
@@ -38,7 +38,8 @@ Project gates that opt into the **planning** stage check spec artifacts before c
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. Otherwise, confirm remediation was applied to exactly one finding
+3. If every remaining finding is tagged `NEEDS_HUMAN` (planning-gate findings needing judgment, including `gate-execution` errors), output the same promise tag and exit — Lisa only remediates mechanical findings; judgment findings are left for human review
+4. Otherwise, confirm remediation was applied to exactly one finding
 
 ## Phase 2: Validate
 
@@ -71,4 +72,4 @@ Project gates that opt into the **planning** stage check spec artifacts before c
 - Plan: `<FEATURE_DIR>/plan.md`
 - Tasks: `<FEATURE_DIR>/tasks.md`
 - Constitution: `.specify/memory/constitution.md`
-- Planning-stage gates: `.specify/marge/gates/*.sh` (marked `# speckit-stage: planning`) and `.specify/marge/checks/*.md` (with `Stage: planning`)
+- Planning-stage gates: `.specify/marge/gates/*.sh` (marked `# speckit-stage: planning`) and `.specify/marge/checks/*.md` (whose `Stage:` line includes `planning`)
