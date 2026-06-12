@@ -6,11 +6,11 @@ Marge (`/speckit.review`) and Lisa (`/speckit.lisa.analyze`) find issues by runn
 
 Three terms get confused because they share words. They are different things:
 
-- **Pack** — a finding source the review/planning loops run. Every pack emits findings in one shared YAML shape (below). A pack runs in one of two **modes**, told apart by file extension:
-  - **prose pack** (`.md`) — a sub-agent reads the rule text and applies it. LLM-interpreted.
-  - **script pack** (`.sh`) — `run-gates.sh` executes it; no LLM. Deterministic.
+- **Pack** — a finding source the review/planning loops run; *everything that finds issues is a pack*. Every pack emits findings in one shared YAML shape (below), and is described by two independent axes:
+  - **origin** — *where it lives*: `baseline/` (shipped, generic code-quality) or `project/` (yours, repo-specific). Origin is the directory.
+  - **mode** — *how it runs*, set by the file extension: a **prose pack** (`.md`) is LLM-interpreted (a sub-agent reads the rule text and applies it); a **script pack** (`.sh`) is deterministic, run by `run-gates.sh` with no LLM.
 
-  The extension *is* the mode. You never choose a mode by picking a directory.
+  The directory is the origin; the extension is the mode — never the reverse.
 
 - **`PROJECT_GATE`** — a *tag* a finding carries, not a file and not a directory. It marks the finding as a repo-specific continuity rule (e.g. "these sibling files must change together") rather than a generic code-quality issue. **It is derived from location:** every finding from a pack under `project/` carries it; findings from `baseline/` never do. Its one effect: `/speckit.review.pr` always posts `PROJECT_GATE` findings as inline comments, even mechanical ones. Orthogonal to mode — both prose and script packs carry it, though they get it differently: a prose pack has it **stamped automatically**, a script pack **writes it into its own YAML** (see Authoring).
 
@@ -25,7 +25,7 @@ Three terms get confused because they share words. They are different things:
 | `config/` | `*.yml` / `*.json` data read by config-backed prose packs in `project/` | you |
 | `run-gates.sh` | the runner that executes every `project/*.sh` script pack | framework |
 
-A file's path and suffix tell you everything: `baseline/security.md` is a shipped prose pack; `project/dsl-sync.md` is a project prose pack (its findings get `PROJECT_GATE`); `project/sibling-sync.sh` is a project script pack (same tag). Origin lives in the directory, mode lives in the extension.
+A file's path and suffix tell you everything: `baseline/security.md` is a shipped prose pack; `project/dsl-sync.md` is a project prose pack (its findings get `PROJECT_GATE`); `project/sibling-sync.sh` is a project script pack (same tag).
 
 There are deliberately **no READMEs inside `baseline/` or `project/`**: the loops glob those directories for packs (`*.md`) and scripts (`*.sh`), so a stray doc would be read as a pack. All authoring docs live in this file and in `config/README.md`.
 
