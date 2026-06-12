@@ -12,7 +12,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse FEATURE_DIR from the JSON output. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks` from repo root and parse FEATURE_DIR from the JSON output. The `--require-tasks` flag makes the check require **both** `plan.md` and `tasks.md` to exist before splitting: the spec is decomposed only after the whole-feature plan and task list are in place, so the phase boundaries have been validated against the full implementation design rather than the spec alone. If either artifact is missing, the script reports it (e.g. "Run /speckit.plan first" or "Run /speckit.tasks first") and exits non-zero — stop and surface that message instead of proceeding. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Read the parent spec at `FEATURE_DIR/spec.md`.
 
@@ -226,6 +226,7 @@ Running `/speckit.split` multiple times on the same unchanged parent spec and ch
 
 | Condition | Behavior |
 |-----------|----------|
+| `plan.md` or `tasks.md` missing | ERROR from the prerequisite check (`--require-tasks`): run `/speckit.plan` and/or `/speckit.tasks` first — split requires the whole-feature plan and tasks before decomposing |
 | No `## Phases` section in spec.md | ERROR: suggest running `/speckit.phase` |
 | More than 10 phases | ERROR: suggest consolidating phases |
 | Directory name exceeds 200 characters | WARNING: truncate slug, create directory, warn developer |

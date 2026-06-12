@@ -312,7 +312,7 @@ specs/
   c31c-feat-billing-overhaul--p3-ui-reveal/        # phase 3 child
 ```
 
-After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit.split` standalone on any phase-annotated parent spec.
+After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit.split` standalone on a phase-annotated parent spec once its `plan.md` and `tasks.md` exist — split requires the whole-feature plan and task list first, so the phase boundaries are validated against the full implementation design before the spec is decomposed.
 
 **Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+). It syncs the child spec with what earlier sibling phases actually built, so you always pick up from reality rather than the original plan.
 
