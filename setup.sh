@@ -234,10 +234,10 @@ cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.cla
 cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
 cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
-# Framework runner for project script gates (Pattern A: OVERWRITE, like the
+# Framework runner for project script packs (Pattern A: OVERWRITE, like the
 # agent/command copies above). It lives under .specify/marge/ next to the
-# consumer-owned gates/, but is framework code, so it is always refreshed —
-# the gates/*.sh themselves are preserved (seeded skip-if-exists in step 2c).
+# consumer-owned project/, but is framework code, so it is always refreshed —
+# the project/*.sh script packs themselves are authored per repo and preserved.
 mkdir -p "$PROJECT_DIR/.specify/marge"
 cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
 chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
@@ -266,56 +266,87 @@ echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"
 echo "    .specify/marge/run-gates.sh"
 
-# ── 2b. Seed Marge review packs ─────────────────────────────────────
-# Baseline packs ship from the non-hidden source dir specify-marge/checks/.
-# Copy each baseline file into the consumer's .specify/marge/checks/ only if
-# it does not already exist — this preserves consumer customizations while
-# bootstrapping fresh installs. Consumer-added packs (other filenames) are
-# never touched. (Source is non-hidden; setup never reads from the hidden .specify tree.)
+# ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
+# Earlier installs used .specify/marge/checks/ (prose packs) and
+# .specify/marge/gates/ (script packs). The current layout splits by ORIGIN:
+# baseline/ (shipped) and project/ (yours), with mode carried by the extension
+# (.md prose, .sh script). Move any existing files into the new layout,
+# preserving consumer customizations: shipped baseline names go to baseline/,
+# everything else (consumer prose packs) and all old script packs go to project/.
+MARGE_DIR="$PROJECT_DIR/.specify/marge"
+if [[ -d "$MARGE_DIR/checks" || -d "$MARGE_DIR/gates" ]]; then
+  mkdir -p "$MARGE_DIR/baseline" "$MARGE_DIR/project"
 
-MARGE_CHECKS_DIR="$PROJECT_DIR/.specify/marge/checks"
-mkdir -p "$MARGE_CHECKS_DIR"
+  baseline_names=" "
+  for b in "$SCRIPT_DIR/specify-marge/baseline/"*.md; do
+    [[ -f "$b" ]] && baseline_names+="$(basename "$b") "
+  done
+
+  if [[ -d "$MARGE_DIR/checks" ]]; then
+    for f in "$MARGE_DIR/checks/"*.md; do
+      [[ -f "$f" ]] || continue
+      name=$(basename "$f")
+      if [[ "$baseline_names" == *" $name "* ]]; then
+        dest="$MARGE_DIR/baseline/$name"
+      else
+        dest="$MARGE_DIR/project/$name"
+      fi
+      if [[ -e "$dest" ]]; then rm -f "$f"; else mv "$f" "$dest"; fi
+    done
+  fi
+
+  if [[ -d "$MARGE_DIR/gates" ]]; then
+    for f in "$MARGE_DIR/gates/"*.sh; do
+      [[ -f "$f" ]] || continue
+      name=$(basename "$f")
+      dest="$MARGE_DIR/project/$name"
+      if [[ -e "$dest" ]]; then rm -f "$f"; else mv "$f" "$dest"; fi
+    done
+    rm -f "$MARGE_DIR/gates/README.md"   # old contract doc — superseded by .specify/marge/README.md
+  fi
+
+  rmdir "$MARGE_DIR/checks" "$MARGE_DIR/gates" 2>/dev/null || true
+  echo "  Migrated existing .specify/marge/{checks,gates}/ into baseline//project/"
+fi
+
+# ── 2b. Seed Marge baseline packs ───────────────────────────────────
+# Baseline packs ship from the non-hidden source dir specify-marge/baseline/.
+# Copy each into the consumer's .specify/marge/baseline/ only if it does not
+# already exist — preserving consumer customizations while bootstrapping fresh
+# installs. Consumer-added packs go in project/ and are never touched here.
+# (Source is non-hidden; setup never reads from the hidden .specify tree.)
+
+MARGE_BASELINE_DIR="$PROJECT_DIR/.specify/marge/baseline"
+mkdir -p "$MARGE_BASELINE_DIR"
 
 marge_seeded=false
-for pack in "$SCRIPT_DIR/specify-marge/checks/"*.md; do
+for pack in "$SCRIPT_DIR/specify-marge/baseline/"*.md; do
   [[ -f "$pack" ]] || continue
   pack_name=$(basename "$pack")
-  target="$MARGE_CHECKS_DIR/$pack_name"
+  target="$MARGE_BASELINE_DIR/$pack_name"
   if [[ -f "$target" ]]; then
-    echo "  .specify/marge/checks/$pack_name already exists — skipped"
+    echo "  .specify/marge/baseline/$pack_name already exists — skipped"
   else
     cp "$pack" "$target"
-    echo "  Seeded .specify/marge/checks/$pack_name"
+    echo "  Seeded .specify/marge/baseline/$pack_name"
     marge_seeded=true
   fi
 done
 
 if ! $marge_seeded; then
-  echo "  All Marge review packs already present"
+  echo "  All Marge baseline packs already present"
 fi
 
-# ── 2c. Seed Marge project-gate scaffolding ─────────────────────────
-# Project gates are repo-specific, so nothing generic ships except the
-# authoring docs. Seed the gates/ and config/ contract READMEs (and any
-# other templates) into the consumer, skip-if-exists; live gates (*.sh)
-# are authored per project and are never shipped. Source is the non-hidden
-# specify-marge/ dir.
-for sub in gates config; do
-  src_dir="$SCRIPT_DIR/specify-marge/$sub"
-  dest_dir="$PROJECT_DIR/.specify/marge/$sub"
-  mkdir -p "$dest_dir"
-  for f in "$src_dir/"*; do
-    [[ -f "$f" ]] || continue
-    name=$(basename "$f")
-    target="$dest_dir/$name"
-    if [[ -f "$target" ]]; then
-      echo "  .specify/marge/$sub/$name already exists — skipped"
-    else
-      cp "$f" "$target"
-      echo "  Seeded .specify/marge/$sub/$name"
-    fi
-  done
-done
+# ── 2c. Refresh Marge contract docs + scaffold project/ ─────────────
+# The glossary + authoring contract (.specify/marge/README.md) and the config
+# data note (config/README.md) are framework docs — always refreshed (Pattern A,
+# like run-gates.sh above). The project/ dir is created empty: consumers author
+# their own packs there (.md prose, .sh script); nothing generic ships into it.
+mkdir -p "$PROJECT_DIR/.specify/marge/project" "$PROJECT_DIR/.specify/marge/config"
+cp "$SCRIPT_DIR/specify-marge/README.md"        "$PROJECT_DIR/.specify/marge/README.md"
+cp "$SCRIPT_DIR/specify-marge/config/README.md" "$PROJECT_DIR/.specify/marge/config/README.md"
+echo "    .specify/marge/README.md"
+echo "    .specify/marge/config/README.md"
 
 # ── 3. Update .gitignore ────────────────────────────────────────────
 

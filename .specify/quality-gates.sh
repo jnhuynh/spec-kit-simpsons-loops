@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Collect shell files that actually exist
 files=()
-for pattern in *.sh .specify/scripts/bash/*.sh specify-marge/*.sh .specify/marge/*.sh .specify/marge/gates/*.sh; do
+for pattern in *.sh .specify/scripts/bash/*.sh specify-marge/*.sh .specify/marge/*.sh .specify/marge/project/*.sh; do
   for f in $pattern; do
     [ -f "$f" ] && files+=("$f")
   done

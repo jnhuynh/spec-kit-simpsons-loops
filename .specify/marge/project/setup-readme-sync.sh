@@ -4,7 +4,7 @@
 # Invariant: every .claude/ file that setup.sh copies must also appear in the
 # README "Option B: Manual" copy list, and vice versa. Those two lists drift
 # easily whenever a command/agent is added. Emits PROJECT_GATE findings on
-# drift. Contract: specify-marge/gates/README.md (review stage, diff-scoped).
+# drift. Contract: .specify/marge/README.md (review stage, diff-scoped).
 set -euo pipefail
 
 root="${SPECKIT_REPO_ROOT:-$(pwd)}"
@@ -32,7 +32,7 @@ emit() {  # $1=file  $2=issue
 - file: $1:0
   severity: MEDIUM
   confidence: 90
-  pack: gates/$(basename "$0")
+  pack: project/$(basename "$0")
   rule: setup-readme-sync
   issue: "$2"
   fix: "keep setup.sh's .claude/ copy list and README Option B in sync"

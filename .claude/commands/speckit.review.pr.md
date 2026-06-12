@@ -55,17 +55,19 @@ Read the following files if they exist:
 
 1. `.specify/memory/constitution.md` — project principles
 2. `CLAUDE.md` at repo root — project guidelines
-3. Every `*.md` file under `.specify/marge/checks/` — all review packs
+3. Every `*.md` file under `.specify/marge/baseline/` and `.specify/marge/project/` — all prose packs (baseline + project)
 
-If `.specify/marge/checks/` is empty or missing, abort: "No review packs found at `.specify/marge/checks/`. Run `setup.sh` to install baseline packs."
+If `.specify/marge/baseline/` is empty or missing, abort: "No baseline review packs found at `.specify/marge/baseline/`. Run `setup.sh` to install baseline packs." (`.specify/marge/project/` may be absent — project packs are optional.)
 
 ## Step 4: Analyze for human-judgment findings
 
 Run packs sequentially via sub agents (same pattern as `/speckit.review` Step 4). For each pack, spawn a fresh sub agent via the **Agent tool** (`subagent_type: general-purpose`).
 
 **Execution order:**
-1. Baseline packs first, alphabetically by filename
-2. Project-specific packs after baseline, alphabetically
+1. Baseline packs (`baseline/*.md`) first, alphabetically by filename
+2. Project packs (`project/*.md`) after baseline, alphabetically
+
+Findings from a **project pack** (anything under `project/`) are tagged `PROJECT_GATE` by location — instruct the sub agent to add `PROJECT_GATE` to every finding it emits for a `project/` pack. These are always surfaced (Step 6), even when mechanical.
 
 Each sub agent receives:
 - The PR diff
@@ -82,7 +84,7 @@ Each sub agent receives:
 > 2. **Race conditions / concurrency** — shared mutable state, TOCTOU, missing transactions, non-atomic operations
 > 3. **Architectural decisions** — new coupling, layer violations, abstraction boundary changes, dependency direction
 > 4. **Project-specific patterns** — violations of constitution or CLAUDE.md principles that require judgment (not mechanical fixes)
-> 5. **Project continuity gates** — findings from config-backed project packs tagged `PROJECT_GATE` (e.g. sibling-file sync). ALWAYS flag these, even if mechanical — they encode repo-specific continuity rules an out-of-band reviewer cannot otherwise see.
+> 5. **Project continuity rules** — findings from project packs (anything under `project/`), tagged `PROJECT_GATE` (e.g. sibling-file sync). ALWAYS flag these, even if mechanical — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
 >
 > For packs that contain both mechanical and judgment rules, ONLY flag findings tagged `NEEDS_HUMAN` in the pack's rule definitions — EXCEPT `PROJECT_GATE` findings, which are always flagged. Skip all others.
 
@@ -103,9 +105,9 @@ Each sub agent must return findings in this shape:
 
 **Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
 
-## Step 4b: Run script gates
+## Step 4b: Run script packs
 
-Run project **script gates** via the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/gates/README.md`), so deterministic continuity findings reach out-of-band reviewers. Same runner as `/speckit.review` Step 4b, with PR scope — pass the PR's changed files explicitly (the PR diff comes from `gh`, not local git):
+Run project **script packs** via the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/README.md`), so deterministic continuity findings reach out-of-band reviewers. Same runner as `/speckit.review` Step 4b, with PR scope — pass the PR's changed files explicitly (the PR diff comes from `gh`, not local git):
 
 ```bash
 SPECKIT_STAGE=review \
@@ -115,7 +117,7 @@ SPECKIT_DIFF_FILES="$(gh pr diff "$PR_NUMBER" --name-only)" \
 bash .specify/marge/run-gates.sh
 ```
 
-Treat stdout as gate findings (same shape as Step 4; each carries `pack: gates/<name>` and `PROJECT_GATE`; a failed gate appears as one `gate-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Append to the aggregated findings, then continue to Step 5.
+Treat stdout as script-pack findings (same shape as Step 4; each carries `pack: project/<name>` and `PROJECT_GATE`; a failed pack appears as one `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Append to the aggregated findings, then continue to Step 5.
 
 ## Step 5: Aggregate
 
@@ -138,7 +140,7 @@ Map the pack-native severity to the three-tier PR comment scheme:
 | `PROJECT_GATE` (any severity) | CRITICAL→**CRITICAL**, HIGH/MEDIUM→**WARNING**, LOW→**INFO** | Project continuity gates — always surfaced |
 | Any other finding WITHOUT NEEDS_HUMAN, not from a keep-list source | *Dropped* | Marge handles these |
 
-Findings from `one-way-doors.md` and `concurrency.md` packs, and ALL findings tagged `PROJECT_GATE` (script gates and config-backed project packs), are always kept regardless of the NEEDS_HUMAN tag — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
+Findings from `one-way-doors.md` and `concurrency.md` packs, and ALL findings tagged `PROJECT_GATE` (every project pack — prose and script), are always kept regardless of the NEEDS_HUMAN tag — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
 
 ## Step 7: Check idempotency
 
