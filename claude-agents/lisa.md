@@ -12,11 +12,11 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 Run `/speckit.analyze Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
 
-## Phase 0b: Run planning-stage project gates
+## Phase 0b: Run planning-stage project packs
 
-Project gates that opt into the **planning** stage check spec artifacts before code exists (contract: `.specify/marge/gates/README.md`). Run them and fold findings into Phase 1. If none exist, skip silently.
+Project packs that opt into the **planning** stage check spec artifacts before code exists (contract: `.specify/marge/README.md`). Run them and fold findings into Phase 1. If none exist, skip silently.
 
-1. **Script gates** — run the shipped runner in planning mode. It discovers `.specify/marge/gates/*.sh` and runs ONLY gates that opt in via `# speckit-stage: planning` (diff-scoped gates are skipped automatically):
+1. **Script packs** — run the shipped runner in planning mode. It discovers `.specify/marge/project/*.sh` and runs ONLY packs that opt in via `# speckit-stage: planning` (diff-scoped packs are skipped automatically):
 
    ```bash
    SPECKIT_STAGE=planning \
@@ -25,20 +25,20 @@ Project gates that opt into the **planning** stage check spec artifacts before c
    bash .specify/marge/run-gates.sh
    ```
 
-   Treat stdout as findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed gate appears as one `gate-execution` finding). Fold these into Phase 1.
+   Treat stdout as findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed pack appears as one `pack-execution` finding). Fold these into Phase 1.
 
-2. **Config-backed packs** — for each `.specify/marge/checks/*.md` whose `Stage:` line includes `planning`, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its `PROJECT_GATE` findings.
+2. **Config-backed prose packs** — for each `.specify/marge/baseline/*.md` and `.specify/marge/project/*.md` whose `Stage:` line includes `planning`, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its findings (those from `project/` are tagged `PROJECT_GATE`).
 
 `/speckit.analyze` does NOT remediate these. Carry them into Phase 1: if `/speckit.analyze` already remediated a finding this iteration, leave the gate findings for later iterations (one finding per iteration); if `/speckit.analyze` had nothing to remediate but planning-gate findings remain, remediate the single highest-severity non-`NEEDS_HUMAN` gate finding now by editing the spec artifacts.
 
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit.analyze` report and any Phase 0b planning-gate findings
-2. If TOTAL findings (analyze + planning gates) = 0, output the following promise tag and exit immediately:
+1. Review the findings from the `/speckit.analyze` report and any Phase 0b planning-pack findings
+2. If TOTAL findings (analyze + planning packs) = 0, output the following promise tag and exit immediately:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. If every remaining finding is tagged `NEEDS_HUMAN` (planning-gate findings needing judgment, including `gate-execution` errors), output the same promise tag and exit — Lisa only remediates mechanical findings; judgment findings are left for human review
+3. If every remaining finding is tagged `NEEDS_HUMAN` (planning-stage findings needing judgment, including `pack-execution` errors), output the same promise tag and exit — Lisa only remediates mechanical findings; judgment findings are left for human review
 4. Otherwise, confirm remediation was applied to exactly one finding
 
 ## Phase 2: Validate
@@ -72,4 +72,4 @@ Project gates that opt into the **planning** stage check spec artifacts before c
 - Plan: `<FEATURE_DIR>/plan.md`
 - Tasks: `<FEATURE_DIR>/tasks.md`
 - Constitution: `.specify/memory/constitution.md`
-- Planning-stage gates: `.specify/marge/gates/*.sh` (marked `# speckit-stage: planning`) and `.specify/marge/checks/*.md` (whose `Stage:` line includes `planning`)
+- Planning-stage packs: `.specify/marge/project/*.sh` (marked `# speckit-stage: planning`) and `.specify/marge/{baseline,project}/*.md` (whose `Stage:` line includes `planning`)

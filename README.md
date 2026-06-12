@@ -125,7 +125,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, seeds Marge's baseline review packs into `.specify/marge/checks/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
+This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
 ### Option B: Manual
 
@@ -162,16 +162,18 @@ cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/
 cp <path-to-simpsons-loops>/speckit-commands/speckit.phase.md         .claude/commands/speckit.phase.md
 cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/commands/speckit.split.md
 
-# Marge review packs -> .specify/marge/checks/
-mkdir -p .specify/marge/checks
-cp -n <path-to-simpsons-loops>/specify-marge/checks/*.md .specify/marge/checks/
+# Marge baseline packs -> .specify/marge/baseline/
+mkdir -p .specify/marge/baseline
+cp -n <path-to-simpsons-loops>/specify-marge/baseline/*.md .specify/marge/baseline/
 
-# Marge project-gate scaffolding -> .specify/marge/{gates,config}/
-mkdir -p .specify/marge/gates .specify/marge/config
-cp -n <path-to-simpsons-loops>/specify-marge/gates/*  .specify/marge/gates/
-cp -n <path-to-simpsons-loops>/specify-marge/config/* .specify/marge/config/
+# Marge project packs live in .specify/marge/project/ (you author them: .md prose, .sh script)
+mkdir -p .specify/marge/project .specify/marge/config
 
-# Marge script-gate runner (framework — overwrite, not cp -n) -> .specify/marge/
+# Marge contract docs (framework — overwrite, not cp -n) -> .specify/marge/
+cp <path-to-simpsons-loops>/specify-marge/README.md        .specify/marge/README.md
+cp <path-to-simpsons-loops>/specify-marge/config/README.md .specify/marge/config/README.md
+
+# Marge script-pack runner (framework — overwrite, not cp -n) -> .specify/marge/
 cp <path-to-simpsons-loops>/specify-marge/run-gates.sh .specify/marge/run-gates.sh
 chmod +x .specify/marge/run-gates.sh
 ```
@@ -272,7 +274,7 @@ After Ralph has implemented the feature:
 /speckit.marge.review
 ```
 
-Marge reviews the feature branch's diff against baseline and project-specific review packs in `.specify/marge/checks/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
+Marge reviews the feature branch's diff against baseline and project review packs in `.specify/marge/baseline/` and `.specify/marge/project/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
 
 For a single-pass report (no auto-fix), run `/speckit.review` instead.
 
@@ -428,9 +430,9 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 
 All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
 
-### Marge review packs & project gates
+### Marge review packs & project packs
 
-Marge's review rules live in `.specify/marge/checks/` as plain markdown files. `setup.sh` seeds six baseline packs:
+Marge's baseline review rules live in `.specify/marge/baseline/` as plain markdown files. `setup.sh` seeds six baseline packs:
 
 - `generic-bugs.md` — null handling, off-by-one, race conditions, wrong-argument-order, swallowed exceptions
 - `security.md` — OWASP essentials: secrets, SQLi, command injection, authz, crypto misuse, PII in logs
@@ -439,18 +441,18 @@ Marge's review rules live in `.specify/marge/checks/` as plain markdown files. `
 - `one-way-doors.md` — irreversible changes (schema destruction, API breaks, data deletion); always `NEEDS_HUMAN`
 - `concurrency.md` — TOCTOU, shared mutable state, lock ordering, transaction boundaries; always `NEEDS_HUMAN`
 
-Add project-specific packs by dropping additional `*.md` files into the same directory. Marge auto-discovers every `*.md`; the filename is the pack name. Baseline files are preserved on re-install — existing pack files are never overwritten.
+Baseline files are preserved on re-install — existing pack files are never overwritten. Add your own rules as **project packs** (next).
 
-#### Project gates
+#### Project packs
 
-Beyond the prose packs, you can enforce **repo-specific continuity rules** — e.g. "these sibling files must change together", "a generated file stays in sync with its source". Two forms:
+Beyond the baseline packs, you can enforce **repo-specific continuity rules** — e.g. "these sibling files must change together", "a generated file stays in sync with its source". Drop a file in `.specify/marge/project/`; its extension decides the mode:
 
-- **Script gates** — deterministic shell scripts in `.specify/marge/gates/*.sh`. They receive the diff via environment variables and print findings on stdout. Best for mechanical, greppable checks; no LLM.
-- **Config-backed packs** — an ordinary `*.md` pack in `.specify/marge/checks/` that reads data from `.specify/marge/config/` (e.g. groups of files that must change together). Best for data-driven or judgment checks.
+- **Script pack** (`.sh`) — a deterministic shell script. It receives the diff via environment variables and prints findings on stdout. Best for mechanical, greppable rules; no LLM.
+- **Prose pack** (`.md`) — an LLM-interpreted rule, optionally **config-backed**: it reads data from `.specify/marge/config/` (e.g. groups of files that must change together). Best for data-driven or judgment rules.
 
-Both emit findings tagged `PROJECT_GATE` into the **same review pipeline** as the packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Gates run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage gates, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A gate opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage:` line that includes `planning` (packs).
+Findings from any `project/` pack are tagged `PROJECT_GATE` (derived from location) and flow into the **same review pipeline** as the baseline packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Project packs run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage packs, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A pack opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage:` line that includes `planning` (prose packs).
 
-The full authoring contract — environment inputs, the stdout findings shape, exit semantics, and templates — is in `.specify/marge/gates/README.md`.
+The full authoring contract — environment inputs, the stdout findings shape, exit semantics, and templates — is in `.specify/marge/README.md`.
 
 ## References
 

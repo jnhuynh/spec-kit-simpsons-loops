@@ -35,20 +35,18 @@ If `$ARGUMENTS` contains a `spec-dir` token (path matching `specs/`), read `spec
 
 ## Step 2: Load review packs
 
-Discover every `*.md` file under `.specify/marge/checks/` via Glob. These are the review packs — each pack is a rule file that contributes findings.
+Discover every `*.md` **prose pack** via Glob from two directories:
 
-Expected baseline packs (installed by `setup.sh`):
+- `.specify/marge/baseline/` — shipped baseline packs (generic code-quality rules)
+- `.specify/marge/project/` — project packs (repo-specific rules; their findings are tagged `PROJECT_GATE` — see Step 4)
 
-- `generic-bugs.md`
-- `security.md`
-- `testing.md`
-- `architecture.md`
+Expected baseline packs (installed by `setup.sh`): `generic-bugs.md`, `security.md`, `testing.md`, `architecture.md`, `concurrency.md`, `one-way-doors.md`.
 
-Project-specific packs live alongside (any additional `*.md` the consumer dropped in). Run every pack regardless of baseline-vs-specific status — the directory is the API.
+Run every pack regardless of origin — the directories are the API. A pack's directory tells you its origin (baseline vs project); its extension tells you its mode (`.md` prose here, `.sh` script in Step 4b).
 
-Some project packs are **config-backed**: the pack text instructs the sub agent to `Read` a data file under `.specify/marge/config/` and treat it as rule data (e.g. sibling-file sync groups). No special handling is needed here — the sub agent reads that file itself in Step 4. A config-backed pack whose config file is missing or empty emits zero findings, and tags its findings `PROJECT_GATE` (see Step 4b and `.specify/marge/gates/README.md`).
+Some project packs are **config-backed**: the pack text instructs the sub agent to `Read` a data file under `.specify/marge/config/` and treat it as rule data (e.g. sibling-file sync groups). No special handling is needed here — the sub agent reads that file itself in Step 4. A config-backed pack whose config file is missing or empty emits zero findings. (Contract: `.specify/marge/README.md`.)
 
-If the directory is empty or missing, abort: "No review packs found at `.specify/marge/checks/`. Run `setup.sh` to install baseline packs."
+If `.specify/marge/baseline/` is empty or missing, abort: "No baseline review packs found at `.specify/marge/baseline/`. Run `setup.sh` to install baseline packs." (`.specify/marge/project/` may be absent — project packs are optional.)
 
 ## Step 3: Consult rule sources
 
@@ -63,8 +61,8 @@ These are not rewritten; they are context the packs use to calibrate findings.
 
 For each pack in the discovered list, spawn a fresh sub agent via the **Agent tool** (`subagent_type: general-purpose`). Run them **one at a time** in this order:
 
-1. Baseline packs first, alphabetically by filename
-2. Project-specific packs after baseline, alphabetically
+1. Baseline packs (`baseline/*.md`) first, alphabetically by filename
+2. Project packs (`project/*.md`) after baseline, alphabetically
 
 Each sub agent receives:
 - The diff
@@ -72,6 +70,7 @@ Each sub agent receives:
 - The pack's full text (read via the prompt or by instructing the sub agent to `Read` the pack path)
 - Every prior pack's findings (aggregated so far)
 - The constitution + CLAUDE.md content as context
+- Whether the pack is a **project pack** (from `project/`). If so, instruct the sub agent to add `PROJECT_GATE` to the `tags` of every finding it emits — the tag is derived from the pack's location, not written into the pack text. Baseline packs never get `PROJECT_GATE`.
 
 Each sub agent must return findings in this shape (one per finding):
 
@@ -83,18 +82,18 @@ Each sub agent must return findings in this shape (one per finding):
   rule: <rule name from the pack>
   issue: <one-line description>
   fix: <concrete suggestion>
-  tags: [NEEDS_HUMAN?]   # present only if the finding requires human judgment
+  tags: [PROJECT_GATE?, NEEDS_HUMAN?]   # PROJECT_GATE auto-added for project/ packs; NEEDS_HUMAN if it needs judgment
   corroborates: <prior finding id>?   # if duplicates an earlier finding — merges
   refutes: <prior finding id>?        # if refutes an earlier finding — drops it
 ```
 
 **Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
 
-## Step 4b: Run script gates
+## Step 4b: Run script packs
 
-Project **script gates** are deterministic continuity checks under `.specify/marge/gates/*.sh`, executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/gates/README.md`). The runner discovers the gates, applies the per-gate timeout, exports the contract env, and emits findings — or one `gate-execution` meta-finding per failed gate — on stdout; it never aborts.
+Project **script packs** are deterministic continuity checks under `.specify/marge/project/*.sh`, executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/README.md`). The runner discovers the script packs, applies the per-pack timeout, exports the contract env, and emits findings — or one `pack-execution` meta-finding per failed pack — on stdout; it never aborts.
 
-Run it **once, after the packs** (so gate findings can corroborate/refute pack findings in Step 5) via the Bash tool. Pass the base ref from Step 1; the runner derives the changed-file list from it:
+Run it **once, after the packs** (so script-pack findings can corroborate/refute prose-pack findings in Step 5) via the Bash tool. Pass the base ref from Step 1; the runner derives the changed-file list from it:
 
 ```bash
 SPECKIT_STAGE=review \
@@ -103,13 +102,13 @@ SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>" \
 bash .specify/marge/run-gates.sh
 ```
 
-Treat the runner's stdout as a findings YAML sequence in the same shape as Step 4 — each item already carries `pack: gates/<name>` and `PROJECT_GATE` (a failed gate appears as one LOW `gate-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero gate findings. Append them to the aggregated findings list, then continue to Step 5. If `.specify/marge/gates/` is absent the runner prints nothing — gates are optional (only `.specify/marge/checks/` is required).
+Treat the runner's stdout as a findings YAML sequence in the same shape as Step 4 — each item already carries `pack: project/<name>` and `PROJECT_GATE` (a failed pack appears as one LOW `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero script-pack findings. Append them to the aggregated findings list, then continue to Step 5. If `.specify/marge/project/` is absent the runner prints nothing — script packs are optional (only `.specify/marge/baseline/` is required).
 
 ## Step 5: Aggregate
 
 1. Apply `corroborates:` — merge into the prior finding, bump its confidence by +10 (cap 100), append the corroborating source to its `pack` line.
 2. Apply `refutes:` — drop the refuted finding; record it in a "Refuted" appendix.
-3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later source — script gates (`pack: gates/*`) and project-specific packs win over baseline packs.
+3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one; break ties by later source — project packs (`pack: project/*`, prose or script) win over baseline packs.
 4. Filter findings with `confidence < 70` unless `$ARGUMENTS` contains `--strict`.
 5. Sort within each severity bucket by confidence descending.
 
@@ -158,7 +157,7 @@ If in remediate-one mode, additionally print which finding was remediated and wh
 - Never post to GitHub. Terminal output only. Never call `gh pr comment` / `gh pr review`.
 - Never commit. Remediation edits files but does not stage or commit.
 - Review only lines the diff touches. Pre-existing issues are out of scope.
-- If `.specify/marge/checks/` is missing or empty, abort with a helpful error.
+- If `.specify/marge/baseline/` is missing or empty, abort with a helpful error.
 
 ## Examples
 
