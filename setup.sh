@@ -58,10 +58,9 @@ fi
 # Ralph command file for custom quality gates before it gets overwritten.
 
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
-# Prefer the new skills location; fall back to the legacy command path so an
-# upgrading consumer's custom gates are still detected on first migration run.
+# Skills location of the Ralph command file — read to detect custom quality
+# gates a consumer may have set there before this file is overwritten.
 RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit-ralph-implement/SKILL.md"
-[[ -f "$RALPH_CMD_FILE" ]] || RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
 SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then

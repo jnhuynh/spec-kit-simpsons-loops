@@ -16,7 +16,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 Verify that the single-pass review skill exists. Marge's Phase 0 delegates to it:
 
 ```bash
-if test -f ".claude/skills/speckit-review/SKILL.md" || test -f ".claude/commands/speckit.review.md"; then echo "speckit-review: EXISTS"; else echo "speckit-review: MISSING"; fi
+if test -f ".claude/skills/speckit-review/SKILL.md"; then echo "speckit-review: EXISTS"; else echo "speckit-review: MISSING"; fi
 ```
 
 If **MISSING**, display this error and **STOP**:
@@ -24,7 +24,7 @@ If **MISSING**, display this error and **STOP**:
 ```
 ERROR: Required /speckit-review definition not found.
 
-Missing: .claude/skills/speckit-review/SKILL.md (or legacy .claude/commands/speckit.review.md)
+Missing: .claude/skills/speckit-review/SKILL.md
 
 Marge invokes /speckit-review during Phase 0 to generate findings.
 Ensure the skill is installed at:
