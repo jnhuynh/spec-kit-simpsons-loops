@@ -50,4 +50,17 @@ while IFS= read -r p; do
   emit "setup.sh" "README Option B lists $p but setup.sh no longer copies it"
 done < <(comm -13 <(printf '%s\n' "$setup_targets") <(printf '%s\n' "$readme_targets"))
 
+# Skills install as a whole tree (a loop in setup.sh; a `cp -R .../speckit-skills/*`
+# glob in README) rather than per-file cp lines, so the comm checks above don't see
+# them. Guard the pair at directory level: if one side installs skills, so must the other.
+setup_has_skills=$(grep -q 'speckit-skills/' "$setup" && echo yes || echo no)
+readme_has_skills=$(grep -q 'speckit-skills/' "$readme" && echo yes || echo no)
+if [ "$setup_has_skills" != "$readme_has_skills" ]; then
+  if [ "$setup_has_skills" = yes ]; then
+    emit "README.md" "setup.sh installs the speckit-skills/ tree but README Option B does not mention speckit-skills/"
+  else
+    emit "setup.sh" "README Option B installs speckit-skills/ but setup.sh no longer does"
+  fi
+fi
+
 exit 0

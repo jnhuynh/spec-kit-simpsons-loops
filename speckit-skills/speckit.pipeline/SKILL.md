@@ -1,4 +1,5 @@
 ---
+name: speckit.pipeline
 description: Orchestrate the full SpecKit pipeline (reconcile, specify, homer, phase, plan, tasks, lisa, split, ralph, marge) from feature description to reviewed implementation.
 ---
 
@@ -284,7 +285,7 @@ For each step (starting from the detected/specified step), spawn fresh sub agent
 
 When composing the prompt for each sub agent, always include:
 - Instruct the agent to read and follow the corresponding agent file from `.claude/agents/`
-- When those instructions reference a slash command (e.g., `/speckit.clarify`), read the corresponding file from `.claude/commands/` and follow its instructions directly
+- When those instructions reference a slash command (e.g., `/speckit.clarify`), read its definition — prefer `.claude/skills/<command>/SKILL.md`, falling back to `.claude/commands/<command>.md` — and follow those instructions directly
 - Provide: `Feature directory: <FEATURE_DIR>`
 
 #### Reconcile (conditional single-shot step — child specs only)
@@ -586,7 +587,7 @@ Use dot-padding to align status values. Mark the phase that was just completed w
 Detect whether the `/speckit.review.pr` skill is installed. Run via Bash tool:
 
 ```bash
-if test -f ".claude/commands/speckit.review.pr.md"; then echo "PRESENT"; else echo "ABSENT"; fi
+if test -f ".claude/skills/speckit.review.pr/SKILL.md" || test -f ".claude/commands/speckit.review.pr.md"; then echo "PRESENT"; else echo "ABSENT"; fi
 ```
 
 If **ABSENT**, log `speckit.review.pr not installed — skipping PR review` and proceed to Step 6.
@@ -601,7 +602,7 @@ If no PR exists, log `No open PR for current branch — skipping PR review` and 
 
 If both conditions pass, spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **prompt**: `Read and follow the instructions in .claude/commands/speckit.review.pr.md. Run non-interactively — auto-detect the PR from the current branch.`
+- **prompt**: `Read and follow the instructions in .claude/skills/speckit.review.pr/SKILL.md (or .claude/commands/speckit.review.pr.md if that file does not exist). Run non-interactively — auto-detect the PR from the current branch.`
 
 **Failure handling**: If the sub agent fails, log `PR review phase failed — continuing pipeline`. Do NOT abort — PR review is informational, not a gate.
 

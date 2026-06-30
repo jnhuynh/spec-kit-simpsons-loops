@@ -1,4 +1,5 @@
 ---
+name: speckit.phase
 description: Detect deployment boundaries in a spec's user stories and generate phase annotations.
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: speckit.lisa.analyze
 description: Orchestrate iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
 ---
 

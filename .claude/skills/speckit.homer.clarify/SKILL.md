@@ -1,4 +1,5 @@
 ---
+name: speckit.homer.clarify
 description: Orchestrate iterative spec clarification and remediation (Homer loop) on spec.md until all findings are resolved.
 ---
 

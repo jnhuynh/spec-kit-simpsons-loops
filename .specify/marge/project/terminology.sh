@@ -17,8 +17,8 @@ root="${SPECKIT_REPO_ROOT:-$(pwd)}"
 docs=(
   specify-marge/README.md
   specify-marge/config/README.md
-  speckit-commands/speckit.review.md
-  speckit-commands/speckit.review.pr.md
+  speckit-skills/speckit.review/SKILL.md
+  speckit-skills/speckit.review.pr/SKILL.md
   claude-agents/marge.md
   claude-agents/lisa.md
   README.md

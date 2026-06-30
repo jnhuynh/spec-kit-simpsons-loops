@@ -1,4 +1,5 @@
 ---
+name: speckit.review.pr
 description: Post a PR review with inline comments for findings requiring human judgment — one-way doors, concurrency risks, architectural decisions, and project-specific patterns.
 ---
 
