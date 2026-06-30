@@ -58,7 +58,10 @@ fi
 # Ralph command file for custom quality gates before it gets overwritten.
 
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
-RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
+# Prefer the new skills location; fall back to the legacy command path so an
+# upgrading consumer's custom gates are still detected on first migration run.
+RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit.ralph.implement/SKILL.md"
+[[ -f "$RALPH_CMD_FILE" ]] || RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
 SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then
@@ -211,6 +214,7 @@ fi
 
 mkdir -p "$PROJECT_DIR/.claude/commands"
 mkdir -p "$PROJECT_DIR/.claude/agents"
+mkdir -p "$PROJECT_DIR/.claude/skills"
 
 cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.claude/agents/homer.md"
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
@@ -220,22 +224,27 @@ cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
 cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
 cp "$SCRIPT_DIR/claude-agents/loop-orchestrator.md"             "$PROJECT_DIR/.claude/agents/loop-orchestrator.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.ralph.implement.md"    "$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.lisa.analyze.md"       "$PROJECT_DIR/.claude/commands/speckit.lisa.analyze.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.homer.clarify.md"      "$PROJECT_DIR/.claude/commands/speckit.homer.clarify.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.marge.review.md"       "$PROJECT_DIR/.claude/commands/speckit.marge.review.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.review.md"             "$PROJECT_DIR/.claude/commands/speckit.review.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.pipeline.md"           "$PROJECT_DIR/.claude/commands/speckit.pipeline.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.brainstorm.md"        "$PROJECT_DIR/.claude/commands/speckit.brainstorm.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.review.pr.md"        "$PROJECT_DIR/.claude/commands/speckit.review.pr.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.phase.md"            "$PROJECT_DIR/.claude/commands/speckit.phase.md"
-cp "$SCRIPT_DIR/speckit-commands/speckit.split.md"            "$PROJECT_DIR/.claude/commands/speckit.split.md"
+# Skills (Pattern A: clean overwrite per dir, recursive so reference/ subdirs
+# for progressively-disclosed skills come along). Source is the non-hidden
+# speckit-skills/ ship dir. Each skill also removes the legacy per-command copy
+# it supersedes (skill dir speckit.foo -> legacy .claude/commands/speckit.foo.md),
+# so an upgrading consumer is not left with duplicate command+skill entries.
+for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
+  skill_name=$(basename "$skill_src")
+  rm -rf "$PROJECT_DIR/.claude/skills/$skill_name"
+  cp -R "${skill_src%/}" "$PROJECT_DIR/.claude/skills/"
+  legacy="$PROJECT_DIR/.claude/commands/$skill_name.md"
+  if [[ -f "$legacy" ]]; then
+    rm "$legacy"
+    echo "  Removed legacy command (now a skill): .claude/commands/$skill_name.md"
+  fi
+done
 cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.claude/agents/phase.md"
 cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
 cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
 # Framework runner for project script packs (Pattern A: OVERWRITE, like the
-# agent/command copies above). It lives under .specify/marge/ next to the
+# agent/skill copies above). It lives under .specify/marge/ next to the
 # consumer-owned project/, but is framework code, so it is always refreshed —
 # the project/*.sh script packs themselves are authored per repo and preserved.
 mkdir -p "$PROJECT_DIR/.specify/marge"
@@ -251,16 +260,9 @@ echo "    .claude/agents/plan.md"
 echo "    .claude/agents/tasks.md"
 echo "    .claude/agents/specify.md"
 echo "    .claude/agents/loop-orchestrator.md"
-echo "    .claude/commands/speckit.ralph.implement.md"
-echo "    .claude/commands/speckit.lisa.analyze.md"
-echo "    .claude/commands/speckit.homer.clarify.md"
-echo "    .claude/commands/speckit.marge.review.md"
-echo "    .claude/commands/speckit.review.md"
-echo "    .claude/commands/speckit.pipeline.md"
-echo "    .claude/commands/speckit.brainstorm.md"
-echo "    .claude/commands/speckit.review.pr.md"
-echo "    .claude/commands/speckit.phase.md"
-echo "    .claude/commands/speckit.split.md"
+  for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
+    echo "    .claude/skills/$(basename "$skill_src")/"
+  done
 echo "    .claude/agents/phase.md"
 echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"

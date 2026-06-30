@@ -1,4 +1,5 @@
 ---
+name: speckit.review
 description: Analyze a feature branch diff against baseline and project-specific review packs; optionally remediate the single highest-severity finding.
 ---
 

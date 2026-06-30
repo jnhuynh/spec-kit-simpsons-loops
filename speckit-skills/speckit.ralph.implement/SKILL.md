@@ -1,4 +1,5 @@
 ---
+name: speckit.ralph.implement
 description: Orchestrate task-by-task implementation (Ralph loop) until all tasks are complete.
 ---
 

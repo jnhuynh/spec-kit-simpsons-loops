@@ -1,4 +1,5 @@
 ---
+name: speckit.split
 description: Split a phase-annotated spec into independent child specs, one per phase.
 ---
 

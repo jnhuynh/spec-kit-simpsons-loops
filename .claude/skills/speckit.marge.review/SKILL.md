@@ -1,4 +1,5 @@
 ---
+name: speckit.marge.review
 description: Orchestrate iterative code review and remediation (Marge loop) over the feature branch diff until all findings are resolved.
 ---
 
@@ -10,24 +11,24 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Pre-Flight: Review Command Check
+## Pre-Flight: Review Skill Check
 
-Verify that the single-pass review command exists. Marge's Phase 0 delegates to it:
+Verify that the single-pass review skill exists. Marge's Phase 0 delegates to it:
 
 ```bash
-test -f ".claude/commands/speckit.review.md" && echo "speckit.review.md: EXISTS" || echo "speckit.review.md: MISSING"
+if test -f ".claude/skills/speckit.review/SKILL.md" || test -f ".claude/commands/speckit.review.md"; then echo "speckit.review: EXISTS"; else echo "speckit.review: MISSING"; fi
 ```
 
 If **MISSING**, display this error and **STOP**:
 
 ```
-ERROR: Required command file not found.
+ERROR: Required /speckit.review definition not found.
 
-Missing: .claude/commands/speckit.review.md
+Missing: .claude/skills/speckit.review/SKILL.md (or legacy .claude/commands/speckit.review.md)
 
 Marge invokes /speckit.review during Phase 0 to generate findings.
-Ensure the file is present at:
-  .claude/commands/speckit.review.md
+Ensure the skill is installed at:
+  .claude/skills/speckit.review/SKILL.md
 ```
 
 ## Pre-Loop: Diff Existence Check

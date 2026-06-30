@@ -113,7 +113,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands in `.claude/commands/` (at minimum: `speckit.specify.md`, `speckit.implement.md`, `speckit.analyze.md`, `speckit.clarify.md`, `speckit.plan.md`, `speckit.tasks.md`). Marge's review loop additionally relies on `speckit.review.md`, and the splitting skill relies on `speckit.split.md` — both are installed by `setup.sh`.
+- Existing Speckit commands or skills installed (at minimum: `speckit.specify`, `speckit.implement`, `speckit.analyze`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`). Marge's review loop additionally relies on the `speckit.review` skill, and the splitting skill relies on `speckit.split` — both are installed by `setup.sh`.
 
 ## Setup
 
@@ -125,7 +125,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This deploys CLAUDE.md and constitution.md templates, copies agent definitions and loop command files into `.claude/agents/` and `.claude/commands/`, seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
+This deploys CLAUDE.md and constitution.md templates, copies agent definitions into `.claude/agents/` and installs the loop skills into `.claude/skills/` (removing any legacy per-command copies), seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
 ### Option B: Manual
 
@@ -150,17 +150,9 @@ cp <path-to-simpsons-loops>/claude-agents/phase.md       .claude/agents/phase.md
 cp <path-to-simpsons-loops>/claude-agents/split.md      .claude/agents/split.md
 cp <path-to-simpsons-loops>/claude-agents/reconcile.md  .claude/agents/reconcile.md
 
-# Loop commands -> .claude/commands/
-cp <path-to-simpsons-loops>/speckit-commands/speckit.ralph.implement.md   .claude/commands/speckit.ralph.implement.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.lisa.analyze.md      .claude/commands/speckit.lisa.analyze.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.homer.clarify.md     .claude/commands/speckit.homer.clarify.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.marge.review.md      .claude/commands/speckit.marge.review.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.review.md            .claude/commands/speckit.review.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.pipeline.md          .claude/commands/speckit.pipeline.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.brainstorm.md       .claude/commands/speckit.brainstorm.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.review.pr.md       .claude/commands/speckit.review.pr.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.phase.md         .claude/commands/speckit.phase.md
-cp <path-to-simpsons-loops>/speckit-commands/speckit.split.md          .claude/commands/speckit.split.md
+# Loop skills -> .claude/skills/ (each skill is a directory; reference/ files ride along)
+mkdir -p .claude/skills
+cp -R <path-to-simpsons-loops>/speckit-skills/* .claude/skills/
 
 # Marge baseline packs -> .specify/marge/baseline/
 mkdir -p .specify/marge/baseline

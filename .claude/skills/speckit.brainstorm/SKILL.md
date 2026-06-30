@@ -1,4 +1,5 @@
 ---
+name: speckit.brainstorm
 description: Challenge and refine a vague idea into a well-formed feature description through adversarial questioning. Produces output ready for /speckit.specify or /speckit.pipeline.
 ---
 

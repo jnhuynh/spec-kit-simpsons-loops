@@ -109,7 +109,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `<AGENT_FILE>`
-     - When those instructions reference a slash command (e.g., `<SLASH_COMMAND_REF>`), read the corresponding file from `.claude/commands/` and follow its instructions directly
+     - When those instructions reference a slash command (e.g., `<SLASH_COMMAND_REF>`), read its definition — prefer `.claude/skills/<command>/SKILL.md`, falling back to `.claude/commands/<command>.md` — and follow those instructions directly
      - Provide: `Feature directory: <FEATURE_DIR>`
      - Append EXTRA_PROMPT_SUFFIX if non-empty
    - Each sub agent gets a fresh context window, preventing hallucination drift
