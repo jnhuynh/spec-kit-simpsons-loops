@@ -58,10 +58,9 @@ fi
 # Ralph command file for custom quality gates before it gets overwritten.
 
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
-# Prefer the new skills location; fall back to the legacy command path so an
-# upgrading consumer's custom gates are still detected on first migration run.
-RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit.ralph.implement/SKILL.md"
-[[ -f "$RALPH_CMD_FILE" ]] || RALPH_CMD_FILE="$PROJECT_DIR/.claude/commands/speckit.ralph.implement.md"
+# Skills location of the Ralph command file — read to detect custom quality
+# gates a consumer may have set there before this file is overwritten.
+RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit-ralph-implement/SKILL.md"
 SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then
@@ -226,17 +225,25 @@ cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/loop-orchestrator.md"             "$PROJECT_DIR/.claude/agents/loop-orchestrator.md"
 # Skills (Pattern A: clean overwrite per dir, recursive so reference/ subdirs
 # for progressively-disclosed skills come along). Source is the non-hidden
-# speckit-skills/ ship dir. Each skill also removes the legacy per-command copy
-# it supersedes (skill dir speckit.foo -> legacy .claude/commands/speckit.foo.md),
-# so an upgrading consumer is not left with duplicate command+skill entries.
+# speckit-skills/ ship dir. Skill dirs are hyphenated (e.g. speckit-homer-clarify);
+# each install also removes the dotted predecessors it supersedes — the original
+# command-mode file (.claude/commands/speckit.homer.clarify.md) and the earlier
+# dotted skill dir (.claude/skills/speckit.homer.clarify/) — so an upgrading
+# consumer is not left with duplicate or stale entries.
 for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
-  skill_name=$(basename "$skill_src")
+  skill_name=$(basename "$skill_src")                        # hyphen, e.g. speckit-homer-clarify
   rm -rf "$PROJECT_DIR/.claude/skills/$skill_name"
   cp -R "${skill_src%/}" "$PROJECT_DIR/.claude/skills/"
-  legacy="$PROJECT_DIR/.claude/commands/$skill_name.md"
-  if [[ -f "$legacy" ]]; then
-    rm "$legacy"
-    echo "  Removed legacy command (now a skill): .claude/commands/$skill_name.md"
+  dotted=$(printf '%s' "$skill_name" | tr '-' '.')           # speckit.homer.clarify
+  for legacy in "$PROJECT_DIR/.claude/commands/$dotted.md" "$PROJECT_DIR/.claude/commands/$skill_name.md"; do
+    if [[ -f "$legacy" ]]; then
+      rm "$legacy"
+      echo "  Removed legacy command: ${legacy#"$PROJECT_DIR"/}"
+    fi
+  done
+  if [[ -d "$PROJECT_DIR/.claude/skills/$dotted" ]]; then
+    rm -rf "$PROJECT_DIR/.claude/skills/$dotted"
+    echo "  Removed legacy dotted skill dir: .claude/skills/$dotted/"
   fi
 done
 cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.claude/agents/phase.md"
@@ -367,5 +374,5 @@ else
 fi
 
 echo ""
-echo "Done! Run /speckit.pipeline for the full end-to-end workflow, or use individual loops:"
-echo "  /speckit.ralph.implement  /speckit.lisa.analyze  /speckit.homer.clarify  /speckit.marge.review"
+echo "Done! Run /speckit-pipeline for the full end-to-end workflow, or use individual loops:"
+echo "  /speckit-ralph-implement  /speckit-lisa-analyze  /speckit-homer-clarify  /speckit-marge-review"

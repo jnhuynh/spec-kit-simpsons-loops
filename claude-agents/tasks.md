@@ -8,7 +8,7 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Instructions
 
-Run `/speckit.tasks` to generate the task list. This will read the spec and plan, then produce a `tasks.md` in the feature directory.
+Run `/speckit-tasks` to generate the task list. This will read the spec and plan, then produce a `tasks.md` in the feature directory.
 
 After the tasks are generated, commit and push:
 

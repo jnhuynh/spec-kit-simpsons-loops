@@ -10,7 +10,7 @@ The feature directory (a child spec directory) is provided via the `-p` prompt w
 
 1. Resolve the parent directory by stripping the `--p{N}-{slug}` suffix from the child directory name. For example, `specs/c31c-feat-billing--p2-integration` -> `specs/c31c-feat-billing`.
 
-2. Run `/speckit.split` targeting the parent directory. This reconciles all child specs with what earlier phases actually built, updating child spec content to reflect reality from earlier phases.
+2. Run `/speckit-split` targeting the parent directory. This reconciles all child specs with what earlier phases actually built, updating child spec content to reflect reality from earlier phases.
 
 3. After reconciliation is complete, commit and push:
 

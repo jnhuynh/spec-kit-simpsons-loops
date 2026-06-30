@@ -8,7 +8,7 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Instructions
 
-Run `/speckit.plan` to generate the implementation plan. This will read the spec and produce a `plan.md` in the feature directory.
+Run `/speckit-plan` to generate the implementation plan. This will read the spec and produce a `plan.md` in the feature directory.
 
 After the plan is generated, commit and push:
 

@@ -9,7 +9,7 @@ The calling command MUST have provided all of these values before you begin. Con
 - **AGENT_NAME**: lowercase name (e.g., `homer`, `lisa`, `ralph`, `marge`)
 - **AGENT_DISPLAY_NAME**: display name (e.g., `Homer`, `Lisa`, `Ralph`, `Marge`)
 - **AGENT_FILE**: path to agent behavior file (e.g., `.claude/agents/homer.md`)
-- **SLASH_COMMAND_REF**: the slash command the agent references (e.g., `/speckit.clarify`)
+- **SLASH_COMMAND_REF**: the slash command the agent references (e.g., `/speckit-clarify`)
 - **PROMISE_TAG**: completion signal (e.g., `ALL_FINDINGS_RESOLVED` or `ALL_TASKS_COMPLETE`)
 - **PREREQ_FLAGS**: flags for `check-prerequisites.sh` (e.g., `--json --paths-only`)
 - **REQUIRED_ARTIFACTS**: list of files that must exist in FEATURE_DIR (e.g., `spec.md` or `spec.md, plan.md, tasks.md`)
@@ -37,7 +37,7 @@ Missing: .specify/scripts/bash/check-prerequisites.sh
 This script is required for feature directory resolution and prerequisite validation.
 To install it, run the SpecKit setup command:
 
-  /speckit.setup
+  /speckit-setup
 
 ```
 
@@ -91,9 +91,9 @@ Parse `$ARGUMENTS` (passed through from the calling command) for the following (
 For each file listed in REQUIRED_ARTIFACTS, confirm it exists in `FEATURE_DIR`.
 
 If any are missing, abort with guidance:
-- Missing `spec.md` → "Run /speckit.specify first"
-- Missing `plan.md` → "Run /speckit.plan first"
-- Missing `tasks.md` → "Run /speckit.tasks first"
+- Missing `spec.md` → "Run /speckit-specify first"
+- Missing `plan.md` → "Run /speckit-plan first"
+- Missing `tasks.md` → "Run /speckit-tasks first"
 
 ## Step 4: Run Loop
 
@@ -109,7 +109,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `<AGENT_FILE>`
-     - When those instructions reference a slash command (e.g., `<SLASH_COMMAND_REF>`), read its definition — prefer `.claude/skills/<command>/SKILL.md`, falling back to `.claude/commands/<command>.md` — and follow those instructions directly
+     - When those instructions reference a slash command like `/speckit-<verb>` (older command-mode installs use the dotted `/speckit.<verb>`), read its definition from the first path that exists, in order: `.claude/skills/speckit-<verb>/SKILL.md` (skills mode), `.claude/skills/speckit.<verb>/SKILL.md`, then `.claude/commands/speckit.<verb>.md` (legacy command mode) — and follow those instructions directly
      - Provide: `Feature directory: <FEATURE_DIR>`
      - Append EXTRA_PROMPT_SUFFIX if non-empty
    - Each sub agent gets a fresh context window, preventing hallucination drift

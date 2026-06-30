@@ -10,11 +10,11 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Phase 0: Clarify
 
-Run `/speckit.clarify Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Clarification Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
+Run `/speckit-clarify Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Clarification Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
 
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit.clarify` report
+1. Review the findings from the `/speckit-clarify` report
 2. If TOTAL findings = 0, output the following promise tag and exit immediately:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>

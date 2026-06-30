@@ -9,17 +9,17 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 
 | Loop     | What it does                                                                                                                                                                                        |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Homer    | Iterative spec clarification. Runs `/speckit.clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                                       |
-| Lisa     | Iterative cross-artifact analysis. Runs `/speckit.analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
+| Homer    | Iterative spec clarification. Runs `/speckit-clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                                       |
+| Lisa     | Iterative cross-artifact analysis. Runs `/speckit-analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
-| Marge    | Iterative code review. Runs `/speckit.review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
+| Marge    | Iterative code review. Runs `/speckit-review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
 | Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
 
 **Pre-pipeline:**
 
 | Command     | What it does                                                                                                                                                                                        |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.         |
+| Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit-specify` or `/speckit-pipeline --description "..."`.         |
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
@@ -32,7 +32,7 @@ The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each
 
 ```mermaid
 flowchart TD
-    A["/speckit.pipeline"] --> B{Auto-detect\nstarting step}
+    A["/speckit-pipeline"] --> B{Auto-detect\nstarting step}
     B --> R["Reconcile\n(child specs only)"]
     R --> C["Specify\n(sub agent)"]
     C --> D["Homer Loop"]
@@ -62,7 +62,7 @@ flowchart TD
 
 ### Standalone loop iteration lifecycle
 
-Each standalone loop command (`/speckit.homer.clarify`, `/speckit.lisa.analyze`, `/speckit.ralph.implement`, `/speckit.marge.review`) follows the same iteration lifecycle.
+Each standalone loop command (`/speckit-homer-clarify`, `/speckit-lisa-analyze`, `/speckit-ralph-implement`, `/speckit-marge-review`) follows the same iteration lifecycle.
 
 ```mermaid
 flowchart TD
@@ -83,7 +83,7 @@ flowchart TD
 
 ## Recommended workflow
 
-Before kicking off the pipeline or any loop, refine your specs manually. Start with `/speckit.brainstorm` if your idea is still vague — it will challenge you to sharpen it. Then run `/speckit.specify` to draft the initial spec, and `/speckit.clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
+Before kicking off the pipeline or any loop, refine your specs manually. Start with `/speckit-brainstorm` if your idea is still vague — it will challenge you to sharpen it. Then run `/speckit-specify` to draft the initial spec, and `/speckit-clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
 
 You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
@@ -91,11 +91,11 @@ You can also run each loop individually and review between stages instead of run
 
 When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
 
-1. **Run the pipeline** — `/speckit.pipeline --from specify --description "..."` runs specify, homer (clarify), phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
+1. **Run the pipeline** — `/speckit-pipeline --from specify --description "..."` runs specify, homer (clarify), phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
 
 2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
 
-3. **Implement phase by phase** — Run `/speckit.pipeline` on each child spec in order. The pipeline enforces phase ordering: phase N cannot start until all earlier phases are marked "Complete" in the parent manifest. Use `--skip-phase-guard` to bypass this when phases are independent.
+3. **Implement phase by phase** — Run `/speckit-pipeline` on each child spec in order. The pipeline enforces phase ordering: phase N cannot start until all earlier phases are marked "Complete" in the parent manifest. Use `--skip-phase-guard` to bypass this when phases are independent.
 
 4. **Auto-status** — The pipeline automatically updates the parent manifest as work progresses. When a child pipeline starts, the phase is marked "In Progress". When Marge (code review) completes successfully, the phase is marked "Complete". After each update, a phase status summary is printed so you can see progress across all phases at a glance.
 
@@ -113,7 +113,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands or skills installed (at minimum: `speckit.specify`, `speckit.implement`, `speckit.analyze`, `speckit.clarify`, `speckit.plan`, `speckit.tasks`). Marge's review loop additionally relies on the `speckit.review` skill, and the splitting skill relies on `speckit.split` — both are installed by `setup.sh`.
+- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, and the splitting skill relies on `speckit-split` — both are installed by `setup.sh`.
 
 ## Setup
 
@@ -225,17 +225,17 @@ Each loop has a corresponding slash command that orchestrates iterations using t
 Sharpen a vague idea before writing a spec:
 
 ```
-/speckit.brainstorm I want to add some kind of caching layer
+/speckit-brainstorm I want to add some kind of caching layer
 ```
 
-Asks 4-7 targeted questions that challenge your assumptions, then produces a feature description ready for `/speckit.specify` or `/speckit.pipeline --description "..."`.
+Asks 4-7 targeted questions that challenge your assumptions, then produces a feature description ready for `/speckit-specify` or `/speckit-pipeline --description "..."`.
 
 ### Homer (clarification)
 
-After running `/speckit.specify` to create `spec.md`:
+After running `/speckit-specify` to create `spec.md`:
 
 ```
-/speckit.homer.clarify
+/speckit-homer-clarify
 ```
 
 Homer only requires `spec.md` to exist — it does not need `plan.md` or `tasks.md`. This means you can run Homer immediately after creating your spec.
@@ -245,15 +245,15 @@ Homer only requires `spec.md` to exist — it does not need `plan.md` or `tasks.
 Once you have `spec.md`, `plan.md`, and `tasks.md`:
 
 ```
-/speckit.lisa.analyze
+/speckit-lisa-analyze
 ```
 
 ### Ralph (implementation)
 
-Once you have `tasks.md` from `/speckit.tasks`:
+Once you have `tasks.md` from `/speckit-tasks`:
 
 ```
-/speckit.ralph.implement
+/speckit-ralph-implement
 ```
 
 Ralph validates that `.specify/quality-gates.sh` exists and contains executable content before starting. If the file is missing or empty, Ralph aborts with a clear error.
@@ -263,31 +263,31 @@ Ralph validates that `.specify/quality-gates.sh` exists and contains executable 
 After Ralph has implemented the feature:
 
 ```
-/speckit.marge.review
+/speckit-marge-review
 ```
 
 Marge reviews the feature branch's diff against baseline and project review packs in `.specify/marge/baseline/` and `.specify/marge/project/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
 
-For a single-pass report (no auto-fix), run `/speckit.review` instead.
+For a single-pass report (no auto-fix), run `/speckit-review` instead.
 
 ### PR Review (human-judgment findings)
 
 After Marge finishes (or independently on any branch with an open PR), post inline comments for findings that need human attention:
 
 ```
-/speckit.review.pr
+/speckit-review-pr
 ```
 
 Or target a specific PR:
 
 ```
-/speckit.review.pr pr:42
+/speckit-review-pr pr:42
 ```
 
 Or preview findings without posting:
 
 ```
-/speckit.review.pr --dry-run
+/speckit-review-pr --dry-run
 ```
 
 Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), concurrency risks (WARNING), architectural decisions (WARNING), and project-specific patterns (INFO). Uses `COMMENT` event type — informational, not a merge gate. Idempotent: won't double-post on the same commit.
@@ -306,7 +306,7 @@ specs/
   c31c-feat-billing-overhaul--p3-ui-reveal/        # phase 3 child
 ```
 
-After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit.split` standalone on a phase-annotated parent spec once its `plan.md` and `tasks.md` exist — split requires the whole-feature plan and task list first, so the phase boundaries are validated against the full implementation design before the spec is decomposed.
+After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit-split` standalone on a phase-annotated parent spec once its `plan.md` and `tasks.md` exist — split requires the whole-feature plan and task list first, so the phase boundaries are validated against the full implementation design before the spec is decomposed.
 
 **Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+). It syncs the child spec with what earlier sibling phases actually built, so you always pick up from reality rather than the original plan.
 
@@ -316,40 +316,40 @@ Phase status follows a forward-only state machine: Draft -> In Progress -> Compl
 
 ### Pipeline (end-to-end)
 
-After creating a spec with `/speckit.specify`, run the full pipeline:
+After creating a spec with `/speckit-specify`, run the full pipeline:
 
 ```
-/speckit.pipeline
+/speckit-pipeline
 ```
 
 Or target a specific spec directory:
 
 ```
-/speckit.pipeline specs/a1b2-feat-user-auth
+/speckit-pipeline specs/a1b2-feat-user-auth
 ```
 
 Or resume from a specific step:
 
 ```
-/speckit.pipeline --from ralph specs/a1b2-feat-user-auth
+/speckit-pipeline --from ralph specs/a1b2-feat-user-auth
 ```
 
 Or stop the pipeline after a specific step completes:
 
 ```
-/speckit.pipeline --stop-after plan
+/speckit-pipeline --stop-after plan
 ```
 
 Or bootstrap end-to-end from a feature description:
 
 ```
-/speckit.pipeline --from specify --description "Add user authentication with OAuth2"
+/speckit-pipeline --from specify --description "Add user authentication with OAuth2"
 ```
 
 `--from`, `--stop-after`, and `--description` can be combined. For example, run homer through tasks only:
 
 ```
-/speckit.pipeline --from homer --stop-after tasks specs/a1b2-feat-user-auth
+/speckit-pipeline --from homer --stop-after tasks specs/a1b2-feat-user-auth
 ```
 
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
@@ -420,7 +420,7 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 | Ralph | incomplete tasks + 10 |
 | Marge | 30                    |
 
-All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit.homer.clarify 5`).
+All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit-homer-clarify 5`).
 
 ### Marge review packs & project packs
 

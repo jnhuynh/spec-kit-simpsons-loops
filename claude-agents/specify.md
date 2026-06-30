@@ -8,7 +8,7 @@ The feature directory and description are provided via the `-p` prompt when this
 
 ## Instructions
 
-Run `/speckit.specify` with the feature description provided in the prompt.
+Run `/speckit-specify` with the feature description provided in the prompt.
 
 **CRITICAL — Non-Interactive Mode**: Do not ask the user for clarification — make your best judgment and proceed. For any aspect that would normally require a [NEEDS CLARIFICATION] marker, instead make an informed guess based on context, industry standards, and common patterns. Document all assumptions in the Assumptions section of the spec. The Homer loop will refine any gaps afterward.
 
