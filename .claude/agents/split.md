@@ -8,7 +8,7 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Instructions
 
-Run `/speckit.split` to split the phase-annotated spec into child spec directories. This will read the parent spec's Phases section, create child spec directories under `specs/`, and update the parent spec with a Manifest section.
+Run `/speckit-split` to split the phase-annotated spec into child spec directories. This will read the parent spec's Phases section, create child spec directories under `specs/`, and update the parent spec with a Manifest section.
 
 After the split is complete, commit and push:
 

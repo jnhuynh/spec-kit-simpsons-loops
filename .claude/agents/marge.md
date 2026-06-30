@@ -10,11 +10,11 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Phase 0: Review
 
-Run `/speckit.review Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Code Review Report with a findings table grouped by severity, then remediates only one finding (the highest severity that is not flagged `NEEDS_HUMAN`).
+Run `/speckit-review Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Code Review Report with a findings table grouped by severity, then remediates only one finding (the highest severity that is not flagged `NEEDS_HUMAN`).
 
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit.review` report
+1. Review the findings from the `/speckit-review` report
 2. If TOTAL findings = 0, output the following promise tag and exit immediately:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>

@@ -10,7 +10,7 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Phase 0: Analyze
 
-Run `/speckit.analyze Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
+Run `/speckit-analyze Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Analysis Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
 
 ## Phase 0b: Run planning-stage project packs
 
@@ -29,11 +29,11 @@ Project packs that opt into the **planning** stage check spec artifacts before c
 
 2. **Config-backed prose packs** — for each `.specify/marge/baseline/*.md` and `.specify/marge/project/*.md` whose `Stage:` line includes `planning`, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its findings (those from `project/` are tagged `PROJECT_GATE`).
 
-`/speckit.analyze` does NOT remediate these. Carry them into Phase 1: if `/speckit.analyze` already remediated a finding this iteration, leave the gate findings for later iterations (one finding per iteration); if `/speckit.analyze` had nothing to remediate but planning-gate findings remain, remediate the single highest-severity non-`NEEDS_HUMAN` gate finding now by editing the spec artifacts.
+`/speckit-analyze` does NOT remediate these. Carry them into Phase 1: if `/speckit-analyze` already remediated a finding this iteration, leave the gate findings for later iterations (one finding per iteration); if `/speckit-analyze` had nothing to remediate but planning-gate findings remain, remediate the single highest-severity non-`NEEDS_HUMAN` gate finding now by editing the spec artifacts.
 
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit.analyze` report and any Phase 0b planning-pack findings
+1. Review the findings from the `/speckit-analyze` report and any Phase 0b planning-pack findings
 2. If TOTAL findings (analyze + planning packs) = 0, output the following promise tag and exit immediately:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>

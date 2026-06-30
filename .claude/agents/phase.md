@@ -8,7 +8,7 @@ The feature directory is provided via the `-p` prompt when this agent is invoked
 
 ## Instructions
 
-Run `/speckit.phase` to detect deployment boundaries in the spec's user stories and generate the `## Phases` section.
+Run `/speckit-phase` to detect deployment boundaries in the spec's user stories and generate the `## Phases` section.
 
 After phase detection is complete, commit and push:
 

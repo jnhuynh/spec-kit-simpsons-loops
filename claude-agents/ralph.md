@@ -22,7 +22,7 @@ The feature directory and quality gates are provided via the `-p` prompt when th
 
 ## Phase 1: Implement
 
-Run `/speckit.implement Only implement the next incomplete task` to implement the single next incomplete task. This handles implementation, validation, and quality gates.
+Run `/speckit-implement Only implement the next incomplete task` to implement the single next incomplete task. This handles implementation, validation, and quality gates.
 
 ## Phase 2: Validate
 
