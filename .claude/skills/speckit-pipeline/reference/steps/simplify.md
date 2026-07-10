@@ -11,7 +11,7 @@ If **ABSENT**, log `simplify skill not installed — skipping post-ralph simplif
 If **PRESENT**, spawn a sub agent:
 
 - **subagent_type**: `general-purpose`
-- **prompt**: `Invoke the /simplify skill via the Skill tool. It will review the current diff for reuse, quality, and efficiency issues and apply fixes. When it finishes, stage and commit any resulting changes with: git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "chore($scope): [$ticket] post-ralph simplify pass". If the skill made no changes, exit without committing. Report "no changes" or a one-line summary of what was fixed.`
+- **prompt**: `Invoke the /simplify skill via the Skill tool. It will review the current diff for reuse, quality, and efficiency issues and apply fixes. When it finishes, stage and commit any resulting changes with: bash .specify/scripts/bash/speckit-commit.sh "post-ralph simplify pass" chore — it exits cleanly if the skill made no changes. Report "no changes" or a one-line summary of what was fixed.`
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), log `simplify phase failed — continuing pipeline` and proceed to security-review. Do NOT abort — simplify is optional polish.
 

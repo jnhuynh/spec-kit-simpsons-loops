@@ -125,7 +125,7 @@ From the root of your target project:
 bash <path-to-simpsons-loops>/setup.sh
 ```
 
-This deploys CLAUDE.md and constitution.md templates, copies agent definitions into `.claude/agents/` and installs the loop skills into `.claude/skills/` (removing any legacy per-command copies), seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
+This deploys CLAUDE.md and constitution.md templates, copies agent definitions into `.claude/agents/` and installs the loop skills into `.claude/skills/` (removing any legacy per-command copies), seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), installs the shared commit helper into `.specify/scripts/bash/speckit-commit.sh`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
 
 ### Option B: Manual
 
@@ -168,6 +168,11 @@ cp <path-to-simpsons-loops>/specify-marge/config/README.md .specify/marge/config
 # Marge script-pack runner (framework — overwrite, not cp -n) -> .specify/marge/
 cp <path-to-simpsons-loops>/specify-marge/run-gates.sh .specify/marge/run-gates.sh
 chmod +x .specify/marge/run-gates.sh
+
+# Shared commit helper (framework — overwrite) -> .specify/scripts/bash/
+mkdir -p .specify/scripts/bash
+cp <path-to-simpsons-loops>/scripts/speckit-commit.sh .specify/scripts/bash/speckit-commit.sh
+chmod +x .specify/scripts/bash/speckit-commit.sh
 ```
 
 #### 2. Update `.gitignore`

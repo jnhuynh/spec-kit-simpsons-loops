@@ -42,8 +42,7 @@ If validation fails:
 1. Mark task `- [x]` in tasks.md
 2. Commit and push:
    ```bash
-   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] [task summary]"
-   git push origin $(git branch --show-current)
+   bash .specify/scripts/bash/speckit-commit.sh "[task summary]"
    ```
 3. Exit immediately — you will restart with fresh context for the next task
 

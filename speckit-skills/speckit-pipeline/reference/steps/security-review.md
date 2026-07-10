@@ -11,7 +11,7 @@ If **ABSENT**, log `security-review skill not installed — skipping pre-marge s
 If **PRESENT**, spawn a sub agent:
 
 - **subagent_type**: `general-purpose`
-- **prompt**: `Invoke the /security-review skill via the Skill tool. It will perform a security review of the pending changes on the current branch. Apply any straightforward fixes it recommends. When finished, stage and commit any resulting changes with: git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "chore($scope): [$ticket] pre-marge security review pass". If no changes were needed, exit without committing. Report "no changes" or a one-line summary of what was fixed; any residual findings will be picked up by marge.`
+- **prompt**: `Invoke the /security-review skill via the Skill tool. It will perform a security review of the pending changes on the current branch. Apply any straightforward fixes it recommends. When finished, stage and commit any resulting changes with: bash .specify/scripts/bash/speckit-commit.sh "pre-marge security review pass" chore — it exits cleanly if no changes were needed. Report "no changes" or a one-line summary of what was fixed; any residual findings will be picked up by marge.`
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), log `security-review phase failed — continuing pipeline` and proceed to marge. Do NOT abort — security-review is optional polish.
 

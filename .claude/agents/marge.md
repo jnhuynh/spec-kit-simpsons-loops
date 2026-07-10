@@ -33,8 +33,7 @@ Run `/speckit-review Remediate only the single highest-severity finding without 
 
 1. Commit all changes:
    ```bash
-   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] fix [SEVERITY] finding from code review"
-   git push origin $(git branch --show-current)
+   bash .specify/scripts/bash/speckit-commit.sh "fix [SEVERITY] finding from code review"
    ```
 2. Exit immediately — you will restart with fresh context for the next finding
 

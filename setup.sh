@@ -228,6 +228,13 @@ mkdir -p "$PROJECT_DIR/.specify/marge"
 cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
 chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
 
+# Shared commit helper used by loop and single-shot agents (Pattern A:
+# OVERWRITE). Lives next to check-prerequisites.sh, which agents already
+# invoke by that path.
+mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
+cp "$SCRIPT_DIR/scripts/speckit-commit.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
+chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
+
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
@@ -244,6 +251,7 @@ echo "    .claude/agents/phase.md"
 echo "    .claude/agents/split.md"
 echo "    .claude/agents/reconcile.md"
 echo "    .specify/marge/run-gates.sh"
+echo "    .specify/scripts/bash/speckit-commit.sh"
 
 # ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
 # Earlier installs used .specify/marge/checks/ (prose packs) and
