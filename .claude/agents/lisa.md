@@ -6,7 +6,7 @@ Analyze spec artifacts for inconsistencies, gaps, and quality issues. Fix **one 
 
 ## Feature Directory
 
-The feature directory is provided via the `-p` prompt when this agent is invoked. Extract the path from the prompt (e.g., "Feature directory: specs/a1b2-feat-foo").
+The feature directory is provided in the invocation prompt (each iteration is spawned via the Agent tool). Extract the path from the prompt (e.g., "Feature directory: specs/a1b2-feat-foo").
 
 ## Phase 0: Analyze
 

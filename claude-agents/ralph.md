@@ -6,7 +6,7 @@ Execute **one task** from tasks.md per iteration. Each iteration runs with FRESH
 
 ## Feature Directory & Quality Gates
 
-The feature directory and quality gates are provided via the `-p` prompt when this agent is invoked. Extract:
+The feature directory and quality gates are provided in the invocation prompt (each iteration is spawned via the Agent tool). Extract:
 - **Feature directory**: the path (e.g., "Feature directory: specs/a1b2-feat-foo")
 - **Quality gates**: the per-iteration command to run for validation. The orchestrator passes the **fast** gate (`bash .specify/quality-gates-fast.sh`) when available, which scopes checks to changed files for quick feedback. If only the full gate exists, it passes that instead. The orchestrator runs the **full** gate (`bash .specify/quality-gates.sh`) once after the loop terminates — do not run it yourself per iteration.
 
@@ -29,7 +29,7 @@ Run `/speckit-implement Only implement the next incomplete task` to implement th
 Verify the task was implemented correctly:
 
 1. Re-read the modified files
-2. Run the quality gates provided in the `-p` prompt — **MUST pass before proceeding**
+2. Run the quality gates provided in the invocation prompt — **MUST pass before proceeding**
 
 If validation fails:
 

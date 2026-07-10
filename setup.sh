@@ -54,41 +54,12 @@ if [[ "$SELF_INSTALL" != true ]]; then
 fi
 
 # ── 0. Quality gate file (never overwrite) ──────────────────────────
-# MUST run before file copies so we can inspect the target's existing
-# Ralph command file for custom quality gates before it gets overwritten.
-
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
-# Skills location of the Ralph command file — read to detect custom quality
-# gates a consumer may have set there before this file is overwritten.
-RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit-ralph-implement/SKILL.md"
-SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then
   echo "  Quality gate file already exists — skipped"
 else
-  # Determine content: placeholder or extracted custom gates
-  qg_content=""
-
-  if [[ -f "$RALPH_CMD_FILE" ]] && ! grep -qF "$SENTINEL" "$RALPH_CMD_FILE"; then
-    # Sentinel is absent → custom quality gates → extract code block from
-    # the "### Step 3: Extract Quality Gates" section
-    extracted=$(awk '
-      /^### Step 3: Extract Quality Gates/ { found_section=1; next }
-      found_section && /^```bash/ { in_block=1; next }
-      in_block && /^```/ { exit }
-      in_block { print }
-    ' "$RALPH_CMD_FILE")
-
-    if [[ -n "$extracted" ]]; then
-      qg_content="$(printf '#!/usr/bin/env bash\n%s\n' "$extracted")"
-      echo "  Extracted custom quality gates from Ralph command file"
-    fi
-  fi
-
-  # If nothing was extracted (no file, sentinel present, or empty block),
-  # create the placeholder
-  if [[ -z "$qg_content" ]]; then
-    qg_content='#!/usr/bin/env bash
+  qg_content='#!/usr/bin/env bash
 # SPECKIT_DEFAULT_QUALITY_GATE
 #
 # Quality Gates Configuration
@@ -109,8 +80,7 @@ else
 echo "ERROR: Quality gates not configured."
 echo "Edit .specify/quality-gates.sh with your project'\''s quality gate commands."
 exit 1'
-    echo "  Created placeholder quality gate file"
-  fi
+  echo "  Created placeholder quality gate file"
 
   # Atomic write: temp file → mv
   tmp=$(mktemp)

@@ -35,9 +35,10 @@ ERROR: Required utility script not found.
 Missing: .specify/scripts/bash/check-prerequisites.sh
 
 This script is required for feature directory resolution and prerequisite validation.
-To install it, run the SpecKit setup command:
+It is installed by Spec Kit itself, not by Simpsons Loops. Initialize Spec Kit in
+this project first (e.g. `specify init`), then re-run the Simpsons Loops installer:
 
-  /speckit-setup
+  bash <path-to-simpsons-loops>/setup.sh
 
 ```
 
