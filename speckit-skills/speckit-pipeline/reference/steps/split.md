@@ -5,8 +5,8 @@ If not a child spec, check if spec.md has 2+ phases (count `### Phase` subsectio
 
 If multi-phase parent spec (2+ phases): spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/split.md`
-- **prompt**: `Feature directory: <FEATURE_DIR>. Run non-interactively.`
+- **agent file**: `.claude/agents/single-shot.md`
+- **prompt**: `Read and follow .claude/agents/single-shot.md with SINGLE_SHOT_CONFIG — STEP_COMMAND: /speckit-split; COMMIT_DESCRIPTION: split phase-annotated spec into child specs; FEATURE_DIR: <FEATURE_DIR>; EXTRA_INSTRUCTIONS: (none).`
 
 After split completes, read the parent spec's `## Manifest` section to get the list of child directories. Then prompt the user with two options using the AskUserQuestion tool:
 

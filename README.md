@@ -142,13 +142,8 @@ cp <path-to-simpsons-loops>/claude-agents/homer.md  .claude/agents/homer.md
 cp <path-to-simpsons-loops>/claude-agents/lisa.md   .claude/agents/lisa.md
 cp <path-to-simpsons-loops>/claude-agents/marge.md  .claude/agents/marge.md
 cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
-cp <path-to-simpsons-loops>/claude-agents/plan.md   .claude/agents/plan.md
-cp <path-to-simpsons-loops>/claude-agents/tasks.md  .claude/agents/tasks.md
-cp <path-to-simpsons-loops>/claude-agents/specify.md .claude/agents/specify.md
+cp <path-to-simpsons-loops>/claude-agents/single-shot.md .claude/agents/single-shot.md
 cp <path-to-simpsons-loops>/claude-agents/loop-orchestrator.md .claude/agents/loop-orchestrator.md
-cp <path-to-simpsons-loops>/claude-agents/phase.md       .claude/agents/phase.md
-cp <path-to-simpsons-loops>/claude-agents/split.md      .claude/agents/split.md
-cp <path-to-simpsons-loops>/claude-agents/reconcile.md  .claude/agents/reconcile.md
 
 # Loop skills -> .claude/skills/ (each skill is a directory; reference/ files ride along)
 mkdir -p .claude/skills

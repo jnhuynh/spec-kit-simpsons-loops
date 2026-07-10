@@ -189,10 +189,16 @@ cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
 cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
-cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
-cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
-cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
+cp "$SCRIPT_DIR/claude-agents/single-shot.md"                   "$PROJECT_DIR/.claude/agents/single-shot.md"
 cp "$SCRIPT_DIR/claude-agents/loop-orchestrator.md"             "$PROJECT_DIR/.claude/agents/loop-orchestrator.md"
+
+# Remove per-step single-shot agents superseded by single-shot.md
+for stale_agent in specify plan tasks phase split reconcile; do
+  if [[ -f "$PROJECT_DIR/.claude/agents/$stale_agent.md" ]]; then
+    rm "$PROJECT_DIR/.claude/agents/$stale_agent.md"
+    echo "  Removed superseded agent: .claude/agents/$stale_agent.md"
+  fi
+done
 # Skills (Pattern A: clean overwrite per dir, recursive so reference/ subdirs
 # for progressively-disclosed skills come along). Source is the non-hidden
 # speckit-skills/ ship dir. Skill dirs are hyphenated (e.g. speckit-homer-clarify);
@@ -216,9 +222,6 @@ for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
     echo "  Removed legacy dotted skill dir: .claude/skills/$dotted/"
   fi
 done
-cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.claude/agents/phase.md"
-cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
-cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
 # Framework runner for project script packs (Pattern A: OVERWRITE, like the
 # agent/skill copies above). It lives under .specify/marge/ next to the
@@ -240,16 +243,11 @@ echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
-echo "    .claude/agents/plan.md"
-echo "    .claude/agents/tasks.md"
-echo "    .claude/agents/specify.md"
+echo "    .claude/agents/single-shot.md"
 echo "    .claude/agents/loop-orchestrator.md"
   for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
     echo "    .claude/skills/$(basename "$skill_src")/"
   done
-echo "    .claude/agents/phase.md"
-echo "    .claude/agents/split.md"
-echo "    .claude/agents/reconcile.md"
 echo "    .specify/marge/run-gates.sh"
 echo "    .specify/scripts/bash/speckit-commit.sh"
 

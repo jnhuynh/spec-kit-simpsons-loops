@@ -1,8 +1,8 @@
 # Phase (single-shot step)
 Skip if `spec.md` already contains a populated `## Phases` section (check for at least one `### Phase` subsection within it). Otherwise, spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/phase.md`
-- **prompt**: `Feature directory: <FEATURE_DIR>. Run non-interactively.`
+- **agent file**: `.claude/agents/single-shot.md`
+- **prompt**: `Read and follow .claude/agents/single-shot.md with SINGLE_SHOT_CONFIG — STEP_COMMAND: /speckit-phase; COMMIT_DESCRIPTION: detect deployment boundaries and generate phase annotations; FEATURE_DIR: <FEATURE_DIR>; EXTRA_INSTRUCTIONS: (none).`
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (phase) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Print: "Phase step failed. Fix the issue and re-invoke with --from phase". Suggest manual review and resuming with `--from phase`.
 

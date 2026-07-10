@@ -36,7 +36,7 @@ this project first (e.g. `specify init`), then re-run the Simpsons Loops install
 Verify that all required agent files exist before starting the pipeline. Check each of these files using the Bash tool:
 
 ```bash
-for f in reconcile specify homer phase plan tasks lisa split ralph marge; do
+for f in homer lisa ralph marge loop-orchestrator single-shot; do
   test -f ".claude/agents/${f}.md" && echo "${f}.md: EXISTS" || echo "${f}.md: MISSING"
 done
 ```
@@ -50,16 +50,12 @@ Missing: .claude/agents/<name>.md
 
 Agent files are required for pipeline sub-agents to execute. These files define
 the behavior of each pipeline phase. Ensure all agent files are present:
-  .claude/agents/reconcile.md
-  .claude/agents/specify.md
   .claude/agents/homer.md
-  .claude/agents/phase.md
-  .claude/agents/plan.md
-  .claude/agents/tasks.md
   .claude/agents/lisa.md
-  .claude/agents/split.md
   .claude/agents/ralph.md
   .claude/agents/marge.md
+  .claude/agents/loop-orchestrator.md
+  .claude/agents/single-shot.md
 ```
 
 If **all** agent files exist, proceed to the Overview section below.

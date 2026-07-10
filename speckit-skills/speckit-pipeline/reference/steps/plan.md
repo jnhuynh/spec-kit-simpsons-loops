@@ -2,7 +2,8 @@
 
 Skip if `plan.md` already exists. Otherwise, spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/plan.md`
+- **agent file**: `.claude/agents/single-shot.md`
+- **prompt**: `Read and follow .claude/agents/single-shot.md with SINGLE_SHOT_CONFIG — STEP_COMMAND: /speckit-plan; COMMIT_DESCRIPTION: generate implementation plan; FEATURE_DIR: <FEATURE_DIR>; EXTRA_INSTRUCTIONS: (none).`
 
 **Failure handling**: If the sub agent fails (crash, timeout, or error), abort the pipeline immediately. Log failure context: agent type (plan) and error message. Do NOT retry — sub agent failures in loop commands are treated as deterministic. Suggest manual review and resuming with `--from plan`.
 
