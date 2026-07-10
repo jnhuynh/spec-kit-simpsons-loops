@@ -1,8 +1,8 @@
 # Homer Clarification Mode - Spec Kit Integration
 
-Clarify spec artifacts by resolving ambiguities, unanswered questions, and unclear requirements. Fix **one finding**, then exit. Each iteration runs with FRESH CONTEXT.
+Clarify spec artifacts by resolving ambiguities, unanswered questions, and unclear requirements. Run **one full clarification session** per iteration (up to 5 questions, self-answered), then exit. Each iteration runs with FRESH CONTEXT. Loop until a fresh scan finds nothing left worth clarifying.
 
-> **Note:** One finding per iteration. Loop until zero findings remain.
+> **Note:** One clarify session per iteration. `/speckit-clarify` caps each session at 5 questions, so an iteration resolves up to 5 ambiguities.
 
 ## Feature Directory
 
@@ -10,40 +10,46 @@ The feature directory is provided in the invocation prompt (each iteration is sp
 
 ## Phase 0: Clarify
 
-Run `/speckit-clarify Remediate only the single highest-severity finding without asking for confirmation` to generate findings and auto-remediate. This produces a Specification Clarification Report with a findings table, coverage summary, and metrics, then remediates only one finding (the highest severity).
+Run `/speckit-clarify` with this argument:
+
+> Autonomous mode: no human is available. Run your ambiguity & coverage scan and queue questions as usual (up to your 5-per-session cap). For each question, adopt your own Recommended/Suggested answer immediately instead of waiting for user input, and integrate it into the spec per your integration rules (recording it under `## Clarifications`). Never re-ask anything already answered under `## Clarifications`; if a category remains Partial after a recorded answer, mark it Deferred rather than re-asking.
+
+One iteration therefore resolves up to 5 ambiguities, prioritized by the skill's own (Impact × Uncertainty) heuristic. The spec's `## Clarifications` section is the ledger — it prevents re-asking across iterations.
 
 ## Phase 1: Assess
 
-1. Review the findings from the `/speckit-clarify` report
-2. If TOTAL findings = 0, output the following promise tag and exit immediately:
+1. Review the coverage summary from the `/speckit-clarify` run
+2. If the skill reported no critical ambiguities worth formal clarification, or every taxonomy category is Clear, Resolved, or Deferred, output the following promise tag and exit — Deferred items are judgment calls left for humans or the planning phase. If this session answered questions, complete Phases 2-3 (validate + commit) FIRST, then emit the tag; exiting without committing would strand the integrated answers:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. Otherwise, confirm remediation was applied to exactly one finding
+3. Otherwise, confirm the session's answers were integrated into the spec. Report the count of categories still Outstanding as the work-remaining count.
 
 ## Phase 2: Validate
 
-1. Re-read all modified files
-2. Verify the fix resolved its finding
-3. Check no new same-or-higher severity issues were introduced
+1. Re-read the modified spec
+2. Verify each recorded answer was integrated into the relevant section (not just appended to `## Clarifications`)
+3. Check no contradictory or vague text remains where answers were integrated
 
 ## Phase 3: Commit & Exit
 
 1. Commit all changes:
    ```bash
-   bash .specify/scripts/bash/speckit-commit.sh "fix [SEVERITY] finding from spec clarification"
+   bash .specify/scripts/bash/speckit-commit.sh "clarify spec: answer N questions"
    ```
-2. Exit immediately — you will restart with fresh context for the next finding
+   (Replace N with the number of questions answered this iteration.)
+2. Exit immediately — you will restart with fresh context for the next session
 
 ## Guardrails
 
 | #   | Rule                                                                                             |
 | --- | ------------------------------------------------------------------------------------------------ |
-| 999 | **One finding per iteration** — Fix one finding, then exit                                      |
+| 999 | **One clarify session per iteration** — One full session (max 5 questions, all self-answered), then exit |
 | 998 | **Constitution is authoritative** — Never modify constitution.md; adjust spec/plan/tasks instead |
 | 997 | **Spec artifacts only** — Only modify files within the feature directory                         |
-| 996 | **Validate after remediation** — Re-read modified files and verify fix before committing         |
-| 995 | **Highest severity first** — Always target CRITICAL before HIGH before MEDIUM before LOW         |
+| 996 | **Validate after integration** — Re-read the spec and verify answers landed before committing    |
+| 995 | **Highest impact first** — Rely on the skill's own (Impact × Uncertainty) prioritization         |
+| 992 | **Never re-ask an answered question** — `## Clarifications` is the ledger; a category still Partial after a recorded answer is marked Deferred, not re-asked |
 
 ## File Paths
 

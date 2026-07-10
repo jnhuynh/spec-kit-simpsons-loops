@@ -47,10 +47,10 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 
 - Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation
 - Adjust spec, plan, or tasks instead
-- **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
-- **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
+- **Homer (clarify)** → answer up to 5 clarification questions per iteration (self-answered), loop until `ALL_FINDINGS_RESOLVED`
+- **Lisa (analyze)** → fix all auto-fixable findings per iteration, then verify with a clean re-scan, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
-- **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
+- **Marge (review)** → fix all auto-fixable code-review findings per iteration, then verify with a clean re-review, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment); a finding that reappears after being fixed is escalated to `NEEDS_HUMAN`, never re-fixed
 - **Project packs** → repo-specific continuity rules (e.g. sibling files must change together): script packs (`.specify/marge/project/*.sh`) and prose packs (`.specify/marge/project/*.md`, optionally config-backed via `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `.specify/marge/README.md`
 - Exit after each iteration — restart with fresh context
 

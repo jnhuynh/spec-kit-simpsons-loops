@@ -22,9 +22,9 @@ Set the following LOOP_CONFIG values for this execution:
 - **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
 - **PREREQ_FLAGS**: --json --require-tasks --include-tasks
 - **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
-- **MAX_ITERATIONS**: 30
+- **MAX_ITERATIONS**: 10
 - **EXTRA_PROMPT_SUFFIX**: (none)
-- **REPORT_MODE**: standard
+- **REPORT_MODE**: needs_human
 
 ## Execute
 
@@ -32,7 +32,7 @@ Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using
 
 ## Examples
 
-- `/speckit-lisa-analyze` — Auto-detect spec dir from current branch, use default max iterations (30)
+- `/speckit-lisa-analyze` — Auto-detect spec dir from current branch, use default max iterations (10)
 - `/speckit-lisa-analyze specs/003-fix-pipeline-delegation` — Run for specific spec dir
 - `/speckit-lisa-analyze 5` — Auto-detect spec dir, limit to 5 iterations
 - `/speckit-lisa-analyze specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations

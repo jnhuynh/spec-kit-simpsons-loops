@@ -1,6 +1,6 @@
 ---
 name: speckit-review
-description: Analyze a feature branch diff against baseline and project-specific review packs; optionally remediate the single highest-severity finding.
+description: Analyze a feature branch diff against baseline and project-specific review packs; optionally remediate the auto-fixable findings in severity order.
 ---
 
 ## User Input
@@ -13,12 +13,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Modes
 
-This command has two modes:
+This command has three modes:
 
 - **Report mode** (default) — analyze the diff, print a severity-ordered findings report, exit. No code changes.
-- **Remediate-one mode** — if `$ARGUMENTS` contains natural-language text like "Remediate only the single highest-severity finding" (case-insensitive), analyze AND apply a fix to the single highest-severity actionable finding, then exit.
+- **Remediate-all mode** — if `$ARGUMENTS` contains natural-language text like "Remediate all auto-fixable findings" (case-insensitive), analyze AND apply fixes to every finding not tagged `NEEDS_HUMAN`, in severity order, then exit.
+- **Remediate-one mode** — if `$ARGUMENTS` contains natural-language text like "Remediate only the single highest-severity finding" (case-insensitive), analyze AND apply a fix to the single highest-severity actionable finding, then exit. (Kept for back-compat with older installed agent copies.)
 
-Marge's loop agent invokes this in remediate-one mode. Humans typically invoke it in report mode.
+Marge's loop agent invokes this in remediate-all mode. Humans typically invoke it in report mode.
 
 ## Step 1: Determine scope
 
@@ -52,15 +53,17 @@ Read and follow `.claude/skills/speckit-review/reference/pack-execution.md` — 
 - **RUNNER_ENV**: `SPECKIT_STAGE=review SPECKIT_REPO_ROOT="$(pwd)" SPECKIT_BASE_REF="<the merge-base/base ref from Step 1>"`
 - **CONFIDENCE_RULE**: drop findings with `confidence < 70` unless `$ARGUMENTS` contains `--strict`
 
-## Step 4: Remediate (only in remediate-one mode)
+## Step 4: Remediate (remediate modes only)
 
-If in remediate-one mode:
+**Remediate-all mode:**
 
-1. Pick the single highest-severity finding that is NOT tagged `NEEDS_HUMAN`. Ties broken by confidence, then by file path.
+1. Sort the auto-fixable findings (everything NOT tagged `NEEDS_HUMAN`) in severity order: CRITICAL, HIGH, MEDIUM, LOW; confidence descending within a severity.
 2. If every finding is tagged `NEEDS_HUMAN`, skip remediation and proceed to reporting.
-3. Apply the finding's `fix` directly to the modified files. Stay inside the blast radius of the single finding — do not opportunistically refactor or fix other findings.
-4. After applying, re-read the modified files to confirm the edit is correct.
+3. Apply each finding's `fix` one at a time, in that order. Stay inside each finding's blast radius — no opportunistic refactoring beyond the listed fixes.
+4. After each edit, re-read the touched file to confirm the edit is correct before moving to the next finding.
 5. Do NOT commit. The Marge agent commits after its Phase 3 validation gate.
+
+**Remediate-one mode:** same as above, but stop after the single highest-severity auto-fixable finding (ties broken by confidence, then by file path).
 
 ## Step 5: Report
 
@@ -90,7 +93,7 @@ Rules:
 - Append a "Refuted" appendix only if refutations occurred and `--strict` is set.
 - End with a one-line summary: total counts by severity + NEEDS_HUMAN count + the command that was run.
 
-If in remediate-one mode, additionally print which finding was remediated and which files were edited, so the calling agent (Marge) can validate.
+In the remediate modes, additionally print which findings were remediated (the full list, in the order applied) and which files were edited, so the calling agent (Marge) can validate.
 
 ## Rules
 
@@ -106,4 +109,5 @@ If in remediate-one mode, additionally print which finding was remediated and wh
 - `/speckit-review pr:123` — Report mode against PR #123
 - `/speckit-review --strict` — Report mode, include low-confidence findings
 - `/speckit-review --show low` — Report mode, expand the Low bucket
-- `/speckit-review Remediate only the single highest-severity finding without asking for confirmation` — Remediate-one mode (used by Marge Phase 0)
+- `/speckit-review Remediate all auto-fixable findings in severity order without asking for confirmation` — Remediate-all mode (used by Marge Phase 0)
+- `/speckit-review Remediate only the single highest-severity finding without asking for confirmation` — Remediate-one mode (back-compat)

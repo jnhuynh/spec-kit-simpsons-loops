@@ -9,10 +9,10 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 
 | Loop     | What it does                                                                                                                                                                                        |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Homer    | Iterative spec clarification. Runs `/speckit-clarify` on `spec.md`, resolves the highest-severity ambiguity, commits, and repeats until zero findings remain.                                       |
-| Lisa     | Iterative cross-artifact analysis. Runs `/speckit-analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes the highest-severity finding, commits, and repeats until zero findings remain.            |
+| Homer    | Iterative spec clarification. Runs `/speckit-clarify` on `spec.md`, self-answers up to 5 queued questions per iteration using the skill's own recommended answers, commits, and repeats until no critical ambiguities remain — typically 2-3 iterations.  |
+| Lisa     | Iterative cross-artifact analysis. Runs `/speckit-analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes all auto-fixable findings in severity order, commits, and re-scans to verify — typically 2-3 iterations.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
-| Marge    | Iterative code review. Runs `/speckit-review` on the feature branch diff, fixes the highest-severity mechanical finding (leaves `NEEDS_HUMAN` for humans), commits, and repeats until none remain. |
+| Marge    | Iterative code review. Runs `/speckit-review` on the feature branch diff, fixes all mechanical findings in severity order (leaves `NEEDS_HUMAN` for humans), commits, and re-reviews to verify — typically 2-3 iterations. |
 | Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
 
 **Pre-pipeline:**
@@ -266,7 +266,7 @@ After Ralph has implemented the feature:
 /speckit-marge-review
 ```
 
-Marge reviews the feature branch's diff against baseline and project review packs in `.specify/marge/baseline/` and `.specify/marge/project/`, fixes the highest-severity mechanical finding per iteration, and loops until all findings are resolved or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer.
+Marge reviews the feature branch's diff against baseline and project review packs in `.specify/marge/baseline/` and `.specify/marge/project/`, fixes all mechanical findings in severity order each iteration, and loops until a fresh review comes back clean or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer, and a finding that reappears after being fixed is escalated to `NEEDS_HUMAN` instead of being re-fixed forever. Each iteration persists its findings ledger to `<FEATURE_DIR>/review-report.md`.
 
 For a single-pass report (no auto-fix), run `/speckit-review` instead.
 
@@ -374,12 +374,16 @@ Or bootstrap end-to-end from a feature description:
 
 ## How the loops work
 
+**Batch remediation** — Homer, Lisa, and Marge fix everything auto-fixable in one pass per iteration (severity order), commit, and let the next iteration's fresh scan verify. The typical shape is: iteration 1 scans and fixes all findings, iteration 2's clean scan emits the promise tag. Ralph stays one task per iteration — tasks are sized at planning time.
+
+**Reappearance guard** — Lisa and Marge persist a findings ledger (`analysis-report.md` / `review-report.md` in the feature directory) with stable IDs. A finding that reappears after being fixed is marked `reappeared` and escalated to `NEEDS_HUMAN` instead of being re-fixed — this kills fix/re-flag oscillation. Homer's ledger is the spec's own `## Clarifications` section.
+
 **Completion detection** — Each loop looks for promise tags in the output:
 
 - Homer / Lisa / Marge: `<promise>ALL_FINDINGS_RESOLVED</promise>`
 - Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
 
-**Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling.
+**Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling. Count-based stall and oscillation detectors back this up.
 
 **Logging** — All iterations are logged to `.specify/logs/` with timestamps (e.g. `ralph-20260218-130522.log`).
 
@@ -415,10 +419,10 @@ This project uses itself to build itself — simpsons-loops builds simpsons-loop
 
 | Loop  | Default               |
 | ----- | --------------------- |
-| Homer | 30                    |
-| Lisa  | 30                    |
+| Homer | 10                    |
+| Lisa  | 10                    |
 | Ralph | incomplete tasks + 10 |
-| Marge | 30                    |
+| Marge | 10                    |
 
 All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit-homer-clarify 5`).
 

@@ -22,7 +22,7 @@ Set the following LOOP_CONFIG values for this execution:
 - **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
 - **PREREQ_FLAGS**: --json --paths-only
 - **REQUIRED_ARTIFACTS**: spec.md
-- **MAX_ITERATIONS**: 30
+- **MAX_ITERATIONS**: 10
 - **EXTRA_PROMPT_SUFFIX**: (none)
 - **REPORT_MODE**: standard
 
@@ -32,7 +32,7 @@ Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using
 
 ## Examples
 
-- `/speckit-homer-clarify` — Auto-detect spec dir from current branch, use default max iterations (30)
+- `/speckit-homer-clarify` — Auto-detect spec dir from current branch, use default max iterations (10)
 - `/speckit-homer-clarify specs/003-fix-pipeline-delegation` — Run for specific spec dir
 - `/speckit-homer-clarify 5` — Auto-detect spec dir, limit to 5 iterations
 - `/speckit-homer-clarify specs/003-fix-pipeline-delegation 5` — Specific spec dir with 5 max iterations
