@@ -56,28 +56,15 @@ Read the following files if they exist:
 
 1. `.specify/memory/constitution.md` — project principles
 2. `CLAUDE.md` at repo root — project guidelines
-3. Every `*.md` file under `.specify/marge/baseline/` and `.specify/marge/project/` — all prose packs (baseline + project)
 
-If `.specify/marge/baseline/` is empty or missing, abort: "No baseline review packs found at `.specify/marge/baseline/`. Run `setup.sh` to install baseline packs." (`.specify/marge/project/` may be absent — project packs are optional.)
+## Step 4: Run the pack engine (human-judgment lens)
 
-## Step 4: Analyze for human-judgment findings
+Read and follow `.claude/skills/speckit-review/reference/pack-execution.md` — the shared engine that discovers packs, runs them sequentially with corroborate/refute, runs script packs, and aggregates. Provide it:
 
-Run packs sequentially via sub agents (same pattern as `/speckit-review` Step 4). For each pack, spawn a fresh sub agent via the **Agent tool** (`subagent_type: general-purpose`).
-
-**Execution order:**
-1. Baseline packs (`baseline/*.md`) first, alphabetically by filename
-2. Project packs (`project/*.md`) after baseline, alphabetically
-
-Findings from a **project pack** (anything under `project/`) are tagged `PROJECT_GATE` by location — instruct the sub agent to add `PROJECT_GATE` to every finding it emits for a `project/` pack. These are always surfaced (Step 6), even when mechanical.
-
-Each sub agent receives:
-- The PR diff
-- The file list
-- The pack's full text
-- Every prior pack's findings (aggregated so far)
-- Constitution + CLAUDE.md content as context
-
-**Critical instruction to each sub agent:**
+- **DIFF** / **FILE_LIST**: the PR diff and file list from Step 2
+- **PER_PACK_INSTRUCTION**: the blockquote below — it restricts every pack to human-judgment findings
+- **RUNNER_ENV**: `SPECKIT_STAGE=review SPECKIT_REPO_ROOT="$(pwd)" SPECKIT_BASE_REF="$BASE_REF" SPECKIT_DIFF_FILES="$(gh pr diff "$PR_NUMBER" --name-only)"` — the PR diff comes from `gh`, not local git, so the changed files are passed explicitly
+- **CONFIDENCE_RULE**: drop findings with `confidence < 70`
 
 > You are analyzing for findings that require HUMAN JUDGMENT. Mechanical issues (style, linting, common bugs with obvious fixes) are handled by Marge's auto-fix loop and MUST NOT be flagged. Focus exclusively on:
 >
@@ -89,46 +76,7 @@ Each sub agent receives:
 >
 > For packs that contain both mechanical and judgment rules, ONLY flag findings tagged `NEEDS_HUMAN` in the pack's rule definitions — EXCEPT `PROJECT_GATE` findings, which are always flagged. Skip all others.
 
-Each sub agent must return findings in this shape:
-
-```
-- file: <path>:<line>
-  severity: CRITICAL | HIGH | MEDIUM | LOW
-  confidence: <0–100>
-  pack: <pack filename>
-  rule: <rule name from the pack>
-  issue: <one-line description>
-  fix: <concrete suggestion if a safe fix exists, otherwise omit>
-  tags: [NEEDS_HUMAN]
-  corroborates: <prior finding id>?
-  refutes: <prior finding id>?
-```
-
-**Strict sequential execution**: wait for one pack to return before spawning the next. Later packs see earlier findings and can corroborate / refute.
-
-## Step 4b: Run script packs
-
-Run project **script packs** via the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/README.md`), so deterministic continuity findings reach out-of-band reviewers. Same runner as `/speckit-review` Step 4b, with PR scope — pass the PR's changed files explicitly (the PR diff comes from `gh`, not local git):
-
-```bash
-SPECKIT_STAGE=review \
-SPECKIT_REPO_ROOT="$(pwd)" \
-SPECKIT_BASE_REF="$BASE_REF" \
-SPECKIT_DIFF_FILES="$(gh pr diff "$PR_NUMBER" --name-only)" \
-bash .specify/marge/run-gates.sh
-```
-
-Treat stdout as script-pack findings (same shape as Step 4; each carries `pack: project/<name>` and `PROJECT_GATE`; a failed pack appears as one `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Append to the aggregated findings, then continue to Step 5.
-
-## Step 5: Aggregate
-
-1. Apply `corroborates:` — merge into the prior finding, bump its confidence by +10 (cap 100).
-2. Apply `refutes:` — drop the refuted finding.
-3. Dedupe any remaining pairs at the same `file:line` with similar issue text. Keep the higher-confidence one.
-4. Filter findings with `confidence < 70`.
-5. Sort by severity descending, then confidence descending within each severity.
-
-## Step 6: Map to PR severity
+## Step 5: Map to PR severity
 
 Map the pack-native severity to the three-tier PR comment scheme:
 
@@ -143,7 +91,7 @@ Map the pack-native severity to the three-tier PR comment scheme:
 
 Findings from `one-way-doors.md` and `concurrency.md` packs, and ALL findings tagged `PROJECT_GATE` (every project pack — prose and script), are always kept regardless of the NEEDS_HUMAN tag — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
 
-## Step 7: Check idempotency
+## Step 6: Check idempotency
 
 Before posting, check if a prior review from this command exists:
 
@@ -157,9 +105,9 @@ Parse the sentinel: `<!-- speckit-review-pr sha:<SHA> -->`
 - If a prior review exists with a **different SHA**: proceed to post a new review. Note in the summary that this supersedes the prior review.
 - If no prior review exists: proceed to post.
 
-## Step 8: Post PR review
+## Step 7: Post PR review
 
-**If `--dry-run`:** print findings to terminal in the same format as `/speckit-review` Step 7 and exit. Do NOT post to GitHub.
+**If `--dry-run`:** print findings to terminal in the same format as `/speckit-review`'s Report step and exit. Do NOT post to GitHub.
 
 **If posting:** build and submit a GitHub PR review.
 
@@ -235,7 +183,7 @@ echo '$JSON_PAYLOAD' | gh api "repos/$REPO/pulls/$PR_NUMBER/reviews" --method PO
 
 The `line` field must reference the line number in the final version of the file (the `+` side of the diff, `side: RIGHT`). If a finding references a line that is not part of the diff (pre-existing code not touched by this PR), fall back to a file-level comment by omitting the `line` and `side` fields (GitHub posts it as a general file comment).
 
-## Step 9: Report
+## Step 8: Report
 
 Print a terminal summary:
 
