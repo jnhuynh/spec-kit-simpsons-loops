@@ -256,10 +256,7 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 
 ### Step 4: Configuration
 
-- Homer max iterations: **30**
-- Lisa max iterations: **30**
-- Ralph max iterations: **incomplete_tasks + 10** (count `- [ ]` lines in tasks.md at the start of the ralph step, then add 10)
-- Marge max iterations: **30**
+Loop iteration limits are owned by each loop's standalone skill (the `LOOP_CONFIG` in `.claude/skills/speckit-<loop>-*/SKILL.md`); ralph's is dynamic (incomplete tasks + 10). The loop playbooks defer to those skills — the pipeline does not restate the limits.
 
 ### Step 4b: Execution Plan Announcement
 
@@ -277,6 +274,8 @@ The step names in the plan are joined with ` -> `. Only include steps from the s
 **CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Agent tool call MUST return before the next one is spawned. Never use parallel Agent calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
 
 **POST-STEP STOP CHECK**: After each step completes (whether it was executed or skipped because its artifact already existed), if `STOP_AFTER_STEP` is set and equals the current step name, output the stop message and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). Each step's playbook (see the Step 5 list below) includes the specific stop check with the exact message to output.
+
+**FAILURE HANDLING (all steps)**: If a required step's sub agent fails (crash, timeout, or error), or a loop step aborts (stuck, stalled, oscillating, max iterations, or sub-agent failure), abort the pipeline immediately. Log the step name and the error. Do NOT retry — sub agent failures are treated as deterministic. Suggest manual review and resuming with `--from <step>`. Exception: the optional polish steps (simplify, security-review, pr-review) log the failure and continue, per their playbooks.
 
 For each step (starting from the detected/specified step), spawn fresh sub agents using the **Agent tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
 

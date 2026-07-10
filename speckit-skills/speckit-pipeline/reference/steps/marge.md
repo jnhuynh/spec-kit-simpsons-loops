@@ -1,29 +1,11 @@
 # Marge (loop step)
 
-**Diff existence check**: Confirm there is a diff to review. Run `git diff --quiet $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main)...HEAD` via Bash tool; if the command exits 0 (no diff), abort: "No changes detected between the feature branch and main. Nothing to review."
+Run the Marge loop exactly as its standalone skill defines it: read and follow `.claude/skills/speckit-marge-review/SKILL.md`, passing `<FEATURE_DIR>` through as the skill's spec-dir argument. The skill owns the review-skill pre-flight, diff existence check, quality-gate validation, LOOP_CONFIG (including MAX_ITERATIONS), the end-of-loop full quality gate, and review report verification.
 
-Execute the Marge loop using the shared loop orchestrator. Read and follow `.claude/agents/loop-orchestrator.md` with this LOOP_CONFIG:
+**Pipeline deltas**:
 
-- **AGENT_NAME**: marge
-- **AGENT_DISPLAY_NAME**: Marge
-- **AGENT_FILE**: .claude/agents/marge.md
-- **SLASH_COMMAND_REF**: /speckit-review
-- **PROMISE_TAG**: ALL_FINDINGS_RESOLVED
-- **PREREQ_FLAGS**: --json --require-tasks --include-tasks
-- **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
-- **MAX_ITERATIONS**: 30 (or marge max from Step 4)
-- **EXTRA_PROMPT_SUFFIX**: (none)
-- **REPORT_MODE**: needs_human
-
-Skip the orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
-
-**End-of-loop full quality gate**: When the marge loop exits via the success path (all findings resolved), run the full gate once via Bash tool:
-
-```bash
-bash .specify/quality-gates.sh
-```
-
-If it exits non-zero, set the pipeline completion status to **failure** with reason "marge end-of-loop full quality gates failed", surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run this gate on max-iterations, stuck, or failure exits.
+- Skip the loop orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from the orchestrator's Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
+- If the skill reports **failure** (loop abort, or its end-of-loop full quality gate failed), set the pipeline completion status to **failure** with the skill's reason, surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run the manifest update below on failure exits — the phase is not complete.
 
 **Post-marge manifest update (child specs only)**: When the marge loop exits via the success path (all findings resolved) AND the full quality gate passes, update the parent manifest to mark this phase as "Complete". Skip this entirely if FEATURE_DIR does not match the `--p{N}-` pattern (not a child spec).
 
@@ -55,6 +37,3 @@ Phase Status Summary (parent: {PARENT_DIR}):
 ```
 
 Use dot-padding to align status values. Mark the phase that was just completed with `<-- complete`.
-
-**Failure handling**: If the loop aborts (stuck, stalled, oscillating, or sub agent failure), abort the pipeline immediately. Do NOT run the manifest update on failure exits — the phase is not complete. Suggest manual review and resuming with `--from marge`.
-
