@@ -190,6 +190,7 @@ cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
 cp "$SCRIPT_DIR/claude-agents/single-shot.md"                   "$PROJECT_DIR/.claude/agents/single-shot.md"
+cp "$SCRIPT_DIR/claude-agents/findings-ledger.md"               "$PROJECT_DIR/.claude/agents/findings-ledger.md"
 cp "$SCRIPT_DIR/claude-agents/loop-orchestrator.md"             "$PROJECT_DIR/.claude/agents/loop-orchestrator.md"
 
 # Remove per-step single-shot agents superseded by single-shot.md
@@ -244,6 +245,7 @@ echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
 echo "    .claude/agents/single-shot.md"
+echo "    .claude/agents/findings-ledger.md"
 echo "    .claude/agents/loop-orchestrator.md"
   for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
     echo "    .claude/skills/$(basename "$skill_src")/"

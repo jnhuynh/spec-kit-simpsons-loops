@@ -13,22 +13,25 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Flight: Review Skill Check
 
-Verify that the single-pass review skill exists. Marge's Phase 0 delegates to it:
+Verify that the single-pass review skill exists. Marge's review phase delegates to it:
 
 ```bash
 if test -f ".claude/skills/speckit-review/SKILL.md"; then echo "speckit-review: EXISTS"; else echo "speckit-review: MISSING"; fi
+if test -f ".claude/agents/findings-ledger.md"; then echo "findings-ledger: EXISTS"; else echo "findings-ledger: MISSING"; fi
 ```
 
-If **MISSING**, display this error and **STOP**:
+If either is **MISSING**, display this error and **STOP**:
 
 ```
-ERROR: Required /speckit-review definition not found.
+ERROR: Required file(s) not found.
 
-Missing: .claude/skills/speckit-review/SKILL.md
+Missing: <the missing path(s)>
 
-Marge invokes /speckit-review during Phase 0 to generate findings.
-Ensure the skill is installed at:
+Marge invokes /speckit-review during its review phase to generate findings, and
+follows the shared ledger protocol in .claude/agents/findings-ledger.md for
+reappearance detection. Run setup.sh to (re)install:
   .claude/skills/speckit-review/SKILL.md
+  .claude/agents/findings-ledger.md
 ```
 
 ## Pre-Loop: Diff Existence Check
@@ -108,20 +111,9 @@ If it exits zero, proceed to review report verification.
 
 After the loop completes, confirm `<FEATURE_DIR>/review-report.md` exists and was written by the final sub agent — the persisted review report is the audit trail of what was found and fixed, and the ledger the next Marge run uses for reappearance detection. If the file is absent after the loop completes, surface this as a failure and instruct the user to re-run `/speckit-marge-review`.
 
-## Persisted Review Report (FR-012a)
+## Persisted Review Report
 
-Every iteration of this loop spawns a Marge sub agent (per `.claude/agents/marge.md`) that MUST overwrite `<FEATURE_DIR>/review-report.md` before exiting. This command does NOT write the file directly; it relies on the agent's persistence contract documented in the **Persisted Review Report** section of `.claude/agents/marge.md` (sourced from `claude-agents/marge.md`).
-
-The persisted report is the single source of truth downstream steps consume for per-phase gating decisions. The **Persisted Review Report** section of `.claude/agents/marge.md` (sourced from `claude-agents/marge.md`) is the authoritative contract. In summary:
-
-- A single GitHub Flavored Markdown table with the **exact** header row `| ID | Severity | Phase | Status | Check Pack | Summary |` in that order.
-- Stable per-finding `ID` values reused across runs against the same branch state.
-- `Severity` is one of `critical`, `high`, `medium`, `low`.
-- `Phase` is the integer phase number for multi-phase findings attributable to a single phase, or the literal `-` for single-phase findings or multi-phase non-attributable structural inconsistencies.
-- `Status` is one of `open`, `fixed`, `resolved`, `reappeared`, `needs_human` — `open` for new findings, `fixed` once remediated this iteration, `resolved` when a later pass confirms the issue gone; `reappeared` (regenerated after a fix — never auto-fixed again) and `needs_human` are terminal.
-- `Check Pack` is the source check pack filename (informational; not used for gating).
-- `Summary` is a single-sentence human-readable description; pipe characters in cell values MUST be escaped as `\|` so `awk -F '|'` parses cleanly.
-- The file is overwritten in full on every Marge run (never appended to).
+Every iteration of this loop spawns a Marge sub agent (per `.claude/agents/marge.md`) that MUST overwrite `<FEATURE_DIR>/review-report.md` before exiting. This command does NOT write the file directly. The authoritative schema and status lifecycle live in the shared ledger protocol `.claude/agents/findings-ledger.md` (sourced from `claude-agents/findings-ledger.md`), which `claude-agents/marge.md` configures with `REPORT_FILE: <FEATURE_DIR>/review-report.md`. The report is the audit trail of what was found and fixed, and the ledger the next Marge run loads for reappearance detection — do not restate its schema here.
 
 The orchestrator MUST treat absence of `<FEATURE_DIR>/review-report.md` after the loop completes as a Marge failure — without it the next Marge run has no ledger for reappearance detection.
 

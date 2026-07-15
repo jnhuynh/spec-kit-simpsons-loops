@@ -12,7 +12,7 @@ The feature directory and quality gates are provided in the invocation prompt (e
 
 ## Phase 0: Orient
 
-0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`)
+0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`). Report the total count of incomplete tasks (including this one) as the work-remaining count in your final output — the orchestrator's stall detection depends on it.
 
 0b. If NO incomplete tasks remain (no `- [ ]` in tasks.md), output the following promise tag and exit immediately:
 

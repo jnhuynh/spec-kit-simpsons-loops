@@ -143,6 +143,7 @@ cp <path-to-simpsons-loops>/claude-agents/lisa.md   .claude/agents/lisa.md
 cp <path-to-simpsons-loops>/claude-agents/marge.md  .claude/agents/marge.md
 cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
 cp <path-to-simpsons-loops>/claude-agents/single-shot.md .claude/agents/single-shot.md
+cp <path-to-simpsons-loops>/claude-agents/findings-ledger.md .claude/agents/findings-ledger.md
 cp <path-to-simpsons-loops>/claude-agents/loop-orchestrator.md .claude/agents/loop-orchestrator.md
 
 # Loop skills -> .claude/skills/ (each skill is a directory; reference/ files ride along)
@@ -193,8 +194,6 @@ chmod +x .specify/scripts/bash/speckit-commit.sh
 *.marge-prompt.md*
 *.marge-prev-output*
 *.marge-state*
-
-.specify/logs/          # All log files
 ```
 
 #### 3. Create quality gates file
@@ -384,8 +383,6 @@ Or bootstrap end-to-end from a feature description:
 - Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
 
 **Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling. Count-based stall and oscillation detectors back this up.
-
-**Logging** — All iterations are logged to `.specify/logs/` with timestamps (e.g. `ralph-20260218-130522.log`).
 
 ## Customization
 

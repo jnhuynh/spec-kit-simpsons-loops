@@ -12,18 +12,19 @@ The feature directory is provided in the invocation prompt (each iteration is sp
 
 Run `/speckit-clarify` with this argument:
 
-> Autonomous mode: no human is available. Run your ambiguity & coverage scan and queue questions as usual (up to your 5-per-session cap). For each question, adopt your own Recommended/Suggested answer immediately instead of waiting for user input, and integrate it into the spec per your integration rules (recording it under `## Clarifications`). Never re-ask anything already answered under `## Clarifications`; if a category remains Partial after a recorded answer, mark it Deferred rather than re-asking.
+> Autonomous mode: no human is available. Run your ambiguity & coverage scan and queue questions as usual (up to your 5-per-session cap). For each question, adopt your own Recommended/Suggested answer immediately instead of waiting for user input, and integrate it into the spec per your integration rules (recording it under `## Clarifications`). Never re-ask anything already answered under `## Clarifications`; if a category remains Partial after a recorded answer, mark it Deferred rather than re-asking. In your coverage summary, distinguish WHY a category is Deferred: "Deferred (planning)" for items better suited to the planning phase or already answered, vs "Deferred (quota)" for categories skipped only because the 5-question session cap was reached.
 
 One iteration therefore resolves up to 5 ambiguities, prioritized by the skill's own (Impact × Uncertainty) heuristic. The spec's `## Clarifications` section is the ledger — it prevents re-asking across iterations.
 
 ## Phase 1: Assess
 
 1. Review the coverage summary from the `/speckit-clarify` run
-2. If the skill reported no critical ambiguities worth formal clarification, or every taxonomy category is Clear, Resolved, or Deferred, output the following promise tag and exit — Deferred items are judgment calls left for humans or the planning phase. If this session answered questions, complete Phases 2-3 (validate + commit) FIRST, then emit the tag; exiting without committing would strand the integrated answers:
+2. Categories deferred ONLY because the session quota was reached ("Deferred (quota)") are NOT terminal — they are unresolved work for the next iteration. Count them as Outstanding.
+3. If the skill reported no critical ambiguities worth formal clarification, or every taxonomy category is Clear, Resolved, or Deferred (planning) — with no Outstanding and no quota-deferred categories — output the following promise tag and exit. Deferred (planning) items are judgment calls left for humans or the planning phase; list them in your final report so they surface. If this session answered questions, complete Phases 2-3 (validate + commit) FIRST, then emit the tag; exiting without committing would strand the integrated answers:
 
 <promise>ALL_FINDINGS_RESOLVED</promise>
 
-3. Otherwise, confirm the session's answers were integrated into the spec. Report the count of categories still Outstanding as the work-remaining count.
+4. Otherwise, confirm the session's answers were integrated into the spec. Report the count of Outstanding categories (including quota-deferred ones) as the work-remaining count and exit — the next iteration's session picks them up.
 
 ## Phase 2: Validate
 
