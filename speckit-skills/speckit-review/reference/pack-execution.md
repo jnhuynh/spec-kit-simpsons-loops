@@ -49,8 +49,8 @@ Each sub agent must return findings in this shape (one per finding):
   pack: <pack filename>
   rule: <rule name from the pack>
   issue: <one-line description>
-  fix: <concrete suggestion; omit if no safe fix exists>
-  tags: [PROJECT_GATE?, NEEDS_HUMAN?]   # PROJECT_GATE auto-added for project/ packs; NEEDS_HUMAN if it needs judgment
+  fix: <concrete suggestion; omit ONLY if no safe fix exists>
+  tags: [PROJECT_GATE?, NEEDS_HUMAN?]   # PROJECT_GATE auto-added for project/ packs; NEEDS_HUMAN if it needs judgment. A finding WITHOUT a fix MUST carry NEEDS_HUMAN — fix-less untagged findings are unremediable and stall remediation loops.
   corroborates: <prior finding id>?   # if duplicates an earlier finding — merges
   refutes: <prior finding id>?        # if refutes an earlier finding — drops it
 ```

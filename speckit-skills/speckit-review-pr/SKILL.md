@@ -16,6 +16,25 @@ You **MUST** consider the user input before proceeding (if not empty).
 - **Post mode** (default) — analyze the diff, post findings as a GitHub PR review with inline comments.
 - **Dry-run mode** — if `$ARGUMENTS` contains `--dry-run`, analyze and print findings to terminal without posting to GitHub.
 
+## Pre-Flight: Pack Engine Check
+
+Step 4 delegates to the shared pack-execution engine installed with the `speckit-review` skill:
+
+```bash
+if test -f ".claude/skills/speckit-review/reference/pack-execution.md"; then echo "pack-execution: EXISTS"; else echo "pack-execution: MISSING"; fi
+```
+
+If **MISSING**, display this error and **STOP**:
+
+```
+ERROR: Required pack-execution engine not found.
+
+Missing: .claude/skills/speckit-review/reference/pack-execution.md
+
+/speckit-review-pr runs review packs via the engine shipped with the
+speckit-review skill. Install both skills together (run setup.sh), then re-run.
+```
+
 ## Step 1: Resolve PR
 
 Determine the PR to review:
@@ -63,7 +82,7 @@ Read and follow `.claude/skills/speckit-review/reference/pack-execution.md` — 
 
 - **DIFF** / **FILE_LIST**: the PR diff and file list from Step 2
 - **PER_PACK_INSTRUCTION**: the blockquote below — it restricts every pack to human-judgment findings
-- **RUNNER_ENV**: `SPECKIT_STAGE=review SPECKIT_REPO_ROOT="$(pwd)" SPECKIT_BASE_REF="$BASE_REF" SPECKIT_DIFF_FILES="$(gh pr diff "$PR_NUMBER" --name-only)"` — the PR diff comes from `gh`, not local git, so the changed files are passed explicitly
+- **RUNNER_ENV**: `SPECKIT_STAGE=review SPECKIT_REPO_ROOT="$(pwd)" SPECKIT_BASE_REF="<base ref>" SPECKIT_DIFF_FILES="$(gh pr diff <number> --name-only)"` — substitute the LITERAL base ref and PR number captured in Step 1 (each Bash call is a fresh shell; `$BASE_REF`/`$PR_NUMBER` are not set there). The PR diff comes from `gh`, not local git, so the changed files are passed explicitly. Before running the engine's script-pack step, verify the substituted `gh pr diff <number> --name-only` output is non-empty — if it fails or is empty, abort rather than letting script packs silently pass on an empty file list.
 - **CONFIDENCE_RULE**: drop findings with `confidence < 70`
 
 > You are analyzing for findings that require HUMAN JUDGMENT. Mechanical issues (style, linting, common bugs with obvious fixes) are handled by Marge's auto-fix loop and MUST NOT be flagged. Focus exclusively on:

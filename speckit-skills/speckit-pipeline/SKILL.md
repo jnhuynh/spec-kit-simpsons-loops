@@ -33,32 +33,33 @@ this project first (e.g. `specify init`), then re-run the Simpsons Loops install
 
 ## Agent File Check
 
-Verify that all required agent files exist before starting the pipeline. Check each of these files using the Bash tool:
+Verify that all required agent files AND the loop skills the step playbooks delegate to exist before starting the pipeline. Check via the Bash tool:
 
 ```bash
-for f in homer lisa ralph marge loop-orchestrator single-shot; do
+for f in homer lisa ralph marge loop-orchestrator single-shot findings-ledger; do
   test -f ".claude/agents/${f}.md" && echo "${f}.md: EXISTS" || echo "${f}.md: MISSING"
+done
+for s in speckit-homer-clarify speckit-lisa-analyze speckit-ralph-implement speckit-marge-review; do
+  test -f ".claude/skills/${s}/SKILL.md" && echo "${s}: EXISTS" || echo "${s}: MISSING"
 done
 ```
 
-If **any** agent file is MISSING, display this error and **STOP** — do not proceed with pipeline execution:
+If **any** file is MISSING, display this error and **STOP** — do not proceed with pipeline execution:
 
 ```
-ERROR: Required agent file(s) not found.
+ERROR: Required agent or loop-skill file(s) not found.
 
-Missing: .claude/agents/<name>.md
+Missing: <the missing path(s)>
 
-Agent files are required for pipeline sub-agents to execute. These files define
-the behavior of each pipeline phase. Ensure all agent files are present:
-  .claude/agents/homer.md
-  .claude/agents/lisa.md
-  .claude/agents/ralph.md
-  .claude/agents/marge.md
-  .claude/agents/loop-orchestrator.md
-  .claude/agents/single-shot.md
+Agent files define the behavior of each pipeline phase; the loop-step playbooks
+delegate to the loop skills. Ensure all are present:
+  .claude/agents/{homer,lisa,ralph,marge,loop-orchestrator,single-shot,findings-ledger}.md
+  .claude/skills/speckit-{homer-clarify,lisa-analyze,ralph-implement,marge-review}/SKILL.md
+
+Run setup.sh to (re)install them.
 ```
 
-If **all** agent files exist, proceed to the Overview section below.
+If **all** exist, proceed to the Overview section below.
 
 ## Overview
 

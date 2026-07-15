@@ -7,7 +7,7 @@
 # `pack-execution` meta-finding instead of aborting. ONLY findings go to stdout
 # (diagnostics, if any, go to stderr). Contract: .specify/marge/README.md.
 #
-# Called by /speckit.review and /speckit.review.pr (SPECKIT_STAGE=review) and by
+# Called by /speckit-review and /speckit-review-pr (SPECKIT_STAGE=review) and by
 # the Lisa planning agent (SPECKIT_STAGE=planning). Callers set the stage-scoped
 # env; this runner passes it through to each script pack unchanged.
 set -euo pipefail

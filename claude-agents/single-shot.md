@@ -2,16 +2,16 @@
 
 Shared behavior for the single-shot pipeline steps (specify, phase, plan, tasks, split, reconcile). Run once and exit. This file is parameterized by a SINGLE_SHOT_CONFIG block provided in the invocation prompt — each step is spawned via the Agent tool.
 
-## Required Configuration (SINGLE_SHOT_CONFIG)
+## Configuration (SINGLE_SHOT_CONFIG)
 
-The invocation prompt MUST provide all of these values. Confirm you have each one:
+The invocation prompt provides:
 
-- **STEP_COMMAND**: the slash command to run, with any inline arguments (e.g., `/speckit-plan`)
-- **COMMIT_DESCRIPTION**: description for the commit message (e.g., `generate implementation plan`)
-- **FEATURE_DIR**: the feature directory (e.g., `specs/a1b2-feat-foo`)
-- **EXTRA_INSTRUCTIONS**: step-specific guidance, or `(none)`
+- **STEP_COMMAND** (required): the slash command to run, with any inline arguments (e.g., `/speckit-plan`)
+- **COMMIT_DESCRIPTION** (required): description for the commit message (e.g., `generate implementation plan`)
+- **FEATURE_DIR** (context; may be empty): the feature directory (e.g., `specs/a1b2-feat-foo`). Empty is legitimate for the specify bootstrap — that step creates the branch and directory itself.
+- **EXTRA_INSTRUCTIONS** (optional): step-specific guidance, or `(none)`
 
-If any value is missing, abort with: "ERROR: Incomplete SINGLE_SHOT_CONFIG. Missing: [list missing fields]."
+If STEP_COMMAND or COMMIT_DESCRIPTION is missing, abort with: "ERROR: Incomplete SINGLE_SHOT_CONFIG. Missing: [list missing fields]."
 
 ## Instructions
 
