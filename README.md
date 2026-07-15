@@ -413,7 +413,7 @@ npm test && npm run lint
 
 ### Dogfooding
 
-This project uses itself to build itself — simpsons-loops builds simpsons-loops. The shellcheck quality gate ensures that every Ralph implementation iteration produces clean, lint-free shell scripts before committing.
+This repo can run its own loops on itself: run `bash setup.sh --self` to install the current source into the repo's `.claude/` and `.specify/`. The installed copies are gitignored — dogfood locally, but never commit the output; the non-hidden source directories are the only source of truth.
 
 ### Max iterations
 
