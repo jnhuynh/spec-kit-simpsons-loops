@@ -1,6 +1,6 @@
 # Marge review packs
 
-Marge (`/speckit.review`) and Lisa (`/speckit.lisa.analyze`) find issues by running **packs** against a code diff or a spec. This directory holds them.
+Marge (`/speckit-review`) and Lisa (`/speckit-lisa-analyze`) find issues by running **packs** against a code diff or a spec. This directory holds them.
 
 ## Glossary — read this first
 
@@ -12,7 +12,7 @@ Three terms get confused because they share words. They are different things:
 
   The directory is the origin; the extension is the mode — never the reverse.
 
-- **`PROJECT_GATE`** — a *tag* a finding carries, not a file and not a directory. It marks the finding as a repo-specific continuity rule (e.g. "these sibling files must change together") rather than a generic code-quality issue. **It is derived from location:** every finding from a pack under `project/` carries it; findings from `baseline/` never do. Its one effect: `/speckit.review.pr` always posts `PROJECT_GATE` findings as inline comments, even mechanical ones. Orthogonal to mode — both prose and script packs carry it, though they get it differently: a prose pack has it **stamped automatically**, a script pack **writes it into its own YAML** (see Authoring).
+- **`PROJECT_GATE`** — a *tag* a finding carries, not a file and not a directory. It marks the finding as a repo-specific continuity rule (e.g. "these sibling files must change together") rather than a generic code-quality issue. **It is derived from location:** every finding from a pack under `project/` carries it; findings from `baseline/` never do. Its one effect: `/speckit-review-pr` always posts `PROJECT_GATE` findings as inline comments, even mechanical ones. Orthogonal to mode — both prose and script packs carry it, though they get it differently: a prose pack has it **stamped automatically**, a script pack **writes it into its own YAML** (see Authoring).
 
 - **Quality gate** (`.specify/quality-gates.sh`) — **unrelated to the above.** The CI-style lint / test / type-check script whose non-zero exit reverts a fix and can stop the Ralph and Marge loops. Pass/fail, not findings. Not a pack, not a `PROJECT_GATE`. Named here only to retire the collision: inside this directory, "gate" never means a pack — it survives only in the tag name `PROJECT_GATE` and in "quality gate."
 
@@ -31,9 +31,9 @@ There are deliberately **no READMEs inside `baseline/` or `project/`**: the loop
 
 ## Where packs run (venues)
 
-- **Marge** — `/speckit.review` runs every `baseline/` and `project/` pack against the branch diff. *(default)*
-- **PR review** — `/speckit.review.pr` posts `PROJECT_GATE` findings as inline GitHub comments. Generic findings Marge already fixed are dropped there; `PROJECT_GATE` findings are always kept, because an out-of-band reviewer cannot otherwise see them.
-- **Lisa** — `/speckit.lisa.analyze` (planning) runs only the packs that opt into the planning stage, against `spec.md` / `plan.md` / `tasks.md`, before code exists.
+- **Marge** — `/speckit-review` runs every `baseline/` and `project/` pack against the branch diff. *(default)*
+- **PR review** — `/speckit-review-pr` posts `PROJECT_GATE` findings as inline GitHub comments. Generic findings Marge already fixed are dropped there; `PROJECT_GATE` findings are always kept, because an out-of-band reviewer cannot otherwise see them.
+- **Lisa** — `/speckit-lisa-analyze` (planning) runs only the packs that opt into the planning stage, against `spec.md` / `plan.md` / `tasks.md`, before code exists.
 
 Script packs are repo-committed shell, executed locally by whoever runs a review. Checking out a branch and reviewing it runs that branch's script packs — the same trust model as running its tests. Read script-pack changes in untrusted PRs before invoking the runner.
 
@@ -61,7 +61,7 @@ Both modes emit a YAML sequence; each item:
                                 # emitted by you for script packs. Add NEEDS_HUMAN for judgment.
 ```
 
-`PROJECT_GATE` marks the finding as a project-continuity rule. Add `NEEDS_HUMAN` when resolution needs human judgment — Marge then leaves it for `/speckit.review.pr` instead of auto-fixing. `PROJECT_GATE` alone does **not** stop auto-remediation; Marge still auto-fixes a mechanical `PROJECT_GATE` finding.
+`PROJECT_GATE` marks the finding as a project-continuity rule. Add `NEEDS_HUMAN` when resolution needs human judgment — Marge then leaves it for `/speckit-review-pr` instead of auto-fixing. `PROJECT_GATE` alone does **not** stop auto-remediation; Marge still auto-fixes a mechanical `PROJECT_GATE` finding.
 
 > Derivation, by mode. For **prose packs**, the review/planning command stamps `PROJECT_GATE` on every finding because the pack lives under `project/` — you do not write the tag yourself. For **script packs**, the runner passes your stdout through verbatim (it does not parse or rewrite YAML), so you emit `tags: [PROJECT_GATE]` yourself; the template below already does.
 

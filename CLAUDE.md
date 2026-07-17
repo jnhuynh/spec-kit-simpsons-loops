@@ -47,11 +47,11 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 
 - Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation
 - Adjust spec, plan, or tasks instead
-- **Homer (clarify)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
-- **Lisa (analyze)** → fix one finding per iteration, loop until `ALL_FINDINGS_RESOLVED`
+- **Homer (clarify)** → answer up to 5 clarification questions per iteration (self-answered), loop until `ALL_FINDINGS_RESOLVED`
+- **Lisa (analyze)** → fix all auto-fixable findings per iteration, then verify with a clean re-scan, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
-- **Marge (review)** → fix one code-review finding per iteration, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment)
-- **Project packs** → repo-specific continuity rules (e.g. sibling files must change together): script packs (`.specify/marge/project/*.sh`) and prose packs (`.specify/marge/project/*.md`, optionally config-backed via `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `.specify/marge/README.md`
+- **Marge (review)** → fix all auto-fixable code-review findings per iteration, then verify with a clean re-review, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment); a finding that reappears after being fixed is escalated to `NEEDS_HUMAN`, never re-fixed
+- **Project packs** → repo-specific continuity rules (e.g. sibling files must change together): script packs (`.specify/marge/project/*.sh`) and prose packs (`.specify/marge/project/*.md`, optionally config-backed via `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `specify-marge/README.md` (installed to consumers as `.specify/marge/README.md`)
 - Exit after each iteration — restart with fresh context
 
 ## Karpathy-Inspired Claude Code Guidelines
@@ -126,16 +126,17 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Source vs Installed Files
 
-**Ship-source lives in non-hidden top-level directories; `setup.sh` never sources install-content from `.specify/` or `.claude/`.** The hidden `.specify/` and `.claude/` trees are dogfooding **output** — `setup.sh --self` regenerates them by running the installer on this repo. They are committed only as dogfooding snapshots and must never be an installation source. (`$PROJECT_DIR/...` reads that preserve a consumer's existing customizations are fine; `$SCRIPT_DIR/.specify` or `$SCRIPT_DIR/.claude` reads are not.)
+**Ship-source lives in non-hidden top-level directories; `setup.sh` never sources install-content from `.specify/` or `.claude/`.** Installed copies are NOT committed in this repo — the paths `setup.sh --self` would generate (`.claude/agents/`, `.claude/skills/`, `.specify/marge/` framework files, `.specify/scripts/bash/speckit-commit.sh`) are gitignored. Run `setup.sh --self` only when you want to dogfood locally; never commit its output. (`$PROJECT_DIR/...` reads that preserve a consumer's existing customizations are fine; `$SCRIPT_DIR/.specify` or `$SCRIPT_DIR/.claude` reads are not.)
 
-The source of truth:
+The source of truth, and where `setup.sh` installs it in a consumer repo:
 
-- `speckit-skills/*/SKILL.md` → installed to `.claude/skills/` by `setup.sh` (each skill is a directory; any `reference/` files ride along for progressive disclosure; the legacy per-command copy is removed on install)
-- `claude-agents/*.md` → installed to `.claude/agents/` by `setup.sh`
-- `specify-marge/baseline/*.md` → seeded into consumer `.specify/marge/baseline/` by `setup.sh` (idempotent — existing files preserved)
-- `specify-marge/README.md`, `specify-marge/config/README.md`, `specify-marge/run-gates.sh` → refreshed into consumer `.specify/marge/` by `setup.sh` (framework docs + runner; project packs live in the consumer-owned `.specify/marge/project/`)
+- `speckit-skills/*/SKILL.md` → `.claude/skills/` (each skill is a directory; any `reference/` files ride along for progressive disclosure; the legacy per-command copy is removed on install)
+- `claude-agents/*.md` → `.claude/agents/`
+- `specify-marge/baseline/*.md` → seeded into `.specify/marge/baseline/` (idempotent — existing files preserved)
+- `specify-marge/README.md`, `specify-marge/config/README.md`, `specify-marge/run-gates.sh` → refreshed into `.specify/marge/` (framework docs + runner; project packs live in the consumer-owned `.specify/marge/project/`)
+- `scripts/speckit-commit.sh` → refreshed into `.specify/scripts/bash/` (shared commit helper the loop and single-shot agents call)
 
-**Always edit the source files** (`speckit-skills/`, `claude-agents/`, `specify-marge/`), never the installed/seeded copies (`.claude/skills/`, `.claude/agents/`, `.specify/marge/`). The hidden copies are overwritten/regenerated by `setup.sh` and exist only for dogfooding. After editing source files, run `setup.sh --self` to refresh the dogfooding copies. A repo's own project packs live in its `.specify/marge/project/` (dogfooding — committed, but not shipped).
+**Always edit the source files** (`speckit-skills/`, `claude-agents/`, `specify-marge/`, `scripts/`) — never an installed copy. What remains committed under the hidden dirs is repo-owned or upstream Spec Kit material, not Simpsons Loops output: `.claude/commands/speckit.*.md` (upstream Spec Kit commands), `.specify/memory/constitution.md`, `.specify/scripts/bash/` (Spec Kit's own scripts), `.specify/templates/`, quality gates, and the hand-authored project packs in `.specify/marge/project/`.
 
 ## Active Technologies
 - Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`) (002-rerun-setup-pipeline)

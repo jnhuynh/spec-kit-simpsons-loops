@@ -6,13 +6,13 @@ Execute **one task** from tasks.md per iteration. Each iteration runs with FRESH
 
 ## Feature Directory & Quality Gates
 
-The feature directory and quality gates are provided via the `-p` prompt when this agent is invoked. Extract:
+The feature directory and quality gates are provided in the invocation prompt (each iteration is spawned via the Agent tool). Extract:
 - **Feature directory**: the path (e.g., "Feature directory: specs/a1b2-feat-foo")
 - **Quality gates**: the per-iteration command to run for validation. The orchestrator passes the **fast** gate (`bash .specify/quality-gates-fast.sh`) when available, which scopes checks to changed files for quick feedback. If only the full gate exists, it passes that instead. The orchestrator runs the **full** gate (`bash .specify/quality-gates.sh`) once after the loop terminates — do not run it yourself per iteration.
 
 ## Phase 0: Orient
 
-0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`)
+0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`). Report the total count of incomplete tasks (including this one) as the work-remaining count in your final output — the orchestrator's stall detection depends on it.
 
 0b. If NO incomplete tasks remain (no `- [ ]` in tasks.md), output the following promise tag and exit immediately:
 
@@ -29,7 +29,7 @@ Run `/speckit-implement Only implement the next incomplete task` to implement th
 Verify the task was implemented correctly:
 
 1. Re-read the modified files
-2. Run the quality gates provided in the `-p` prompt — **MUST pass before proceeding**
+2. Run the quality gates provided in the invocation prompt — **MUST pass before proceeding**
 
 If validation fails:
 
@@ -42,8 +42,7 @@ If validation fails:
 1. Mark task `- [x]` in tasks.md
 2. Commit and push:
    ```bash
-   git add -A && type=$(git branch --show-current | cut -f 2 -d '-') && scope=$(git branch --show-current | cut -f 3- -d '-') && ticket=$(git branch --show-current | cut -f 1 -d '-') && git commit -m "$type($scope): [$ticket] [task summary]"
-   git push origin $(git branch --show-current)
+   bash .specify/scripts/bash/speckit-commit.sh "[task summary]"
    ```
 3. Exit immediately — you will restart with fresh context for the next task
 

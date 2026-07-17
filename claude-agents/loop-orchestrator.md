@@ -35,9 +35,10 @@ ERROR: Required utility script not found.
 Missing: .specify/scripts/bash/check-prerequisites.sh
 
 This script is required for feature directory resolution and prerequisite validation.
-To install it, run the SpecKit setup command:
+It is installed by Spec Kit itself, not by Simpsons Loops. Initialize Spec Kit in
+this project first (e.g. `specify init`), then re-run the Simpsons Loops installer:
 
-  /speckit-setup
+  bash <path-to-simpsons-loops>/setup.sh
 
 ```
 
@@ -63,7 +64,7 @@ It defines the behavior of each iteration. Ensure the file is present at:
 
 ## Goal
 
-Orchestrate the <AGENT_DISPLAY_NAME> loop directly within this session. Each iteration spawns a fresh sub agent (via the Agent tool) that executes one unit of work, commits, and exits. The loop continues until the completion condition is met or max iterations is reached.
+Orchestrate the <AGENT_DISPLAY_NAME> loop directly within this session. Each iteration spawns a fresh sub agent (via the Agent tool) that executes one full remediation pass (or one task, for Ralph), commits, and exits. The loop continues until the completion condition is met or max iterations is reached. Under batch remediation, loops typically converge in 2-3 iterations: a fix-all pass, then a clean verification pass that emits the promise tag.
 
 **AUTONOMOUS EXECUTION**: This loop runs unattended. Do NOT ask the user for confirmation between iterations. Do NOT pause for permission requests. Execute all iterations back-to-back until a completion condition is met (completion signal received, max iterations reached, or stuck detection triggers).
 
@@ -118,7 +119,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
 
 1. **Completion check**: Check the sub agent's returned output for the completion promise tag: `<promise><PROMISE_TAG></promise>`. If found, report success and stop looping.
 
-2. **Progress tracking**: Extract the work-remaining count from the sub agent's output if available (total findings for Homer/Lisa/Marge, incomplete tasks for Ralph). Append to `progress_history`.
+2. **Progress tracking**: Extract the work-remaining count from the sub agent's output if available. The count is what this iteration's fresh scan found, before fixing: auto-fixable findings (excluding `needs_human`/`reappeared`) for Lisa/Marge, Outstanding coverage categories for Homer, incomplete tasks for Ralph. Under batch remediation this should drop steeply (typically N → 0). Append to `progress_history`.
 
 3. **File change check**: Run `git diff $PRE_ITERATION_SHA --stat` via Bash tool.
 
@@ -126,7 +127,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
 
    **a. No-progress stuck** (existing): If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`. If `consecutive_stuck_count >= 2`, abort — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
 
-   **b. Stalled** (new): If `progress_history` has 3+ entries AND the last 3 entries show the same work-remaining count (no reduction), abort — report "stalled: 3 consecutive iterations without reducing work count (consistently at N). The loop is making changes but not making progress." Suggest manual review.
+   **b. Stalled** (new): If `progress_history` has 3+ entries AND the last 3 entries show the same work-remaining count (no reduction), abort — report "stalled: 3 consecutive scans each found N findings despite full remediation passes. The loop is making changes but not making progress." Suggest manual review.
 
    **c. Oscillating** (new): If `progress_history` has 4+ entries AND the last 4 entries alternate between two values (e.g., 5, 4, 5, 4), abort — report "oscillating: work count alternating between N and M. A fix is likely introducing a new issue." Suggest manual review.
 

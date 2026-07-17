@@ -5,8 +5,8 @@ If not a child spec, check if spec.md has 2+ phases (count `### Phase` subsectio
 
 If multi-phase parent spec (2+ phases): spawn a sub agent:
 - **subagent_type**: `general-purpose`
-- **agent file**: `.claude/agents/split.md`
-- **prompt**: `Feature directory: <FEATURE_DIR>. Run non-interactively.`
+- **agent file**: `.claude/agents/single-shot.md`
+- **prompt**: `Read and follow .claude/agents/single-shot.md with SINGLE_SHOT_CONFIG — STEP_COMMAND: /speckit-split; COMMIT_DESCRIPTION: split phase-annotated spec into child specs; FEATURE_DIR: <FEATURE_DIR>; EXTRA_INSTRUCTIONS: (none).`
 
 After split completes, read the parent spec's `## Manifest` section to get the list of child directories. Then prompt the user with two options using the AskUserQuestion tool:
 
@@ -29,8 +29,6 @@ Deploy and validate each phase in production before starting the next. When you 
 
 If user selects option 1 (default/recommended): stop the pipeline. Set completion status to **split-complete**. Proceed to Step 6 (Report Results).
 If user selects option 2: log the warning and continue to ralph/marge.
-
-**Failure handling**: If the sub agent fails, abort. Suggest resuming with `--from split`.
 
 **Post-step stop check**: After split completes, if STOP_AFTER_STEP equals `split`, output: `Pipeline stopped after split per --stop-after parameter. Skipping: ralph, marge.` and skip all remaining steps.
 

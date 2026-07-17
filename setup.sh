@@ -54,41 +54,12 @@ if [[ "$SELF_INSTALL" != true ]]; then
 fi
 
 # ── 0. Quality gate file (never overwrite) ──────────────────────────
-# MUST run before file copies so we can inspect the target's existing
-# Ralph command file for custom quality gates before it gets overwritten.
-
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
-# Skills location of the Ralph command file — read to detect custom quality
-# gates a consumer may have set there before this file is overwritten.
-RALPH_CMD_FILE="$PROJECT_DIR/.claude/skills/speckit-ralph-implement/SKILL.md"
-SENTINEL="# SPECKIT_DEFAULT_QUALITY_GATE"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then
   echo "  Quality gate file already exists — skipped"
 else
-  # Determine content: placeholder or extracted custom gates
-  qg_content=""
-
-  if [[ -f "$RALPH_CMD_FILE" ]] && ! grep -qF "$SENTINEL" "$RALPH_CMD_FILE"; then
-    # Sentinel is absent → custom quality gates → extract code block from
-    # the "### Step 3: Extract Quality Gates" section
-    extracted=$(awk '
-      /^### Step 3: Extract Quality Gates/ { found_section=1; next }
-      found_section && /^```bash/ { in_block=1; next }
-      in_block && /^```/ { exit }
-      in_block { print }
-    ' "$RALPH_CMD_FILE")
-
-    if [[ -n "$extracted" ]]; then
-      qg_content="$(printf '#!/usr/bin/env bash\n%s\n' "$extracted")"
-      echo "  Extracted custom quality gates from Ralph command file"
-    fi
-  fi
-
-  # If nothing was extracted (no file, sentinel present, or empty block),
-  # create the placeholder
-  if [[ -z "$qg_content" ]]; then
-    qg_content='#!/usr/bin/env bash
+  qg_content='#!/usr/bin/env bash
 # SPECKIT_DEFAULT_QUALITY_GATE
 #
 # Quality Gates Configuration
@@ -109,8 +80,7 @@ else
 echo "ERROR: Quality gates not configured."
 echo "Edit .specify/quality-gates.sh with your project'\''s quality gate commands."
 exit 1'
-    echo "  Created placeholder quality gate file"
-  fi
+  echo "  Created placeholder quality gate file"
 
   # Atomic write: temp file → mv
   tmp=$(mktemp)
@@ -219,10 +189,17 @@ cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.c
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
 cp "$SCRIPT_DIR/claude-agents/marge.md"                         "$PROJECT_DIR/.claude/agents/marge.md"
 cp "$SCRIPT_DIR/claude-agents/ralph.md"                         "$PROJECT_DIR/.claude/agents/ralph.md"
-cp "$SCRIPT_DIR/claude-agents/plan.md"                          "$PROJECT_DIR/.claude/agents/plan.md"
-cp "$SCRIPT_DIR/claude-agents/tasks.md"                         "$PROJECT_DIR/.claude/agents/tasks.md"
-cp "$SCRIPT_DIR/claude-agents/specify.md"                       "$PROJECT_DIR/.claude/agents/specify.md"
+cp "$SCRIPT_DIR/claude-agents/single-shot.md"                   "$PROJECT_DIR/.claude/agents/single-shot.md"
+cp "$SCRIPT_DIR/claude-agents/findings-ledger.md"               "$PROJECT_DIR/.claude/agents/findings-ledger.md"
 cp "$SCRIPT_DIR/claude-agents/loop-orchestrator.md"             "$PROJECT_DIR/.claude/agents/loop-orchestrator.md"
+
+# Remove per-step single-shot agents superseded by single-shot.md
+for stale_agent in specify plan tasks phase split reconcile; do
+  if [[ -f "$PROJECT_DIR/.claude/agents/$stale_agent.md" ]]; then
+    rm "$PROJECT_DIR/.claude/agents/$stale_agent.md"
+    echo "  Removed superseded agent: .claude/agents/$stale_agent.md"
+  fi
+done
 # Skills (Pattern A: clean overwrite per dir, recursive so reference/ subdirs
 # for progressively-disclosed skills come along). Source is the non-hidden
 # speckit-skills/ ship dir. Skill dirs are hyphenated (e.g. speckit-homer-clarify);
@@ -246,9 +223,6 @@ for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
     echo "  Removed legacy dotted skill dir: .claude/skills/$dotted/"
   fi
 done
-cp "$SCRIPT_DIR/claude-agents/phase.md"                       "$PROJECT_DIR/.claude/agents/phase.md"
-cp "$SCRIPT_DIR/claude-agents/split.md"                       "$PROJECT_DIR/.claude/agents/split.md"
-cp "$SCRIPT_DIR/claude-agents/reconcile.md"                   "$PROJECT_DIR/.claude/agents/reconcile.md"
 
 # Framework runner for project script packs (Pattern A: OVERWRITE, like the
 # agent/skill copies above). It lives under .specify/marge/ next to the
@@ -258,22 +232,26 @@ mkdir -p "$PROJECT_DIR/.specify/marge"
 cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
 chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
 
+# Shared commit helper used by loop and single-shot agents (Pattern A:
+# OVERWRITE). Lives next to check-prerequisites.sh, which agents already
+# invoke by that path.
+mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
+cp "$SCRIPT_DIR/scripts/speckit-commit.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
+chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
+
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
 echo "    .claude/agents/marge.md"
 echo "    .claude/agents/ralph.md"
-echo "    .claude/agents/plan.md"
-echo "    .claude/agents/tasks.md"
-echo "    .claude/agents/specify.md"
+echo "    .claude/agents/single-shot.md"
+echo "    .claude/agents/findings-ledger.md"
 echo "    .claude/agents/loop-orchestrator.md"
   for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
     echo "    .claude/skills/$(basename "$skill_src")/"
   done
-echo "    .claude/agents/phase.md"
-echo "    .claude/agents/split.md"
-echo "    .claude/agents/reconcile.md"
 echo "    .specify/marge/run-gates.sh"
+echo "    .specify/scripts/bash/speckit-commit.sh"
 
 # ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
 # Earlier installs used .specify/marge/checks/ (prose packs) and

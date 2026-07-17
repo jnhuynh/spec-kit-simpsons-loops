@@ -22,9 +22,10 @@ ERROR: Required utility script not found.
 Missing: .specify/scripts/bash/check-prerequisites.sh
 
 This script is required for feature directory resolution and prerequisite validation.
-To install it, run the SpecKit setup command:
+It is installed by Spec Kit itself, not by Simpsons Loops. Initialize Spec Kit in
+this project first (e.g. `specify init`), then re-run the Simpsons Loops installer:
 
-  /speckit-setup
+  bash <path-to-simpsons-loops>/setup.sh
 
 ```
 
@@ -32,36 +33,33 @@ To install it, run the SpecKit setup command:
 
 ## Agent File Check
 
-Verify that all required agent files exist before starting the pipeline. Check each of these files using the Bash tool:
+Verify that all required agent files AND the loop skills the step playbooks delegate to exist before starting the pipeline. Check via the Bash tool:
 
 ```bash
-for f in reconcile specify homer phase plan tasks lisa split ralph marge; do
+for f in homer lisa ralph marge loop-orchestrator single-shot findings-ledger; do
   test -f ".claude/agents/${f}.md" && echo "${f}.md: EXISTS" || echo "${f}.md: MISSING"
+done
+for s in speckit-homer-clarify speckit-lisa-analyze speckit-ralph-implement speckit-marge-review; do
+  test -f ".claude/skills/${s}/SKILL.md" && echo "${s}: EXISTS" || echo "${s}: MISSING"
 done
 ```
 
-If **any** agent file is MISSING, display this error and **STOP** — do not proceed with pipeline execution:
+If **any** file is MISSING, display this error and **STOP** — do not proceed with pipeline execution:
 
 ```
-ERROR: Required agent file(s) not found.
+ERROR: Required agent or loop-skill file(s) not found.
 
-Missing: .claude/agents/<name>.md
+Missing: <the missing path(s)>
 
-Agent files are required for pipeline sub-agents to execute. These files define
-the behavior of each pipeline phase. Ensure all agent files are present:
-  .claude/agents/reconcile.md
-  .claude/agents/specify.md
-  .claude/agents/homer.md
-  .claude/agents/phase.md
-  .claude/agents/plan.md
-  .claude/agents/tasks.md
-  .claude/agents/lisa.md
-  .claude/agents/split.md
-  .claude/agents/ralph.md
-  .claude/agents/marge.md
+Agent files define the behavior of each pipeline phase; the loop-step playbooks
+delegate to the loop skills. Ensure all are present:
+  .claude/agents/{homer,lisa,ralph,marge,loop-orchestrator,single-shot,findings-ledger}.md
+  .claude/skills/speckit-{homer-clarify,lisa-analyze,ralph-implement,marge-review}/SKILL.md
+
+Run setup.sh to (re)install them.
 ```
 
-If **all** agent files exist, proceed to the Overview section below.
+If **all** exist, proceed to the Overview section below.
 
 ## Overview
 
@@ -259,10 +257,7 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 
 ### Step 4: Configuration
 
-- Homer max iterations: **30**
-- Lisa max iterations: **30**
-- Ralph max iterations: **incomplete_tasks + 10** (count `- [ ]` lines in tasks.md at the start of the ralph step, then add 10)
-- Marge max iterations: **30**
+Loop iteration limits are owned by each loop's standalone skill (the `LOOP_CONFIG` in `.claude/skills/speckit-<loop>-*/SKILL.md`); ralph's is dynamic (incomplete tasks + 10). The loop playbooks defer to those skills — the pipeline does not restate the limits.
 
 ### Step 4b: Execution Plan Announcement
 
@@ -280,6 +275,8 @@ The step names in the plan are joined with ` -> `. Only include steps from the s
 **CRITICAL**: Execute steps **strictly in sequence** — one at a time. Each Agent tool call MUST return before the next one is spawned. Never use parallel Agent calls. Each loop iteration must complete before the next iteration starts. Each pipeline step must fully complete before advancing to the next step.
 
 **POST-STEP STOP CHECK**: After each step completes (whether it was executed or skipped because its artifact already existed), if `STOP_AFTER_STEP` is set and equals the current step name, output the stop message and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). Each step's playbook (see the Step 5 list below) includes the specific stop check with the exact message to output.
+
+**FAILURE HANDLING (all steps)**: If a required step's sub agent fails (crash, timeout, or error), or a loop step aborts (stuck, stalled, oscillating, max iterations, or sub-agent failure), abort the pipeline immediately. Log the step name and the error. Do NOT retry — sub agent failures are treated as deterministic. Suggest manual review and resuming with `--from <step>`. Exception: the optional polish steps (simplify, security-review, pr-review) log the failure and continue, per their playbooks.
 
 For each step (starting from the detected/specified step), spawn fresh sub agents using the **Agent tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
 
