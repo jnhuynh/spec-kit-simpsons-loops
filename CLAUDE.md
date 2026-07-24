@@ -48,6 +48,7 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 - Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation
 - Adjust spec, plan, or tasks instead
 - **Homer (clarify)** → answer up to 5 clarification questions per iteration (self-answered), loop until `ALL_FINDINGS_RESOLVED`
+- **Premortem (human gate)** → `/speckit-premortem` interactive failure-mode discovery across architecture, UX, and support/ops lenses; mitigations encoded into the spec, decisions tracked in `failure-modes.md`; the pipeline halts at this step until the register has zero `open` rows — never self-answered, never automated
 - **Lisa (analyze)** → fix all auto-fixable findings per iteration, then verify with a clean re-scan, loop until `ALL_FINDINGS_RESOLVED`
 - **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
 - **Marge (review)** → fix all auto-fixable code-review findings per iteration, then verify with a clean re-review, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment); a finding that reappears after being fixed is escalated to `NEEDS_HUMAN`, never re-fixed

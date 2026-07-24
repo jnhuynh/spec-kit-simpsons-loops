@@ -8,5 +8,5 @@ Detect if the current spec is a child spec by checking FEATURE_DIR for the `--p{
   - **agent file**: `.claude/agents/single-shot.md`
   - **prompt**: `Read and follow .claude/agents/single-shot.md with SINGLE_SHOT_CONFIG — STEP_COMMAND: /speckit-split <PARENT_DIR>; COMMIT_DESCRIPTION: reconcile child spec with earlier phases; FEATURE_DIR: <FEATURE_DIR>; EXTRA_INSTRUCTIONS: Target the parent directory <PARENT_DIR> (already resolved), not the child feature directory — this reconciles all child specs with what earlier phases actually built.`
 
-**Post-step stop check**: After the reconcile step completes (whether executed or skipped), check STOP_AFTER_STEP. If equals `reconcile`, output: `Pipeline stopped after reconcile per --stop-after parameter. Skipping: specify, homer, phase, plan, tasks, lisa, split, ralph, marge.` and skip all remaining steps.
+**Post-step stop check**: After the reconcile step completes (whether executed or skipped), check STOP_AFTER_STEP. If equals `reconcile`, output: `Pipeline stopped after reconcile per --stop-after parameter. Skipping: specify, homer, premortem, phase, plan, tasks, lisa, split, ralph, marge.` and skip all remaining steps.
 

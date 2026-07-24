@@ -13,7 +13,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-Analyze the user stories in an existing `spec.md` for natural deployment boundaries and generate the `## Phases` section. This command runs after `/speckit-specify` has created the spec and before Homer clarifies it.
+Analyze the user stories in an existing `spec.md` for natural deployment boundaries and generate the `## Phases` section. This command runs after Homer has clarified the spec and the human premortem (`/speckit-premortem`) has been completed, and before `/speckit-plan`.
 
 ## Instructions
 

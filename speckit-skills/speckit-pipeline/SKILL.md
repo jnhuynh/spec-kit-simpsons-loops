@@ -1,6 +1,6 @@
 ---
 name: speckit-pipeline
-description: Orchestrate the full SpecKit pipeline (reconcile, specify, homer, phase, plan, tasks, lisa, split, ralph, marge) from feature description to reviewed implementation.
+description: Orchestrate the full SpecKit pipeline (reconcile, specify, homer, premortem, phase, plan, tasks, lisa, split, ralph, marge) from feature description to reviewed implementation.
 ---
 
 ## User Input
@@ -69,18 +69,19 @@ Orchestrate the full SpecKit pipeline directly within this session. Each step sp
 
 **STRICT SEQUENTIAL EXECUTION**: Each sub agent MUST complete and return its result before the next sub agent is spawned. Never run multiple sub agents in parallel. Within each loop step, wait for one iteration to finish before starting the next. Between pipeline steps, wait for the entire step to complete before advancing. The pipeline order is non-negotiable:
 
-The pipeline runs these 10 steps in sequence:
+The pipeline runs these 11 steps in sequence:
 
 0. **reconcile** — Sync child spec with earlier sibling phases (child specs only)
 1. **specify** — Create feature spec from description (optional, auto-detected)
 2. **homer** — Iterative spec clarification & remediation
-3. **phase** — Detect deployment boundaries and generate phase annotations
-4. **plan** — Generate technical implementation plan
-5. **tasks** — Generate dependency-ordered task list
-6. **lisa** — Cross-artifact consistency analysis
-7. **split** — Split multi-phase parent spec into child specs (parent specs only)
-8. **ralph** — Task-by-task implementation with quality gates
-9. **marge** — Iterative code review of the implementation
+3. **premortem** — Human-required failure-mode discovery gate (never autonomous)
+4. **phase** — Detect deployment boundaries and generate phase annotations
+5. **plan** — Generate technical implementation plan
+6. **tasks** — Generate dependency-ordered task list
+7. **lisa** — Cross-artifact consistency analysis
+8. **split** — Split multi-phase parent spec into child specs (parent specs only)
+9. **ralph** — Task-by-task implementation with quality gates
+10. **marge** — Iterative code review of the implementation
 
 Between ralph and marge, two **optional polish phases** run automatically **if and only if the corresponding skill is installed** in the environment:
 
@@ -95,10 +96,11 @@ If either skill is absent, that phase is silently skipped. These phases are **no
 
 Parse `$ARGUMENTS` for the following (all are optional, can appear in any order):
 
-- **`--from <step>`**: Starting step override. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline starts from this step instead of auto-detecting.
-- **`--stop-after <step>`**: Stop-after step. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is NOT provided, `STOP_AFTER_STEP` MUST remain empty/unset so that all stop checks are no-ops and the pipeline runs all steps from the starting step through marge — identical to the behavior before `--stop-after` was added (FR-007). If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: reconcile, specify, homer, phase, plan, tasks, lisa, split, ralph, marge." and **STOP**.
+- **`--from <step>`**: Starting step override. Valid values: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline starts from this step instead of auto-detecting.
+- **`--stop-after <step>`**: Stop-after step. Valid values: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If provided, the pipeline halts after the specified step completes, skipping all subsequent steps. Store the value in `STOP_AFTER_STEP`. If `--stop-after` is NOT provided, `STOP_AFTER_STEP` MUST remain empty/unset so that all stop checks are no-ops and the pipeline runs all steps from the starting step through marge — identical to the behavior before `--stop-after` was added (FR-007). If `--stop-after` is present but no step name follows (e.g., it is the last argument or the next token is another flag), display an error: "Error: --stop-after requires a step name. Valid steps: reconcile, specify, homer, premortem, phase, plan, tasks, lisa, split, ralph, marge." and **STOP**.
 - **`--description <text>`**: Feature description for the specify step. Capture the full text after `--description` (may be quoted).
 - **`--skip-phase-guard`**: Skip the phase order guard for child specs. When present, the pipeline will not check whether earlier phases are complete before starting this child phase. Use when intentionally working out of order (e.g., phases are independent or earlier phases were cancelled). Store as boolean `SKIP_PHASE_GUARD` (default: false).
+- **`--skip-premortem`**: Bypass the premortem human gate. When present, the pipeline will not halt for the human failure-mode discovery step (e.g., trivial features, intentional bypass). The skip is logged. Store as boolean `SKIP_PREMORTEM` (default: false).
 - **`spec-dir`**: A directory path (e.g., `specs/003-fix-pipeline-delegation`). If provided, use it as `FEATURE_DIR`.
 
 If no `spec-dir` is provided in `$ARGUMENTS`, resolve `FEATURE_DIR` automatically:
@@ -213,7 +215,8 @@ Check which artifacts exist to determine where to start:
 - `tasks.md` with none complete → start at **lisa**
 - `plan.md` exists → start at **tasks**
 - `spec.md` exists and has a populated `## Phases` section (contains at least one `### Phase` subsection) → start at **plan**
-- `spec.md` exists but has no populated `## Phases` section → start at **homer**
+- `spec.md` exists, has no populated `## Phases` section, and `<FEATURE_DIR>/failure-modes.md` exists → start at **premortem** (the gate re-validates that no rows are `open`, then flows into phase)
+- `spec.md` exists, has no populated `## Phases` section, and no `failure-modes.md` → start at **homer**
 - No `spec.md` but `--description` provided → start at **specify**
 
 ### Step 3b: Step Index Mapping
@@ -225,13 +228,14 @@ Assign a numeric index to each pipeline step for use in validation and execution
 | reconcile | 0 |
 | specify | 1 |
 | homer | 2 |
-| phase | 3 |
-| plan | 4 |
-| tasks | 5 |
-| lisa | 6 |
-| split | 7 |
-| ralph | 8 |
-| marge | 9 |
+| premortem | 3 |
+| phase | 4 |
+| plan | 5 |
+| tasks | 6 |
+| lisa | 7 |
+| split | 8 |
+| ralph | 9 |
+| marge | 10 |
 
 Resolve the index for the starting step (from `--from` or auto-detected) into `start_index`. If `STOP_AFTER_STEP` is set, resolve its index into `stop_after_index`. These indices are used in subsequent validation and execution plan steps.
 
@@ -239,10 +243,10 @@ Resolve the index for the starting step (from `--from` or auto-detected) into `s
 
 If `STOP_AFTER_STEP` is set, perform the following validations **before any pipeline steps execute**:
 
-1. **Value validation (FR-006)**: Verify that `STOP_AFTER_STEP` is one of the ten valid step names: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If the value is not in this list, display the following error and **STOP** — do not execute any pipeline steps:
+1. **Value validation (FR-006)**: Verify that `STOP_AFTER_STEP` is one of the eleven valid step names: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. If the value is not in this list, display the following error and **STOP** — do not execute any pipeline steps:
 
 ```
-Invalid --stop-after value '<value>'. Valid steps: reconcile, specify, homer, phase, plan, tasks, lisa, split, ralph, marge.
+Invalid --stop-after value '<value>'. Valid steps: reconcile, specify, homer, premortem, phase, plan, tasks, lisa, split, ralph, marge.
 ```
 
 (Replace `<value>` with the actual invalid value the user provided.)
@@ -250,7 +254,7 @@ Invalid --stop-after value '<value>'. Valid steps: reconcile, specify, homer, ph
 2. **Range validation (FR-005)**: If `STOP_AFTER_STEP` is set and its `stop_after_index` is less than the `start_index` (the starting step, whether set via `--from` or auto-detected), display the following error and **STOP** — do not execute any pipeline steps:
 
 ```
-Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the pipeline sequence (reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge).
+Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the pipeline sequence (reconcile -> specify -> homer -> premortem -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge).
 ```
 
 (Replace `<stop>` with the actual `STOP_AFTER_STEP` value and `<start>` with the actual starting step name.)
@@ -265,8 +269,8 @@ Before executing any steps, output an execution plan announcement listing the st
 
 **Format**:
 
-- **When `--stop-after` is provided**: `Execution plan: specify -> homer -> plan. Stopping after: plan.`
-- **When `--stop-after` is NOT provided**: `Execution plan: homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge.`
+- **When `--stop-after` is provided**: `Execution plan: specify -> homer -> premortem -> phase -> plan. Stopping after: plan.`
+- **When `--stop-after` is NOT provided**: `Execution plan: homer -> premortem -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge.`
 
 The step names in the plan are joined with ` -> `. Only include steps from the starting step through the stop step (inclusive). When `--stop-after` is provided, append ` Stopping after: <step>.` to the announcement. When `--stop-after` is not provided, omit the "Stopping after" clause entirely.
 
@@ -276,7 +280,7 @@ The step names in the plan are joined with ` -> `. Only include steps from the s
 
 **POST-STEP STOP CHECK**: After each step completes (whether it was executed or skipped because its artifact already existed), if `STOP_AFTER_STEP` is set and equals the current step name, output the stop message and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). Each step's playbook (see the Step 5 list below) includes the specific stop check with the exact message to output.
 
-**FAILURE HANDLING (all steps)**: If a required step's sub agent fails (crash, timeout, or error), or a loop step aborts (stuck, stalled, oscillating, max iterations, or sub-agent failure), abort the pipeline immediately. Log the step name and the error. Do NOT retry — sub agent failures are treated as deterministic. Suggest manual review and resuming with `--from <step>`. Exception: the optional polish steps (simplify, security-review, pr-review) log the failure and continue, per their playbooks.
+**FAILURE HANDLING (all steps)**: If a required step's sub agent fails (crash, timeout, or error), or a loop step aborts (stuck, stalled, oscillating, max iterations, or sub-agent failure), abort the pipeline immediately. Log the step name and the error. Do NOT retry — sub agent failures are treated as deterministic. Suggest manual review and resuming with `--from <step>`. The premortem gate halting with `awaiting-human` is NOT a failure — it is the gate working as designed (see its playbook). Exception: the optional polish steps (simplify, security-review, pr-review) log the failure and continue, per their playbooks.
 
 For each step (starting from the detected/specified step), spawn fresh sub agents using the **Agent tool**. Each sub agent gets a fresh context window, preventing hallucination drift.
 
@@ -290,16 +294,17 @@ Each step's full playbook — sub-agent dispatch, prompt/config, conditional ski
 1. **Reconcile** — conditional single-shot, child specs only → read and follow `.claude/skills/speckit-pipeline/reference/steps/reconcile.md`
 2. **Specify** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/specify.md`
 3. **Homer** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/homer.md`
-4. **Phase** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/phase.md`
-5. **Plan** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/plan.md`
-6. **Tasks** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/tasks.md`
-7. **Lisa** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/lisa.md`
-8. **Split** — conditional single-shot, multi-phase parent specs only → read and follow `.claude/skills/speckit-pipeline/reference/steps/split.md`
-9. **Ralph** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/ralph.md`
-10. **Simplify** — optional single-shot, skip if skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/simplify.md`
-11. **Security Review** — optional single-shot, skip if skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/security-review.md`
-12. **Marge** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/marge.md`
-13. **PR Review** — optional single-shot, skip if no open PR or skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/pr-review.md`
+4. **Premortem** — human gate, never spawns a sub agent → read and follow `.claude/skills/speckit-pipeline/reference/steps/premortem.md`
+5. **Phase** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/phase.md`
+6. **Plan** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/plan.md`
+7. **Tasks** — single-shot → read and follow `.claude/skills/speckit-pipeline/reference/steps/tasks.md`
+8. **Lisa** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/lisa.md`
+9. **Split** — conditional single-shot, multi-phase parent specs only → read and follow `.claude/skills/speckit-pipeline/reference/steps/split.md`
+10. **Ralph** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/ralph.md`
+11. **Simplify** — optional single-shot, skip if skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/simplify.md`
+12. **Security Review** — optional single-shot, skip if skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/security-review.md`
+13. **Marge** — loop → read and follow `.claude/skills/speckit-pipeline/reference/steps/marge.md`
+14. **PR Review** — optional single-shot, skip if no open PR or skill absent → read and follow `.claude/skills/speckit-pipeline/reference/steps/pr-review.md`
 
 ### Step 6: Report Results
 
@@ -307,13 +312,14 @@ After all steps complete (or after a `--stop-after` early termination), produce 
 
 #### 6a: Per-Step Status Table
 
-List **all ten pipeline steps** in order, each with a status. Determine the status for each step as follows:
+List **all eleven pipeline steps** in order, each with a status. Determine the status for each step as follows:
 
 - **`executed`**: The step ran during this pipeline invocation (either a sub-agent was spawned or, for loop steps, iterations were performed).
 - **`skipped`**: The step was NOT executed. This applies when:
   - The step falls before the `--from` starting step (outside the execution range), OR
   - The step's artifact already existed so the step was skipped (e.g., `spec.md` already existed so specify was skipped, `plan.md` already existed so plan was skipped).
 - **`stopped-by-param`**: The step was NOT executed because it falls after the `STOP_AFTER_STEP`. This status applies to all steps whose index is greater than the `stop_after_index`. When `--stop-after` is not provided, no step receives this status.
+- **`awaiting-human`**: The premortem gate blocked because the human premortem session is incomplete (no `failure-modes.md`, or `open` rows remain). Only the premortem step can receive this status; all downstream steps report `skipped`.
 
 **Format** — output a table like:
 
@@ -322,6 +328,7 @@ Pipeline Step Status:
   reconcile . skipped
   specify .... executed
   homer ..... executed
+  premortem . executed
   phase ..... executed
   plan ...... executed
   tasks ..... stopped-by-param
@@ -347,11 +354,12 @@ Report one of:
 - **oscillating** — work count alternating between two values
 - **failure** — a sub agent crashed or errored
 - **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before marge due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
+- **awaiting-human** — the pipeline halted at the premortem gate; the human failure-mode session is incomplete. Run `/speckit-premortem` interactively, then resume with `--from premortem`
 - **split-complete** — the pipeline completed through split and stopped because the user chose to work on child specs individually
 
 #### 6d: Resume Suggestion
 
-If the pipeline did not complete all ten steps (whether due to `--stop-after`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`.
+If the pipeline did not complete all eleven steps (whether due to `--stop-after`, `awaiting-human`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`. For `awaiting-human`, suggest: "Run `/speckit-premortem` to complete the failure-mode session(s), then resume with `--from premortem`."
 
 ## Examples
 
@@ -363,6 +371,8 @@ If the pipeline did not complete all ten steps (whether due to `--stop-after`, f
 - `/speckit-pipeline --from specify --description "Add user auth"` — Explicit specify step start
 - `/speckit-pipeline --stop-after plan` — Run through plan step only
 - `/speckit-pipeline --from homer --stop-after tasks` — Run homer through tasks
+- `/speckit-pipeline --from premortem` — Re-check the premortem gate and continue the pipeline
+- `/speckit-pipeline --skip-premortem` — Bypass the premortem human gate (not recommended)
 - `/speckit-pipeline --stop-after homer --from specify --description "Add feature X"` — Specify and homer only
 - `/speckit-pipeline --from marge` — Review-only; assumes ralph has already landed the implementation
 - `/speckit-pipeline --stop-after ralph` — Implement but skip the review loop

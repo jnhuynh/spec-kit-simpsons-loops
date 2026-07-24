@@ -10,10 +10,11 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 | Loop     | What it does                                                                                                                                                                                        |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Homer    | Iterative spec clarification. Runs `/speckit-clarify` on `spec.md`, self-answers up to 5 queued questions per iteration using the skill's own recommended answers, commits, and repeats until no critical ambiguities remain — typically 2-3 iterations.  |
+| Premortem | **Human-required gate** (not a loop). You run `/speckit-premortem` interactively — three failure-mode lenses (architecture, UX, support/ops), 5 questions per session — mitigations are encoded into `spec.md` and a risk register (`failure-modes.md`). The pipeline halts at this step until every discovered failure mode is dispositioned (mitigate / accept / defer). |
 | Lisa     | Iterative cross-artifact analysis. Runs `/speckit-analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes all auto-fixable findings in severity order, commits, and re-scans to verify — typically 2-3 iterations.            |
 | Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
 | Marge    | Iterative code review. Runs `/speckit-review` on the feature branch diff, fixes all mechanical findings in severity order (leaves `NEEDS_HUMAN` for humans), commits, and re-reviews to verify — typically 2-3 iterations. |
-| Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
+| Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> premortem -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
 
 **Pre-pipeline:**
 
@@ -23,6 +24,7 @@ Each loop spawns fresh sub agents (via the Agent tool) with isolated context win
 
 > **Note on permissions**
 > The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
+> The one deliberate exception is the **premortem** step: it is a human gate the pipeline never runs autonomously — risk disposition belongs to a person.
 
 ## Architecture
 
@@ -39,7 +41,9 @@ flowchart TD
     D --> D1["Iteration 1\n(sub agent)"]
     D1 --> D2["Iteration 2\n(sub agent)"]
     D2 --> D3["... until resolved\nor max iterations"]
-    D3 --> P["Phase\n(sub agent)"]
+    D3 --> PM{"Premortem gate\n(human step)"}
+    PM -->|"register clean"| P["Phase\n(sub agent)"]
+    PM -->|"open failure modes"| PMH["Halt: run\n/speckit-premortem\nthen --from premortem"]
     P --> E["Plan\n(sub agent)"]
     E --> F["Tasks\n(sub agent)"]
     F --> G["Lisa Loop"]
@@ -85,13 +89,13 @@ flowchart TD
 
 Before kicking off the pipeline or any loop, refine your specs manually. Start with `/speckit-brainstorm` if your idea is still vague — it will challenge you to sharpen it. Then run `/speckit-specify` to draft the initial spec, and `/speckit-clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
 
-You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
+You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, work the `/speckit-premortem` failure-mode session, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
 
 ### Large features: phased delivery
 
 When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
 
-1. **Run the pipeline** — `/speckit-pipeline --from specify --description "..."` runs specify, homer (clarify), phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
+1. **Run the pipeline** — `/speckit-pipeline --from specify --description "..."` runs specify and homer (clarify), then halts at the premortem gate for your failure-mode session (`/speckit-premortem`); resume with `--from premortem` to continue through phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
 
 2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
 
@@ -113,7 +117,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, and the splitting skill relies on `speckit-split` — both are installed by `setup.sh`.
+- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, the splitting skill relies on `speckit-split`, and the pipeline's premortem gate on `speckit-premortem` — all are installed by `setup.sh`.
 
 ## Setup
 
@@ -239,6 +243,18 @@ After running `/speckit-specify` to create `spec.md`:
 
 Homer only requires `spec.md` to exist — it does not need `plan.md` or `tasks.md`. This means you can run Homer immediately after creating your spec.
 
+### Premortem (failure modes — human gate)
+
+After Homer has clarified the spec, work the failure-mode session yourself:
+
+```
+/speckit-premortem
+```
+
+Imagine the feature has failed and work backwards: the skill enumerates concrete failure scenarios across three lenses — architecture (data integrity, partial failure, concurrency), UX (error states, recovery, destructive actions), and support/ops (observability, "what ticket does this generate", rollback) — and asks **you** up to 5 questions per session, each with a recommended disposition. Decisions land in two places: mitigations are encoded into `spec.md` (Edge Cases, Functional Requirements, Non-Functional Requirements) and every failure mode is tracked in a risk register at `<FEATURE_DIR>/failure-modes.md` with a decision (mitigate / accept / defer).
+
+Premortem only requires `spec.md`. Run sessions until the register has no `open` rows — the pipeline gates on this and will halt at the premortem step until the register is clean (bypass with `--skip-premortem` if you must). This is deliberately the one human-required stop in an otherwise autonomous pipeline: risk disposition is a judgment call, so it is never self-answered.
+
 ### Lisa (analysis)
 
 Once you have `spec.md`, `plan.md`, and `tasks.md`:
@@ -355,7 +371,8 @@ Or bootstrap end-to-end from a feature description:
 
 - Child spec (phase 2+) with no `plan.md` -> **reconcile**
 - No `spec.md` but `--description` provided -> **specify**
-- `spec.md` exists, no populated Phases -> **homer**
+- `spec.md` exists, no populated Phases, no `failure-modes.md` -> **homer**
+- `spec.md` exists, no populated Phases, `failure-modes.md` exists -> **premortem** (gate re-checks, then flows into phase)
 - `spec.md` exists with populated Phases, no `plan.md` -> **plan**
 - `plan.md` exists -> **tasks**
 - `tasks.md` with no tasks started -> **lisa**
@@ -363,11 +380,13 @@ Or bootstrap end-to-end from a feature description:
 - `tasks.md` with some tasks completed -> **ralph**
 - `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
 
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
+**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
 
 **`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
 
 **`--skip-phase-guard`:** Bypasses the phase order guard for child specs. By default, phase N blocks unless all earlier phases (1..N-1) are "Complete" in the parent manifest. Use this flag when phases are independent or when earlier phases were intentionally cancelled.
+
+**`--skip-premortem`:** Bypasses the premortem human gate. By default the pipeline halts at the premortem step until `<FEATURE_DIR>/failure-modes.md` exists with every failure mode dispositioned. Use this flag for trivial features or an intentional bypass — the skip is logged.
 
 **Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
 
