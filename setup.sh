@@ -354,3 +354,4 @@ fi
 echo ""
 echo "Done! Run /speckit-pipeline for the full end-to-end workflow, or use individual loops:"
 echo "  /speckit-ralph-implement  /speckit-lisa-analyze  /speckit-homer-clarify  /speckit-marge-review"
+echo "  Human step after clarify: /speckit-premortem (the pipeline gates on it)"
