@@ -35,7 +35,8 @@ The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each
 ```mermaid
 flowchart TD
     A["/speckit-pipeline"] --> B{Auto-detect\nstarting step}
-    B --> R["Reconcile\n(child specs only)"]
+    B --> R["Reconcile\n(child specs only)\ncorrects the parent spec"]
+    R -->|"child spec:\nhomer, premortem, phase\nnever run"| E
     R --> C["Specify\n(sub agent)"]
     C --> D["Homer Loop"]
     D --> D1["Iteration 1\n(sub agent)"]
@@ -103,7 +104,42 @@ When a feature is too large to implement and deploy as a single unit — databas
 
 4. **Auto-status** — The pipeline automatically updates the parent manifest as work progresses. When a child pipeline starts, the phase is marked "In Progress". When Marge (code review) completes successfully, the phase is marked "Complete". After each update, a phase status summary is printed so you can see progress across all phases at a glance.
 
-5. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step automatically syncs it with what earlier phases actually built. No manual reconciliation needed — each child pipeline is self-healing.
+5. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step compares what earlier phases actually shipped against the parent spec and corrects the parent where they diverged. You always pick up from reality rather than from the original plan, and the correction is visible to every remaining phase at once.
+
+### The parent spec is the single source of truth
+
+A child spec is a **phase view**, not a copy. The parent holds every user story, functional requirement, key entity, and success criterion exactly once; each child names the ones in its phase by ID under `## Inherited Scope` and adds only what phasing itself requires:
+
+```markdown
+**Parent Spec**: `../c31c-feat-billing/spec.md` <- AUTHORITATIVE
+**Phase**: 2 of 3    **Release Strategy**: dark launch with gradual reveal
+
+## Inherited Scope
+| Kind | Parent reference | Parent section |
+|------|------------------|----------------|
+| User Story | User Story 3 - Payment capture (P1) | `## User Scenarios & Testing` |
+| Functional Requirement | FR-004, FR-005, FR-009 | `## Requirements` -> Functional Requirements |
+| Success Criterion | SC-002, SC-004 | `## Success Criteria` |
+
+**Deferred elsewhere**: FR-001-FR-003, SC-001 (Phase 1); FR-010+, SC-003 (Phase 3).
+
+## Phase Boundary
+**Entry state**: `payments.provider_ref` exists, nullable, unbackfilled.
+**Exit state**: every capture writes `provider_ref`; flag `billing.capture_v2` at 100%.
+
+## Requirements *(mandatory)*
+Inherited: FR-004, FR-005, FR-009 - see **Inherited Scope**. The parent spec is authoritative.
+
+Phase-local additions:
+
+- **FR-P2-001**: System MUST gate capture behind `billing.capture_v2`, default off.
+```
+
+Two ID namespaces keep authorship unambiguous. Inherited IDs (`FR-###`, `SC-###`, `User Story N`) belong to the parent and are never restated. Phase-local IDs (`FR-P{N}-###`, `SC-P{N}-###`) belong to the child and cover only what exists because the work is phased — feature flags, dark-launch scaffolding, backfills, compatibility shims.
+
+This is what makes phase PRs reviewable: the diff on a child spec contains only its `## Phase Boundary` and its phase-local entries. Nothing else can drift between parent and child, because nothing else is stored twice. A reviewer who needs the full scope reads the parent, once, and a reviewer checking one phase reads only that phase's delta.
+
+It also means clarifications and requirement edits go to the **parent**, never to a child — which is why `homer`, `premortem`, and `phase` never run on a child spec. A child-spec pipeline run is `reconcile -> plan -> tasks -> lisa -> ralph -> marge`.
 
 ## API key vs. Claude subscription
 
@@ -117,7 +153,7 @@ unset ANTHROPIC_API_KEY
 
 - A project already set up with Speckit (`.specify/` directory exists)
 - [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, the splitting skill relies on `speckit-split`, and the pipeline's premortem gate on `speckit-premortem` — all are installed by `setup.sh`.
+- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, the splitting skill relies on `speckit-split`, the pipeline's reconcile step on `speckit-reconcile`, and its premortem gate on `speckit-premortem` — all are installed by `setup.sh`.
 
 ## Setup
 
@@ -323,9 +359,11 @@ specs/
 
 After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit-split` standalone on a phase-annotated parent spec once its `plan.md` and `tasks.md` exist — split requires the whole-feature plan and task list first, so the phase boundaries are validated against the full implementation design before the spec is decomposed.
 
-**Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+). It syncs the child spec with what earlier sibling phases actually built, so you always pick up from reality rather than the original plan.
+Each child is a **phase view** of the parent, not a copy of it — see [The parent spec is the single source of truth](#the-parent-spec-is-the-single-source-of-truth).
 
-Re-running split is idempotent. It detects manual edits, propagates changes from earlier phases, and flags conflicts with `<!-- CONFLICT: ... -->` markers.
+**Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+), via `/speckit-reconcile`. It compares what each Complete phase actually shipped — its `tasks.md`, its `plan.md`, and the code those name — against the parent spec, and corrects the **parent** where they diverged. Stale wording and shifted requirement assignments are fixed automatically; drift that changes what a requirement is *for* is reported as `NEEDS_HUMAN` and left alone. Because inherited content exists in exactly one place, there is nothing to merge and no conflict to resolve.
+
+Re-running split is idempotent. It regenerates only derived child content (the metadata block, `## Inherited Scope`, and the `Inherited:` lines) and never touches authored content (`## Phase Boundary`, `FR-P{N}-###`, `SC-P{N}-###`).
 
 Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state.
 
@@ -370,6 +408,7 @@ Or bootstrap end-to-end from a feature description:
 **Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
 
 - Child spec (phase 2+) with no `plan.md` -> **reconcile**
+- Child spec (phase 1) with no `plan.md` -> **plan** (homer, premortem, and phase never run on a child spec)
 - No `spec.md` but `--description` provided -> **specify**
 - `spec.md` exists, no populated Phases, no `failure-modes.md` -> **homer**
 - `spec.md` exists, no populated Phases, `failure-modes.md` exists -> **premortem** (gate re-checks, then flows into phase)

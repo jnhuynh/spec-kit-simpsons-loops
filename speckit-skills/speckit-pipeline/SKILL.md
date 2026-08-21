@@ -71,7 +71,7 @@ Orchestrate the full SpecKit pipeline directly within this session. Each step sp
 
 The pipeline runs these 11 steps in sequence:
 
-0. **reconcile** — Sync child spec with earlier sibling phases (child specs only)
+0. **reconcile** — Correct the parent spec where completed phases shipped something else (child specs only)
 1. **specify** — Create feature spec from description (optional, auto-detected)
 2. **homer** — Iterative spec clarification & remediation
 3. **premortem** — Human-required failure-mode discovery gate (never autonomous)
@@ -82,6 +82,8 @@ The pipeline runs these 11 steps in sequence:
 8. **split** — Split multi-phase parent spec into child specs (parent specs only)
 9. **ralph** — Task-by-task implementation with quality gates
 10. **marge** — Iterative code review of the implementation
+
+**Child specs skip three steps.** `homer`, `premortem`, and `phase` **never run on child specs** (directories matching `--p{N}-`). A child spec is a phase view of an already-clarified, already-premortemed, already-phased parent: it references the parent's user stories, requirements, key entities, and success criteria by ID under `## Inherited Scope` and holds no copy of them. There is nothing in a child to clarify, no separate risk register to disposition, and no deployment boundary left to detect. Clarifications go to `/speckit-homer-clarify <PARENT_DIR>`; failure modes to `/speckit-premortem <PARENT_DIR>`. A child-spec run is therefore: **reconcile → plan → tasks → lisa → ralph → marge**.
 
 Between ralph and marge, two **optional polish phases** run automatically **if and only if the corresponding skill is installed** in the environment:
 
@@ -208,7 +210,7 @@ Use dot-padding to align status values. Mark the current phase with `<-- current
 ### Step 3: Auto-detect starting step (if `--from` not specified)
 
 Check which artifacts exist to determine where to start:
-- Child spec (directory name matches `--p{N}-` pattern) with N > 1 and no `plan.md` → start at **reconcile**
+- Child spec (directory name matches `--p{N}-` pattern) with no `plan.md` → start at **reconcile** when N > 1, or at **plan** when N = 1. Auto-detect never selects homer, premortem, or phase for a child spec — those steps never run on one.
 - `tasks.md` with all `- [x]` complete (no `- [ ]` lines remaining) → start at **marge**
 - `tasks.md` with some `- [x]` complete → start at **ralph**
 - `spec.md` with Phases and a `## Manifest` section (split already ran) → start at **ralph**
@@ -259,6 +261,14 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 
 (Replace `<stop>` with the actual `STOP_AFTER_STEP` value and `<start>` with the actual starting step name.)
 
+### Step 3d: Child-Spec Step Applicability
+
+If FEATURE_DIR matches the `--p{N}-` child pattern, `homer`, `premortem`, and `phase` do not apply — see "Child specs skip three steps" in the Overview.
+
+1. **`--from` names an inapplicable step**: log `<step> does not run on child specs — starting at <next applicable step> instead.` and advance `start_index` to the next applicable step (`plan` for a child spec, since reconcile precedes homer). Do not error — the developer's intent is clear.
+
+2. **`--stop-after` names an inapplicable step**: log `<step> does not run on child specs — stopping after <previous applicable step> instead.` and move `stop_after_index` back to the previous applicable step (`reconcile`). If that would put the stop before the starting step, apply the Step 3c range error instead.
+
 ### Step 4: Configuration
 
 Loop iteration limits are owned by each loop's standalone skill (the `LOOP_CONFIG` in `.claude/skills/speckit-<loop>-*/SKILL.md`); ralph's is dynamic (incomplete tasks + 10). The loop playbooks defer to those skills — the pipeline does not restate the limits.
@@ -273,6 +283,8 @@ Before executing any steps, output an execution plan announcement listing the st
 - **When `--stop-after` is NOT provided**: `Execution plan: homer -> premortem -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge.`
 
 The step names in the plan are joined with ` -> `. Only include steps from the starting step through the stop step (inclusive). When `--stop-after` is provided, append ` Stopping after: <step>.` to the announcement. When `--stop-after` is not provided, omit the "Stopping after" clause entirely.
+
+**Child specs**: when FEATURE_DIR matches the `--p{N}-` pattern, omit `homer`, `premortem`, and `phase` from the announced plan — they never run on a child spec. A phase-2 child with no artifacts announces: `Execution plan: reconcile -> plan -> tasks -> lisa -> ralph -> marge.`
 
 ### Step 5: Execute Pipeline Steps
 
@@ -317,7 +329,8 @@ List **all eleven pipeline steps** in order, each with a status. Determine the s
 - **`executed`**: The step ran during this pipeline invocation (either a sub-agent was spawned or, for loop steps, iterations were performed).
 - **`skipped`**: The step was NOT executed. This applies when:
   - The step falls before the `--from` starting step (outside the execution range), OR
-  - The step's artifact already existed so the step was skipped (e.g., `spec.md` already existed so specify was skipped, `plan.md` already existed so plan was skipped).
+  - The step's artifact already existed so the step was skipped (e.g., `spec.md` already existed so specify was skipped, `plan.md` already existed so plan was skipped), OR
+  - The step does not apply to this spec — `homer`, `premortem`, and `phase` on a child spec; `split` on a child or single-phase spec; `reconcile` on a parent, standalone, or phase-1 spec.
 - **`stopped-by-param`**: The step was NOT executed because it falls after the `STOP_AFTER_STEP`. This status applies to all steps whose index is greater than the `stop_after_index`. When `--stop-after` is not provided, no step receives this status.
 - **`awaiting-human`**: The premortem gate blocked because the human premortem session is incomplete (no `failure-modes.md`, or `open` rows remain). Only the premortem step can receive this status; all downstream steps report `skipped`.
 

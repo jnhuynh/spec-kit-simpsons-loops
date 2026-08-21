@@ -5,6 +5,7 @@ Run the Marge loop exactly as its standalone skill defines it: read and follow `
 **Pipeline deltas**:
 
 - Skip the loop orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from the orchestrator's Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
+- **Child specs**: if FEATURE_DIR matches the `--p{N}-` child pattern, pass this through to the review: `This spec is a phase view — it references its parent by ID under ## Inherited Scope and holds no copy of the requirements. Read <PARENT_DIR>/spec.md and resolve those IDs before judging whether the implementation satisfies its spec. Review the code against the inherited requirements plus the child's phase-local FR-P{N}-### / SC-P{N}-### entries, and against the ## Phase Boundary entry/exit state. Work that implements an ID listed under "Deferred elsewhere" is out-of-phase scope creep — flag it.`
 - If the skill reports **failure** (loop abort, or its end-of-loop full quality gate failed), set the pipeline completion status to **failure** with the skill's reason, surface the failing output in the report, and suggest resuming with `--from marge`. Do NOT run the manifest update below on failure exits — the phase is not complete.
 
 **Post-marge manifest update (child specs only)**: When the marge loop exits via the success path (all findings resolved) AND the full quality gate passes, update the parent manifest to mark this phase as "Complete". Skip this entirely if FEATURE_DIR does not match the `--p{N}-` pattern (not a child spec).

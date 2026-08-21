@@ -2,6 +2,8 @@
 
 Failure-mode discovery is a **human-required step** — the pipeline never runs it autonomously and never spawns a sub agent for it. This step only checks that the human work is done: the risk register `<FEATURE_DIR>/failure-modes.md` exists and every failure mode is dispositioned.
 
+**Child-spec skip**: If FEATURE_DIR matches the `--p{N}-` child pattern, **skip this gate** and log `Premortem skipped — child spec (the parent's premortem covers the feature).` The premortem runs once, on the parent, before phase and split. Its risk register lives at `<PARENT_DIR>/failure-modes.md` and covers every phase. To work a phase-specific failure mode, run `/speckit-premortem <PARENT_DIR>` against the parent register.
+
 **Skip check**: If `SKIP_PREMORTEM` is true, log `Premortem gate skipped per --skip-premortem.` and continue to the next step.
 
 **Gate check** (Read tool): Read `<FEATURE_DIR>/failure-modes.md`. The gate passes when the file exists AND its table contains zero rows with Status `open`.
