@@ -265,9 +265,9 @@ Invalid range: --stop-after '<stop>' comes before starting step '<start>' in the
 
 If FEATURE_DIR matches the `--p{N}-` child pattern, `homer`, `premortem`, and `phase` do not apply — see "Child specs skip three steps" in the Overview.
 
-1. **`--from` names an inapplicable step**: log `<step> does not run on child specs — starting at <next applicable step> instead.` and advance `start_index` to the next applicable step (`plan` for a child spec, since reconcile precedes homer). Do not error — the developer's intent is clear.
+1. **`--from` names an inapplicable step**: log `<step> does not run on child specs — starting at <next applicable step> instead.` and advance the starting step **and** `start_index` to the next step after it in a child-spec run (`plan`, for all three — the only steps between them and plan are the other inapplicable ones). Do not error — the developer's intent is clear.
 
-2. **`--stop-after` names an inapplicable step**: log `<step> does not run on child specs — stopping after <previous applicable step> instead.` and move `stop_after_index` back to the previous applicable step (`reconcile`). If that would put the stop before the starting step, apply the Step 3c range error instead.
+2. **`--stop-after` names an inapplicable step**: log `<step> does not run on child specs — stopping after <previous applicable step> instead.` and update **both** `STOP_AFTER_STEP` and `stop_after_index` to the previous step of a child-spec run (`reconcile`, for all three — `specify` and `split` never appear in a child run either, see Step 4b). Updating the name matters: every post-step stop check compares `STOP_AFTER_STEP` by name, so an index-only remap would never fire. If the remapped stop falls before the starting step, apply the Step 3c range error instead.
 
 ### Step 4: Configuration
 
@@ -284,7 +284,7 @@ Before executing any steps, output an execution plan announcement listing the st
 
 The step names in the plan are joined with ` -> `. Only include steps from the starting step through the stop step (inclusive). When `--stop-after` is provided, append ` Stopping after: <step>.` to the announcement. When `--stop-after` is not provided, omit the "Stopping after" clause entirely.
 
-**Child specs**: when FEATURE_DIR matches the `--p{N}-` pattern, omit `homer`, `premortem`, and `phase` from the announced plan — they never run on a child spec. A phase-2 child with no artifacts announces: `Execution plan: reconcile -> plan -> tasks -> lisa -> ralph -> marge.`
+**Child specs**: when FEATURE_DIR matches the `--p{N}-` pattern, omit `homer`, `premortem`, and `phase` from the announced plan — they never run on a child spec — and also omit `specify` and `split`, which never apply to one (a child's `spec.md` always exists, and a child is never re-split). A phase-2 child with no artifacts announces: `Execution plan: reconcile -> plan -> tasks -> lisa -> ralph -> marge.`
 
 ### Step 5: Execute Pipeline Steps
 

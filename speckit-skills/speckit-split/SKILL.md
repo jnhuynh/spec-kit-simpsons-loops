@@ -13,7 +13,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks` from repo root and parse FEATURE_DIR from the JSON output. The `--require-tasks` flag makes the check require **both** `plan.md` and `tasks.md` to exist before splitting: the spec is decomposed only after the whole-feature plan and task list are in place, so the phase boundaries have been validated against the full implementation design rather than the spec alone. If either artifact is missing, the script reports it (e.g. "Run /speckit-plan first" or "Run /speckit-tasks first") and exits non-zero — stop and surface that message instead of proceeding. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Resolve the feature directory. If `$ARGUMENTS` contains a directory path, use it as FEATURE_DIR and verify that **both** `FEATURE_DIR/plan.md` and `FEATURE_DIR/tasks.md` exist -- report the missing artifact (e.g. "Run /speckit-plan first" or "Run /speckit-tasks first") and **STOP** if either is absent. (The directory-argument form is how `/speckit-reconcile` step 7 and callers on a child branch target the **parent** spec -- branch-based resolution would point at the wrong directory.) Otherwise run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks` from repo root and parse FEATURE_DIR from the JSON output. The `--require-tasks` flag makes the check require **both** `plan.md` and `tasks.md` to exist before splitting: the spec is decomposed only after the whole-feature plan and task list are in place, so the phase boundaries have been validated against the full implementation design rather than the spec alone. If either artifact is missing, the script reports it (e.g. "Run /speckit-plan first" or "Run /speckit-tasks first") and exits non-zero — stop and surface that message instead of proceeding. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Read the parent spec at `FEATURE_DIR/spec.md`.
 
@@ -31,6 +31,7 @@ You **MUST** consider the user input before proceeding (if not empty).
       - Assigned stories (from the `**Stories**:` line)
       - Release strategy (from the `**Release Strategy**:` line)
       - Rationale (from the `**Rationale**:` line)
+      - Explicit requirement assignments (from an optional `**Requirements**:` line of comma-separated `FR-###` ids -- written by `/speckit-reconcile` when it adds or reassigns a requirement; absent on a freshly phased spec)
 
    c. **Validate phases**:
       - Phase count must not exceed 10. If it does, report this error and **STOP**:
@@ -146,19 +147,21 @@ You **MUST** consider the user input before proceeding (if not empty).
       **Content rules**:
 
       - Copy **no** prose from the parent. Only IDs, entity names, and story titles cross the boundary -- a title is a label for the reference, not a restatement of the story.
-      - Every parent user story, functional requirement, key entity, and success criterion MUST appear in exactly one child's Inherited Scope. Items tied to no specific story belong to Phase 1's child.
+      - Every parent user story, functional requirement, key entity, and success criterion MUST appear in exactly one child's Inherited Scope. An FR listed on a phase's `**Requirements**:` line in `## Phases` belongs to that phase; every other item follows its story, and items tied to no specific story belong to Phase 1's child.
       - Keep the canonical headings (`## User Scenarios & Testing`, `## Requirements`, `## Success Criteria`) even when a phase adds nothing of its own -- upstream Spec Kit commands (`/speckit-plan`, `/speckit-tasks`, `/speckit-analyze`) look for them.
       - Omit a "Phase-local additions" list when the phase adds none; always keep the `Inherited:` line.
-      - Write entry state as present-tense fact, never as a dependency on a sibling ("`provider_ref` exists, nullable, unbackfilled" -- not "after Phase 1 adds `provider_ref`"). The Manifest and the pipeline's phase order guard already encode sequencing.
+      - Write entry state -- and phase-local `FR-P{N}-###` / `SC-P{N}-###` entries -- as present-tense conditions, never as dependencies on a sibling phase ("`provider_ref` exists, nullable, unbackfilled" -- not "after Phase 1 adds `provider_ref`"). The Manifest and the pipeline's phase order guard already encode sequencing.
 
    e. **Refresh logic** (existing child specs on re-run):
 
       A child spec holds exactly two kinds of content, and only one of them is derived:
 
-      - **Derived** -- the title line, the metadata block, `## Inherited Scope`, and the `Inherited:` line under each canonical heading. All of it comes from the parent's `## Phases` section. Regenerate it in place on every run.
+      - **Derived** -- the title line, the metadata block, the opening phase-view directive blockquote, `## Inherited Scope`, and the `Inherited:` line under each canonical heading. It comes from the parent's `## Phases` section. Regenerate it in place on every run -- with two exceptions inside the metadata block: `**Created**` and `**Status**` are written once at first generation and preserved unchanged on every refresh (they are state, not derivation; restamping them would reset phase status and break byte-for-byte idempotency).
       - **Authored** -- `## Phase Boundary` and the phase-local `FR-P{N}-###` / `SC-P{N}-###` entries. Written by a developer, or by the pipeline while the phase is worked. **Never overwrite, reorder, or delete them.**
 
       Re-running split therefore needs no baseline regeneration, no section diffing, and no conflict markers. The parent holds exactly one copy of every inherited item, so a parent edit cannot conflict with a child -- it simply becomes visible to every child that references it. Re-phasing (a story moved between phases) surfaces as a changed Inherited Scope table and nothing else.
+
+      **Old-model children**: if an existing child predates the reference model (its `spec.md` has no `## Inherited Scope` section -- its sections hold copied parent prose), do **not** refresh it. Leave the file untouched and report it as needing manual conversion to the phase-view shape (replace the copied sections with an `## Inherited Scope` table; renumber phasing-only requirements into `FR-P{N}-###`). The derived/authored split above describes reference-model children only.
 
       **Orphaned phase-local requirements**: if a refresh moves an inherited item out of a phase whose authored `FR-P{N}-###` or `SC-P{N}-###` entries reference that item, refresh the table anyway and report the affected phase-local IDs so the developer can revisit them. Do not edit or delete authored content to resolve this.
 

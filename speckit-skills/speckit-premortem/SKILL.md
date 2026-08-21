@@ -21,10 +21,10 @@ Placement: runs after `/speckit-clarify` (Homer) has clarified the spec and befo
 
 ## Execution Steps
 
-1. Run `.specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root **once**. Parse minimal JSON payload fields:
-   - `FEATURE_DIR`
-   - `FEATURE_SPEC`
-   - If JSON parsing fails, abort and instruct user to re-run `/speckit-specify` or verify feature branch environment.
+1. Resolve the feature directory:
+   - If `$ARGUMENTS` contains a directory path, use it as `FEATURE_DIR` (and `FEATURE_DIR/spec.md` as `FEATURE_SPEC`) -- this is how a phase-specific failure mode is worked from a child branch: pass the parent directory, where the register lives.
+   - Otherwise run `.specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root **once** and parse minimal JSON payload fields `FEATURE_DIR` and `FEATURE_SPEC`. If JSON parsing fails, abort and instruct user to re-run `/speckit-specify` or verify feature branch environment.
+   - If the resolved `FEATURE_DIR` matches the `--p{N}-` child pattern, strip `--p{N}-{slug}` and target the parent directory instead, logging the redirect -- a child spec never owns a risk register; the premortem runs once, on the parent.
 
 2. Load context:
    - Read the spec file in full.

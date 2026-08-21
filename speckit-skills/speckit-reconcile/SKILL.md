@@ -21,7 +21,7 @@ There is nothing to merge and no conflict to resolve: each inherited item exists
 
 1. **Resolve the parent directory**:
    - If `$ARGUMENTS` contains a directory path, use it as `PARENT_DIR`.
-   - Otherwise run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root and parse `FEATURE_DIR`. If `FEATURE_DIR` matches the `--p{N}-{slug}` child pattern, strip that suffix to get `PARENT_DIR`. If it does not match, this is not a phased feature -- report `Not a phased feature -- nothing to reconcile.` and **STOP**.
+   - Otherwise run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root and parse `FEATURE_DIR`. If `FEATURE_DIR` matches the `--p{N}-{slug}` child pattern, strip that suffix to get `PARENT_DIR`. If it does not match, use `FEATURE_DIR` itself as `PARENT_DIR` -- running from the parent's own branch is valid, and step 2's manifest check gates specs that were never split.
 
 2. **Read the parent spec** at `PARENT_DIR/spec.md`. If it has no `## Manifest` section, report this error and **STOP**:
 
@@ -37,14 +37,14 @@ There is nothing to merge and no conflict to resolve: each inherited item exists
    - `specs/{child-directory}/plan.md` -- the technical decisions the phase made
    - The source files those artifacts name -- read the code when a task description and the parent spec disagree, because the code decides
 
-5. **Compare against the parent spec**. For each item in that phase's `## Inherited Scope` (user stories, `FR-###`, key entities, `SC-###`), determine whether the parent's description still matches what shipped. Classify each mismatch:
+5. **Compare against the parent spec, in both directions**. For each item in that phase's `## Inherited Scope` (user stories, `FR-###`, key entities, `SC-###`), determine whether the parent's description still matches what shipped. Then reverse the comparison: work the phase shipped (per step 4's artifacts) that no spec item covers is drift too -- the **Undocumented requirement shipped** row below. Classify each mismatch:
 
    | Drift | Example | Disposition |
    |-------|---------|-------------|
    | **Mechanism changed** | FR says "retry with exponential backoff"; the phase shipped a dead-letter queue | Auto-fix: rewrite the parent's FR text to describe what shipped |
    | **Entity shape changed** | Parent lists `Payment{amount, status}`; the phase shipped a separate `LedgerEntry` | Auto-fix: update the parent's Key Entities |
-   | **Undocumented requirement shipped** | The phase added an idempotency key nothing in the spec asked for | Auto-fix: add a new `FR-###` to the parent and assign it to the phase that shipped it in `## Phases` |
-   | **Requirement not shipped** | `FR-007` was in the phase's scope but no task implemented it | Auto-fix: reassign `FR-007` to a later phase in the parent's `## Phases` section |
+   | **Undocumented requirement shipped** | The phase added an idempotency key nothing in the spec asked for | Auto-fix: add a new `FR-###` to the parent and assign it to the phase that shipped it via that phase's `**Requirements**:` line in `## Phases` (create the line if absent -- split's refresh reads it) |
+   | **Requirement not shipped** | `FR-007` was in the phase's scope but no task implemented it | Auto-fix: reassign `FR-007` by moving it onto a later phase's `**Requirements**:` line in the parent's `## Phases` section |
    | **Intent changed** | The phase shipped behavior that contradicts what the requirement was *for*, not just how it works | **NEEDS_HUMAN**: report it, change nothing |
    | **Success criterion invalidated** | `SC-002`'s threshold is no longer measurable against what shipped | **NEEDS_HUMAN**: report it, change nothing |
 

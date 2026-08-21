@@ -13,7 +13,7 @@
 #     section-by-section manual-edit detection, <!-- CONFLICT --> markers) is gone
 #   - the reconcile pipeline step targets the PARENT spec for drift, not the child
 #   - homer / premortem / phase skip on child specs
-#   - plan / tasks / lisa / marge tell their sub agents to resolve the parent first
+#   - plan / tasks / lisa / ralph / marge / pr-review tell their sub agents to resolve the parent first
 #
 # Expected: FAILS against the duplication model, PASSES after the reference
 #           model lands.
@@ -91,12 +91,13 @@ done
 echo ""
 
 echo "Group 5: consumers resolve the parent before acting"
-for step in plan tasks; do
+for step in plan tasks ralph; do
     assert_contains "$step step tells the sub agent to resolve Inherited Scope" \
         "$STEPS/$step.md" 'Inherited Scope'
 done
 assert_contains "lisa step resolves the parent for child specs" "$STEPS/lisa.md" 'Inherited Scope|parent spec'
 assert_contains "marge step points reviewers at the parent" "$STEPS/marge.md" 'Inherited Scope|parent spec'
+assert_contains "pr-review step points the PR reviewer at the parent" "$STEPS/pr-review.md" 'Inherited Scope'
 echo ""
 
 echo "Group 6: pipeline spine and docs describe the reference model"

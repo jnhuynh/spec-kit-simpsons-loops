@@ -23,7 +23,7 @@ To pipeline each child spec (run in phase order):
   /speckit-pipeline {child-dir-2}
   ...
 
-Deploy and validate each phase in production before starting the next. When you pipeline a child spec, it auto-reconciles with what earlier phases actually built."
+Deploy and validate each phase in production before starting the next. When you pipeline a child spec (phase 2+), the reconcile step compares what earlier phases actually shipped against the parent spec and corrects the parent — each phase picks up from reality, not the original plan."
 
 **Option 2**: "Continue implementing full parent spec as a monolith" — With description: "WARNING: This will implement all phases as a single deployment, producing one large PR with all changes across all phases. This defeats the purpose of phased delivery. Only choose this if phased delivery is not needed despite having multiple phases."
 
