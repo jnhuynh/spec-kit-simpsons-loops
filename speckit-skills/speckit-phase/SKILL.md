@@ -17,7 +17,7 @@ Analyze the user stories in an existing `spec.md` for natural deployment boundar
 
 ## Instructions
 
-1. **Resolve the feature directory**: Run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root via Bash tool. Parse the JSON output for `FEATURE_DIR` and `FEATURE_SPEC`. If the script exits non-zero, display its output and stop.
+1. **Resolve the feature directory**: Run `bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root via Bash tool. Parse the JSON output for `FEATURE_DIR` and `FEATURE_SPEC`. If the script exits non-zero, display its output and stop. If `FEATURE_DIR` matches the `--p{N}-` child pattern, **STOP** and report: `Phase never runs on a child spec -- it is already one phase of the parent. A child's phase number, slug, and release strategy come from the parent's ## Phases section; run /speckit-phase against the parent only if the parent needs re-phasing.`
 
 2. **Read `spec.md`**: Read the spec file at `FEATURE_SPEC`. If it does not exist, display an error and stop.
 

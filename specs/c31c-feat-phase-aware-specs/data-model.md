@@ -3,6 +3,8 @@
 **Date**: 2026-05-28
 **Feature**: `c31c-feat-phase-aware-specs`
 
+> **Superseded in part** by `b4e1-feat-phase-spec-references` (2026-08-21). The **Child Spec** entity is no longer a self-contained copy of the parent's content — it is a phase view that references the parent by ID — and the **Conflict Marker** entity no longer exists. The Phase Annotation, Manifest, Status State Machine, and Parent Spec entities below are unchanged.
+
 ## Entities
 
 ### Phase Annotation

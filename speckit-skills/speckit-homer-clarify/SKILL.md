@@ -28,6 +28,8 @@ Set the following LOOP_CONFIG values for this execution:
 
 ## Execute
 
+**Child-spec guard**: if the spec directory (from `$ARGUMENTS` or branch auto-detection) matches the `--p{N}-` child pattern, **STOP** before starting the loop and report: `Homer never runs on a child spec -- clarifications belong in the parent. Run /speckit-homer-clarify <PARENT_DIR> (strip --p{N}-{slug} from the child directory name).`
+
 Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using the LOOP_CONFIG values above. Pass `$ARGUMENTS` through for argument parsing.
 
 ## Examples

@@ -5,6 +5,7 @@ Run the Ralph loop exactly as its standalone skill defines it: read and follow `
 **Pipeline deltas**:
 
 - Skip the loop orchestrator's Pre-Flight and Agent File checks (already done in pipeline pre-flight). Start from the orchestrator's Step 1 (Parse Arguments) using the already-resolved `FEATURE_DIR`.
+- **Child specs**: if FEATURE_DIR matches the `--p{N}-` child pattern, pass this through to the implementation by appending it to the loop's `EXTRA_PROMPT_SUFFIX` (after the quality-gates value the skill already sets) so it reaches every iteration sub-agent: `This spec is a phase view — it references its parent by ID under ## Inherited Scope and holds no copy of the requirements. Read <PARENT_DIR>/spec.md and resolve those IDs before implementing. Build the inherited requirements plus the child's phase-local FR-P{N}-### / SC-P{N}-### entries, and stop at the ## Phase Boundary exit state. Never implement an ID the child lists under "Deferred elsewhere" — it belongs to another phase and another deployment.`
 - If the skill STOPs on missing/empty quality gates, abort the pipeline with that error.
 - If the skill reports **failure** (loop abort, or its end-of-loop full quality gate failed), abort the pipeline with completion status **failure** and the skill's reason, suggest resuming with `--from ralph`, and skip the simplify, security-review, and marge steps.
 
