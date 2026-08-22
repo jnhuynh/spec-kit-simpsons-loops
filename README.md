@@ -3,116 +3,186 @@
 > ⚠️ _Alpha — Experimental Project_
 > This project is in early alpha and under active, rapid development. Expect frequent breaking changes, shifting APIs, and structural overhauls. Things will change often and without notice. Use at your own risk.
 
-Automated iteration loops and pipeline orchestration for [Speckit](https://github.com/speckit)-powered projects using Claude Code CLI.
+Automated iteration loops and pipeline orchestration for [Spec Kit](https://github.com/github/spec-kit)-powered projects using Claude Code.
 
-Each loop spawns fresh sub agents (via the Agent tool) with isolated context windows per iteration, preventing hallucination drift and context window exhaustion.
+Every loop iteration and every pipeline step runs in a **fresh sub agent** with its own context window. Nothing carries over but the files on disk, which is what keeps long runs from drifting or exhausting context.
 
-| Loop     | What it does                                                                                                                                                                                        |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Homer    | Iterative spec clarification. Runs `/speckit-clarify` on `spec.md`, self-answers up to 5 queued questions per iteration using the skill's own recommended answers, commits, and repeats until no critical ambiguities remain — typically 2-3 iterations.  |
-| Premortem | **Human-required gate** (not a loop). You run `/speckit-premortem` interactively — three failure-mode lenses (architecture, UX, support/ops), 5 questions per session — mitigations are encoded into `spec.md` and a risk register (`failure-modes.md`). The pipeline halts at this step until every discovered failure mode is dispositioned (mitigate / accept / defer). |
-| Lisa     | Iterative cross-artifact analysis. Runs `/speckit-analyze` on `spec.md`, `plan.md`, and `tasks.md`, fixes all auto-fixable findings in severity order, commits, and re-scans to verify — typically 2-3 iterations.            |
-| Ralph    | Task-by-task implementation. Picks the next incomplete task from `tasks.md`, implements it, validates against quality gates, commits, and repeats until all tasks are done.                         |
-| Marge    | Iterative code review. Runs `/speckit-review` on the feature branch diff, fixes all mechanical findings in severity order (leaves `NEEDS_HUMAN` for humans), commits, and re-reviews to verify — typically 2-3 iterations. |
-| Pipeline | End-to-end orchestrator: reconcile -> specify -> homer -> premortem -> phase -> plan -> tasks -> lisa -> split -> ralph -> marge. Auto-detects where to start based on existing artifacts.                       |
+## What's in the box
 
-**Pre-pipeline:**
+The pipeline runs these steps in order. Every one of them is also runnable on its own — see [Running steps individually](#running-steps-individually) for the slash-command names.
 
-| Command     | What it does                                                                                                                                                                                        |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brainstorm  | Adversarial idea refinement. Challenges a vague idea with 4-7 targeted questions, then emits a feature description ready for `/speckit-specify` or `/speckit-pipeline --description "..."`.         |
+| # | Step | Kind | What it does |
+|---|------|------|--------------|
+| 0 | **reconcile** | single-shot, child specs only | Compares what completed phases actually shipped against the parent spec and corrects the **parent**. |
+| 1 | **specify** | single-shot | Creates `spec.md` from a feature description. |
+| 2 | **homer** | loop | Clarifies the spec. Self-answers up to 5 queued questions per iteration using the skill's own recommended answers. Typically 2-3 iterations. |
+| 3 | **premortem** | **human gate** | You work three failure-mode lenses (architecture, UX, support/ops) interactively. Mitigations land in `spec.md`; every risk is tracked in `failure-modes.md`. The pipeline **halts here** until nothing is `open`. |
+| 4 | **phase** | single-shot | Detects deployment boundaries and writes a `## Phases` section. |
+| 5 | **plan** | single-shot | Generates `plan.md`. |
+| 6 | **tasks** | single-shot | Generates a dependency-ordered `tasks.md`. |
+| 7 | **lisa** | loop | Cross-artifact analysis of spec/plan/tasks. Fixes all auto-fixable findings per iteration, then re-scans to verify. Typically 2-3 iterations. |
+| 8 | **split** | single-shot, multi-phase parents only | Generates one child spec directory per phase. |
+| 9 | **ralph** | loop | Implements one task per iteration, validates against quality gates, commits. |
+| — | **simplify** | optional | Invokes `/simplify` for reuse/quality/efficiency fixes. Silently skipped if the skill is absent. |
+| — | **security-review** | optional | Invokes `/security-review` for a security audit. Silently skipped if the skill is absent. |
+| 10 | **marge** | loop | Reviews the branch diff against review packs. Fixes all mechanical findings per iteration, leaves `NEEDS_HUMAN` ones alone, re-reviews to verify. Typically 2-3 iterations. |
+| — | **pr-review** | optional | Posts inline PR comments for human-judgment findings. Skipped if there is no open PR. |
+
+The three unnumbered steps are **optional polish** — they run automatically when their skill is installed, and they are not valid `--from` / `--stop-after` targets.
+
+Two commands sit outside the pipeline:
+
+| Command | What it does |
+|---------|--------------|
+| `/speckit-brainstorm` | Pre-spec. Stress-tests a vague idea with pointed questions — one at a time, 4-5 typical, 7 hard cap — then emits a feature description ready for `/speckit-specify` or `--description`. |
+| `/speckit-review` | Single-pass code review report, no auto-fix. Marge without the loop. |
 
 > **Note on permissions**
-> The loop commands instruct sub agents to execute autonomously — no permission prompts, no confirmation dialogs, no interactive pauses. Review the agent files and understand what each loop does before running them.
-> The one deliberate exception is the **premortem** step: it is a human gate the pipeline never runs autonomously — risk disposition belongs to a person.
+> The loops instruct sub agents to execute autonomously — no permission prompts, no confirmations, no interactive pauses. Read the agent files before running them.
+> The one deliberate exception is **premortem**: a human gate the pipeline never runs for you. Risk disposition belongs to a person.
 
-## Architecture
-
-### Pipeline flow
-
-The pipeline orchestrator spawns a fresh sub agent (via the Agent tool) for each step and each loop iteration. Steps execute strictly in sequence — each sub agent must complete before the next is spawned.
+## Pipeline flow
 
 ```mermaid
 flowchart TD
-    A["/speckit-pipeline"] --> B{Auto-detect\nstarting step}
-    B --> R["Reconcile\n(child specs only)\ncorrects the parent spec"]
-    R -->|"child spec:\nhomer, premortem, phase\nnever run"| E
-    R --> C["Specify\n(sub agent)"]
-    C --> D["Homer Loop"]
-    D --> D1["Iteration 1\n(sub agent)"]
-    D1 --> D2["Iteration 2\n(sub agent)"]
-    D2 --> D3["... until resolved\nor max iterations"]
-    D3 --> PM{"Premortem gate\n(human step)"}
-    PM -->|"register clean"| P["Phase\n(sub agent)"]
-    PM -->|"open failure modes"| PMH["Halt: run\n/speckit-premortem\nthen --from premortem"]
-    P --> E["Plan\n(sub agent)"]
-    E --> F["Tasks\n(sub agent)"]
-    F --> G["Lisa Loop"]
-    G --> G1["Iteration 1\n(sub agent)"]
-    G1 --> G2["Iteration 2\n(sub agent)"]
-    G2 --> G3["... until resolved\nor max iterations"]
-    G3 --> S{"Split\n(multi-phase\nparents only)"}
-    S -->|"Stop & work\non children"| I2["Report Results"]
-    S -->|"Continue as\nmonolith"| H["Ralph Loop"]
-    S -->|"Single phase\nor child spec"| H
-    H --> H1["Iteration 1\n(sub agent)"]
-    H1 --> H2["Iteration 2\n(sub agent)"]
-    H2 --> H3["... until all tasks\ncomplete or max iterations"]
-    H3 --> M["Marge Loop"]
-    M --> M1["Iteration 1\n(sub agent)"]
-    M1 --> M2["Iteration 2\n(sub agent)"]
-    M2 --> M3["... until zero findings\nor max iterations"]
-    M3 --> I["Report Results"]
+    A["/speckit-pipeline"] --> B{Auto-detect<br/>starting step}
+    B --> R["reconcile<br/>(child specs only)<br/>corrects the parent spec"]
+    R -->|"child spec:<br/>homer, premortem, phase<br/>never run"| E
+    R --> C["specify"]
+    C --> D["Homer loop<br/>(fresh sub agent<br/>per iteration)"]
+    D --> PM{"Premortem gate<br/>(human step)"}
+    PM -->|"open failure modes"| PMH["Halt: run<br/>/speckit-premortem<br/>then --from premortem"]
+    PM -->|"register clean"| P["phase"]
+    P --> E["plan"]
+    E --> F["tasks"]
+    F --> G["Lisa loop"]
+    G --> S{"split<br/>(multi-phase<br/>parents only)"}
+    S -->|"Stop & work<br/>on children"| Z["Report results"]
+    S -->|"Continue as monolith,<br/>single phase,<br/>or child spec"| H["Ralph loop"]
+    H --> O1["simplify<br/>(optional)"]
+    O1 --> O2["security-review<br/>(optional)"]
+    O2 --> M["Marge loop"]
+    M --> O3["pr-review<br/>(optional,<br/>needs open PR)"]
+    O3 --> Z
 ```
 
-### Standalone loop iteration lifecycle
+## Prerequisites
 
-Each standalone loop command (`/speckit-homer-clarify`, `/speckit-lisa-analyze`, `/speckit-ralph-implement`, `/speckit-marge-review`) follows the same iteration lifecycle.
+- A project already set up with Spec Kit (a `.specify/` directory exists)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
+- Upstream Spec Kit commands or skills present: `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-analyze`, `speckit-clarify`, `speckit-implement`
 
-```mermaid
-flowchart TD
-    A["Loop Orchestrator"] --> B["Spawn Sub Agent\n(fresh context)"]
-    B --> C["Sub Agent Executes\n(one iteration)"]
-    C --> D{Check completion\npromise tag?}
-    D -->|"Found"| E["Report Success\nExit Loop"]
-    D -->|"Not Found"| F{File changes\nsince last iteration?}
-    F -->|"Yes"| G["Reset stuck counter\nNext iteration"]
-    F -->|"No"| H{Stuck counter\n>= 2?}
-    H -->|"No"| I["Increment stuck counter\nNext iteration"]
-    H -->|"Yes"| J["Abort: Stuck detected\n2 consecutive iterations\nwith no changes"]
-    G --> K{Max iterations\nreached?}
-    I --> K
-    K -->|"No"| B
-    K -->|"Yes"| L["Report: Max iterations reached"]
+Everything else — the loop skills, `speckit-review`, `speckit-split`, `speckit-reconcile`, `speckit-premortem` — is installed by `setup.sh`.
+
+### API key vs. Claude subscription
+
+If `ANTHROPIC_API_KEY` is set, every iteration consumes API credits from that key. To bill your Claude subscription (Pro/Max) instead:
+
+```bash
+unset ANTHROPIC_API_KEY
 ```
 
-## Recommended workflow
+## Setup
 
-Before kicking off the pipeline or any loop, refine your specs manually. Start with `/speckit-brainstorm` if your idea is still vague — it will challenge you to sharpen it. Then run `/speckit-specify` to draft the initial spec, and `/speckit-clarify` interactively to resolve ambiguities. The more precise your spec is before automation takes over, the better the results — automation amplifies whatever it's given.
+From the root of your target project:
 
-You can also run each loop individually and review between stages instead of running the full pipeline. Run Homer first, review the clarified spec, work the `/speckit-premortem` failure-mode session, generate the plan and tasks manually, review those, run Lisa, review, then run Ralph. This staged approach lets you course-correct at every step.
+```bash
+bash <path-to-simpsons-loops>/setup.sh
+```
 
-### Large features: phased delivery
+It is idempotent — re-run it to upgrade.
 
-When a feature is too large to implement and deploy as a single unit — database migrations that need expand-and-contract sequencing, third-party integrations that need production validation, or changes that would produce unreviewable PRs — use phased delivery:
+<details>
+<summary>What setup.sh installs (and how to do it by hand)</summary>
 
-1. **Run the pipeline** — `/speckit-pipeline --from specify --description "..."` runs specify and homer (clarify), then halts at the premortem gate for your failure-mode session (`/speckit-premortem`); resume with `--from premortem` to continue through phase (detect deployment boundaries), plan, tasks, and lisa (cross-artifact analysis) on the parent spec. Phase detection uses vertical-slice grouping by product surface — each surface completes its full deploy cycle before the next starts.
+| Source (this repo) | Destination (your project) | On re-install |
+|--------------------|----------------------------|---------------|
+| `claude-agents/*.md` | `.claude/agents/` | overwritten |
+| `speckit-skills/*/` | `.claude/skills/` | overwritten (each skill is a directory; `reference/` files ride along) |
+| `specify-marge/baseline/*.md` | `.specify/marge/baseline/` | **preserved** — your edits survive |
+| `specify-marge/README.md`, `config/README.md`, `run-gates.sh` | `.specify/marge/` | overwritten (framework docs + runner) |
+| `scripts/speckit-commit.sh` | `.specify/scripts/bash/` | overwritten |
+| `templates/CLAUDE.md` | `CLAUDE.md` | merged — content below the separator is yours |
+| `templates/constitution.md` | `.specify/memory/constitution.md` | merged — content below the separator is yours |
+| `gitignore` | appended to `.gitignore` | skipped if the marker line is present |
 
-2. **Auto-split** — After lisa, the pipeline's split step detects multi-phase specs and generates child spec directories under `specs/`, one per phase, using a `{parent}--p{N}-{slug}` naming convention. It then prompts you: stop and work on children (recommended) or continue as a monolith.
+It also creates `.specify/quality-gates.sh` and `.specify/quality-gates-fast.sh` placeholders if they do not exist (both exit 1 until you edit them), creates the empty `.specify/marge/project/` and `.specify/marge/config/` directories for your own packs, and removes superseded artifacts from earlier versions (bash loop scripts, legacy per-command skill copies, and their `settings.local.json` permissions).
 
-3. **Implement phase by phase** — Run `/speckit-pipeline` on each child spec in order. The pipeline enforces phase ordering: phase N cannot start until all earlier phases are marked "Complete" in the parent manifest. Use `--skip-phase-guard` to bypass this when phases are independent.
+To do it manually, copy each row above with `cp` (`cp -n` for the preserved row), `chmod +x` the two `.sh` files, and append this repo's `gitignore` to yours.
 
-4. **Auto-status** — The pipeline automatically updates the parent manifest as work progresses. When a child pipeline starts, the phase is marked "In Progress". When Marge (code review) completes successfully, the phase is marked "Complete". After each update, a phase status summary is printed so you can see progress across all phases at a glance.
+</details>
 
-5. **Auto-reconcile** — When you pipeline a child spec (phase 2+), the reconcile step compares what earlier phases actually shipped against the parent spec and corrects the parent where they diverged. You always pick up from reality rather than from the original plan, and the correction is visible to every remaining phase at once.
+## Usage
+
+Point the pipeline at a spec and it figures out the rest:
+
+```
+/speckit-pipeline                                  # auto-detect from the current branch
+/speckit-pipeline specs/a1b2-feat-user-auth        # target a spec directory
+```
+
+Auto-detection inspects which artifacts already exist — no `spec.md` starts at specify, an unphased `spec.md` starts at homer, a populated `tasks.md` starts at ralph, an all-complete `tasks.md` starts at marge, and a child spec starts at reconcile or plan. Override it with `--from` when you disagree.
+
+| Flag | Effect |
+|------|--------|
+| `--from <step>` | Start at this step instead of auto-detecting. |
+| `--stop-after <step>` | Halt once this step completes. Must be at or after the starting step. |
+| `--description "<text>"` | Feature description for the specify step. Required with `--from specify`. |
+| `--skip-phase-guard` | Let a child phase run before earlier phases are Complete. |
+| `--skip-premortem` | Bypass the premortem human gate. The skip is logged. |
+
+Valid `--from` / `--stop-after` values: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The flags combine:
+
+```
+/speckit-pipeline --from specify --description "Add OAuth2 authentication"
+/speckit-pipeline --from homer --stop-after tasks specs/a1b2-feat-user-auth
+```
+
+Every iteration commits its work, so an interrupted run resumes cleanly with `--from`.
+
+### Running steps individually
+
+Each step is also a slash command, useful when you want to review between stages:
+
+```
+/speckit-brainstorm I want to add some kind of caching layer
+/speckit-homer-clarify              # needs spec.md only
+/speckit-premortem                  # needs spec.md only; run until nothing is open
+/speckit-lisa-analyze               # needs spec.md + plan.md + tasks.md
+/speckit-ralph-implement            # needs tasks.md and a configured quality gate
+/speckit-marge-review               # needs an implemented branch
+/speckit-review-pr                  # or: pr:42, or --dry-run
+```
+
+All four loops take an optional numeric argument to override max iterations (`/speckit-homer-clarify 5`).
+
+`/speckit-split` and `/speckit-reconcile` normally run inside the pipeline, but both accept a directory argument so you can target a **parent** spec from a child branch (`/speckit-split specs/c31c-feat-billing`).
+
+`/speckit-review-pr` posts a GitHub review with `COMMENT` event type — informational, never a merge gate — covering one-way doors (CRITICAL), concurrency risks and architectural decisions (WARNING), and project patterns (INFO). It is idempotent per commit.
+
+**Automation amplifies whatever it is given.** A sharp spec is worth more than any number of iterations, so brainstorm and clarify before you let the loops run.
+
+## Phased delivery
+
+When a feature is too large for one deploy — expand-and-contract migrations, integrations needing production validation, PRs nobody can review — split it:
+
+1. Run the pipeline on the parent. It clarifies, halts for your premortem, detects deployment boundaries, plans, and analyzes.
+2. **split** generates one child directory per phase: `specs/c31c-feat-billing--p1-expand-schema/`, `--p2-integration/`, `--p3-ui-reveal/`. It then asks whether to work the children (recommended) or continue as a monolith.
+3. Run `/speckit-pipeline` on each child in order. Phase N is blocked until phases 1..N-1 are Complete in the parent manifest (`--skip-phase-guard` to override).
+4. Status is automatic: `Draft -> In Progress -> Complete`, forward-only, with `Cancelled` reachable from any active state. Marge marks the phase Complete on a clean exit.
+5. From phase 2 on, **reconcile** runs first — it reads what earlier phases actually shipped and corrects the parent where reality diverged, so each phase starts from the truth.
 
 ### The parent spec is the single source of truth
 
-A child spec is a **phase view**, not a copy. The parent holds every user story, functional requirement, key entity, and success criterion exactly once; each child names the ones in its phase by ID under `## Inherited Scope` and adds only what phasing itself requires:
+A child spec is a **phase view**, not a copy. The parent holds every user story, requirement, key entity, and success criterion exactly once. Each child names the ones in its phase by ID and adds only what phasing itself requires:
 
 ```markdown
 **Parent Spec**: `../c31c-feat-billing/spec.md` <- AUTHORITATIVE
 **Phase**: 2 of 3    **Release Strategy**: dark launch with gradual reveal
+
+> **This is a phase view, not a standalone spec.** User stories, requirements, key
+> entities, and success criteria are defined once in the parent and are **not**
+> restated here. Read the parent sections named below before acting on this phase.
 
 ## Inherited Scope
 | Kind | Parent reference | Parent section |
@@ -135,375 +205,85 @@ Phase-local additions:
 - **FR-P2-001**: System MUST gate capture behind `billing.capture_v2`, default off.
 ```
 
-Two ID namespaces keep authorship unambiguous. Inherited IDs (`FR-###`, `SC-###`, `User Story N`) belong to the parent and are never restated. Phase-local IDs (`FR-P{N}-###`, `SC-P{N}-###`) belong to the child and cover only what exists because the work is phased — feature flags, dark-launch scaffolding, backfills, compatibility shims.
+Two ID namespaces keep authorship unambiguous. Inherited IDs (`FR-###`, `SC-###`, `User Story N`) belong to the parent and are never restated. Phase-local IDs (`FR-P{N}-###`, `SC-P{N}-###`) belong to the child and cover only what exists *because* the work is phased — feature flags, dark-launch scaffolding, backfills, compatibility shims.
 
-This is what makes phase PRs reviewable: the diff on a child spec contains only its `## Phase Boundary` and its phase-local entries. Nothing else can drift between parent and child, because nothing else is stored twice. A reviewer who needs the full scope reads the parent, once, and a reviewer checking one phase reads only that phase's delta.
+This is what makes phase PRs reviewable: a child spec's diff contains only its `## Phase Boundary` and its phase-local entries. Nothing else can drift, because nothing else is stored twice. Re-running split is idempotent — it regenerates the derived content (title, `## Inherited Scope`, `Inherited:` lines) while preserving both the authored content (`## Phase Boundary`, `FR-P{N}-###`, `SC-P{N}-###`) and the child's `Created` date and `Status`.
 
-It also means clarifications and requirement edits go to the **parent**, never to a child — which is why `homer`, `premortem`, and `phase` never run on a child spec. A child-spec pipeline run is `reconcile -> plan -> tasks -> lisa -> ralph -> marge`.
-
-## API key vs. Claude subscription
-
-If `ANTHROPIC_API_KEY` is set, every iteration will consume API credits from that key. To use your **Claude subscription** (Pro/Max) instead:
-
-```bash
-unset ANTHROPIC_API_KEY
-```
-
-## Prerequisites
-
-- A project already set up with Speckit (`.specify/` directory exists)
-- [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- Existing Speckit commands or skills installed (at minimum: `speckit-specify`, `speckit-implement`, `speckit-analyze`, `speckit-clarify`, `speckit-plan`, `speckit-tasks`). Marge's review loop additionally relies on the `speckit-review` skill, the splitting skill relies on `speckit-split`, the pipeline's reconcile step on `speckit-reconcile`, and its premortem gate on `speckit-premortem` — all are installed by `setup.sh`.
-
-## Setup
-
-### Option A: Automated (recommended)
-
-From the root of your target project:
-
-```bash
-bash <path-to-simpsons-loops>/setup.sh
-```
-
-This deploys CLAUDE.md and constitution.md templates, copies agent definitions into `.claude/agents/` and installs the loop skills into `.claude/skills/` (removing any legacy per-command copies), seeds Marge's baseline review packs into `.specify/marge/baseline/` (idempotent — existing pack files are preserved), installs the shared commit helper into `.specify/scripts/bash/speckit-commit.sh`, creates a placeholder `.specify/quality-gates.sh` if one does not exist, appends `.gitignore` entries, and cleans up any previously-installed bash loop scripts and their permissions.
-
-### Option B: Manual
-
-<details>
-<summary>Click to expand manual steps</summary>
-
-#### 1. Copy files into your project
-
-From the root of your project:
-
-```bash
-# Agent definitions -> .claude/agents/
-cp <path-to-simpsons-loops>/claude-agents/homer.md  .claude/agents/homer.md
-cp <path-to-simpsons-loops>/claude-agents/lisa.md   .claude/agents/lisa.md
-cp <path-to-simpsons-loops>/claude-agents/marge.md  .claude/agents/marge.md
-cp <path-to-simpsons-loops>/claude-agents/ralph.md  .claude/agents/ralph.md
-cp <path-to-simpsons-loops>/claude-agents/single-shot.md .claude/agents/single-shot.md
-cp <path-to-simpsons-loops>/claude-agents/findings-ledger.md .claude/agents/findings-ledger.md
-cp <path-to-simpsons-loops>/claude-agents/loop-orchestrator.md .claude/agents/loop-orchestrator.md
-
-# Loop skills -> .claude/skills/ (each skill is a directory; reference/ files ride along)
-mkdir -p .claude/skills
-cp -R <path-to-simpsons-loops>/speckit-skills/* .claude/skills/
-
-# Marge baseline packs -> .specify/marge/baseline/
-mkdir -p .specify/marge/baseline
-cp -n <path-to-simpsons-loops>/specify-marge/baseline/*.md .specify/marge/baseline/
-
-# Marge project packs live in .specify/marge/project/ (you author them: .md prose, .sh script)
-mkdir -p .specify/marge/project .specify/marge/config
-
-# Marge contract docs (framework — overwrite, not cp -n) -> .specify/marge/
-cp <path-to-simpsons-loops>/specify-marge/README.md        .specify/marge/README.md
-cp <path-to-simpsons-loops>/specify-marge/config/README.md .specify/marge/config/README.md
-
-# Marge script-pack runner (framework — overwrite, not cp -n) -> .specify/marge/
-cp <path-to-simpsons-loops>/specify-marge/run-gates.sh .specify/marge/run-gates.sh
-chmod +x .specify/marge/run-gates.sh
-
-# Shared commit helper (framework — overwrite) -> .specify/scripts/bash/
-mkdir -p .specify/scripts/bash
-cp <path-to-simpsons-loops>/scripts/speckit-commit.sh .specify/scripts/bash/speckit-commit.sh
-chmod +x .specify/scripts/bash/speckit-commit.sh
-```
-
-#### 2. Update `.gitignore`
-
-```gitignore
-# Simpsons loops - generated at runtime
-
-*.ralph-prompt.md*
-*.ralph-prev-output*    # Stuck detection state
-*.ralph-state*          # Resumption state
-
-# Lisa loop temp files
-*.lisa-prompt.md*
-*.lisa-prev-output*
-*.lisa-state*
-
-# Homer loop temp files
-*.homer-prompt.md*
-*.homer-prev-output*
-*.homer-state*
-
-# Marge loop temp files
-*.marge-prompt.md*
-*.marge-prev-output*
-*.marge-state*
-```
-
-#### 3. Create quality gates file
-
-Create `.specify/quality-gates.sh` with your project's quality gate commands:
-
-```bash
-# Example for a Node.js project:
-npm test && npm run lint
-
-# Example for a Python project:
-pytest && ruff check .
-
-# Example for a shell script project:
-shellcheck *.sh
-```
-
-The file must exit 0 for quality gates to pass. This file is required for the Ralph loop to validate implementation work.
-
-</details>
-
-## Usage
-
-Each loop has a corresponding slash command that orchestrates iterations using the **Agent tool** (sub agents) directly within your session. Each iteration gets a fresh context window.
-
-### Brainstorm (pre-spec)
-
-Sharpen a vague idea before writing a spec:
-
-```
-/speckit-brainstorm I want to add some kind of caching layer
-```
-
-Asks 4-7 targeted questions that challenge your assumptions, then produces a feature description ready for `/speckit-specify` or `/speckit-pipeline --description "..."`.
-
-### Homer (clarification)
-
-After running `/speckit-specify` to create `spec.md`:
-
-```
-/speckit-homer-clarify
-```
-
-Homer only requires `spec.md` to exist — it does not need `plan.md` or `tasks.md`. This means you can run Homer immediately after creating your spec.
-
-### Premortem (failure modes — human gate)
-
-After Homer has clarified the spec, work the failure-mode session yourself:
-
-```
-/speckit-premortem
-```
-
-Imagine the feature has failed and work backwards: the skill enumerates concrete failure scenarios across three lenses — architecture (data integrity, partial failure, concurrency), UX (error states, recovery, destructive actions), and support/ops (observability, "what ticket does this generate", rollback) — and asks **you** up to 5 questions per session, each with a recommended disposition. Decisions land in two places: mitigations are encoded into `spec.md` (Edge Cases, Functional Requirements, Non-Functional Requirements) and every failure mode is tracked in a risk register at `<FEATURE_DIR>/failure-modes.md` with a decision (mitigate / accept / defer).
-
-Premortem only requires `spec.md`. Run sessions until the register has no `open` rows — the pipeline gates on this and will halt at the premortem step until the register is clean (bypass with `--skip-premortem` if you must). This is deliberately the one human-required stop in an otherwise autonomous pipeline: risk disposition is a judgment call, so it is never self-answered.
-
-### Lisa (analysis)
-
-Once you have `spec.md`, `plan.md`, and `tasks.md`:
-
-```
-/speckit-lisa-analyze
-```
-
-### Ralph (implementation)
-
-Once you have `tasks.md` from `/speckit-tasks`:
-
-```
-/speckit-ralph-implement
-```
-
-Ralph validates that `.specify/quality-gates.sh` exists and contains executable content before starting. If the file is missing or empty, Ralph aborts with a clear error.
-
-### Marge (code review)
-
-After Ralph has implemented the feature:
-
-```
-/speckit-marge-review
-```
-
-Marge reviews the feature branch's diff against baseline and project review packs in `.specify/marge/baseline/` and `.specify/marge/project/`, fixes all mechanical findings in severity order each iteration, and loops until a fresh review comes back clean or every remaining finding is flagged `NEEDS_HUMAN`. Findings that require design judgment are left for a human reviewer, and a finding that reappears after being fixed is escalated to `NEEDS_HUMAN` instead of being re-fixed forever. Each iteration persists its findings ledger to `<FEATURE_DIR>/review-report.md`.
-
-For a single-pass report (no auto-fix), run `/speckit-review` instead.
-
-### PR Review (human-judgment findings)
-
-After Marge finishes (or independently on any branch with an open PR), post inline comments for findings that need human attention:
-
-```
-/speckit-review-pr
-```
-
-Or target a specific PR:
-
-```
-/speckit-review-pr pr:42
-```
-
-Or preview findings without posting:
-
-```
-/speckit-review-pr --dry-run
-```
-
-Posts a GitHub PR review with inline comments for one-way doors (CRITICAL), concurrency risks (WARNING), architectural decisions (WARNING), and project-specific patterns (INFO). Uses `COMMENT` event type — informational, not a merge gate. Idempotent: won't double-post on the same commit.
-
-When the pipeline runs and an open PR exists, this step runs automatically after Marge.
-
-### Split and Reconcile (pipeline steps)
-
-**Split** runs automatically in the pipeline after lisa for multi-phase parent specs. It generates child spec directories:
-
-```
-specs/
-  c31c-feat-billing-overhaul/                      # parent spec (with manifest)
-  c31c-feat-billing-overhaul--p1-expand-schema/    # phase 1 child
-  c31c-feat-billing-overhaul--p2-integration/      # phase 2 child
-  c31c-feat-billing-overhaul--p3-ui-reveal/        # phase 3 child
-```
-
-After splitting, the pipeline prompts: stop and work on children (recommended) or continue as a monolith. You can also run `/speckit-split` standalone on a phase-annotated parent spec once its `plan.md` and `tasks.md` exist — split requires the whole-feature plan and task list first, so the phase boundaries are validated against the full implementation design before the spec is decomposed.
-
-Each child is a **phase view** of the parent, not a copy of it — see [The parent spec is the single source of truth](#the-parent-spec-is-the-single-source-of-truth).
-
-**Reconcile** runs automatically at the start of a child spec's pipeline (phase 2+), via `/speckit-reconcile`. It compares what each Complete phase actually shipped — its `tasks.md`, its `plan.md`, and the code those name — against the parent spec, and corrects the **parent** where they diverged. Stale wording and shifted requirement assignments are fixed automatically; drift that changes what a requirement is *for* is reported as `NEEDS_HUMAN` and left alone. Because inherited content exists in exactly one place, there is nothing to merge and no conflict to resolve.
-
-Re-running split is idempotent. It regenerates only derived child content (the metadata block, `## Inherited Scope`, and the `Inherited:` lines) and never touches authored content (`## Phase Boundary`, `FR-P{N}-###`, `SC-P{N}-###`).
-
-Phase status follows a forward-only state machine: Draft -> In Progress -> Complete, with Cancelled available from any active state.
-
-### Pipeline (end-to-end)
-
-After creating a spec with `/speckit-specify`, run the full pipeline:
-
-```
-/speckit-pipeline
-```
-
-Or target a specific spec directory:
-
-```
-/speckit-pipeline specs/a1b2-feat-user-auth
-```
-
-Or resume from a specific step:
-
-```
-/speckit-pipeline --from ralph specs/a1b2-feat-user-auth
-```
-
-Or stop the pipeline after a specific step completes:
-
-```
-/speckit-pipeline --stop-after plan
-```
-
-Or bootstrap end-to-end from a feature description:
-
-```
-/speckit-pipeline --from specify --description "Add user authentication with OAuth2"
-```
-
-`--from`, `--stop-after`, and `--description` can be combined. For example, run homer through tasks only:
-
-```
-/speckit-pipeline --from homer --stop-after tasks specs/a1b2-feat-user-auth
-```
-
-**Smart auto-detection:** If `--from` is not specified, the pipeline inspects existing artifacts and starts from the right step:
-
-- Child spec (phase 2+) with no `plan.md` -> **reconcile**
-- Child spec (phase 1) with no `plan.md` -> **plan** (homer, premortem, and phase never run on a child spec)
-- No `spec.md` but `--description` provided -> **specify**
-- `spec.md` exists, no populated Phases, no `failure-modes.md` -> **homer**
-- `spec.md` exists, no populated Phases, `failure-modes.md` exists -> **premortem** (gate re-checks, then flows into phase)
-- `spec.md` exists with populated Phases, no `plan.md` -> **plan**
-- `plan.md` exists -> **tasks**
-- `tasks.md` with no tasks started -> **lisa**
-- `spec.md` with Phases and `## Manifest` section -> **ralph** (split already ran)
-- `tasks.md` with some tasks completed -> **ralph**
-- `tasks.md` with all tasks completed (no `- [ ]` remaining) -> **marge**
-
-**`--stop-after <step>`:** Halts the pipeline after the specified step completes, skipping all subsequent steps. Valid values: `reconcile`, `specify`, `homer`, `premortem`, `phase`, `plan`, `tasks`, `lisa`, `split`, `ralph`, `marge`. The step must come at or after the starting step in the pipeline sequence.
-
-**`--description <text>`:** Provides a feature description for the specify step. Required when using `--from specify`. Enables bootstrapping a new feature end-to-end from a single command.
-
-**`--skip-phase-guard`:** Bypasses the phase order guard for child specs. By default, phase N blocks unless all earlier phases (1..N-1) are "Complete" in the parent manifest. Use this flag when phases are independent or when earlier phases were intentionally cancelled.
-
-**`--skip-premortem`:** Bypasses the premortem human gate. By default the pipeline halts at the premortem step until `<FEATURE_DIR>/failure-modes.md` exists with every failure mode dispositioned. Use this flag for trivial features or an intentional bypass — the skip is logged.
-
-**Resuming after interruption:** All work is committed after each iteration, so you can safely stop and resume.
+It also means requirement edits and clarifications go to the **parent**, which is why `homer`, `premortem`, and `phase` never run on a child. A child-spec run is `reconcile -> plan -> tasks -> lisa -> ralph -> marge`.
 
 ## How the loops work
 
-**Batch remediation** — Homer, Lisa, and Marge fix everything auto-fixable in one pass per iteration (severity order), commit, and let the next iteration's fresh scan verify. The typical shape is: iteration 1 scans and fixes all findings, iteration 2's clean scan emits the promise tag. Ralph stays one task per iteration — tasks are sized at planning time.
+**Batch remediation** — Homer, Lisa, and Marge fix everything auto-fixable in one pass per iteration (severity order), commit, and let the next iteration's fresh scan verify. Iteration 1 scans and fixes; iteration 2's clean scan emits the promise tag. Ralph stays one task per iteration — tasks are sized at planning time.
 
-**Reappearance guard** — Lisa and Marge persist a findings ledger (`analysis-report.md` / `review-report.md` in the feature directory) with stable IDs. A finding that reappears after being fixed is marked `reappeared` and escalated to `NEEDS_HUMAN` instead of being re-fixed — this kills fix/re-flag oscillation. Homer's ledger is the spec's own `## Clarifications` section.
+**Reappearance guard** — Lisa and Marge persist a findings ledger (`analysis-report.md` / `review-report.md`) with stable IDs. A finding that comes back after being fixed is marked `reappeared` and escalated to `NEEDS_HUMAN` rather than re-fixed, which kills fix/re-flag oscillation. Homer's ledger is the spec's own `## Clarifications` section.
 
-**Completion detection** — Each loop looks for promise tags in the output:
+**Completion detection** — each loop watches for a promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>` for Homer, Lisa, and Marge; `<promise>ALL_TASKS_COMPLETE</promise>` for Ralph.
 
-- Homer / Lisa / Marge: `<promise>ALL_FINDINGS_RESOLVED</promise>`
-- Ralph: `<promise>ALL_TASKS_COMPLETE</promise>`
+**Stuck detection** — two consecutive iterations with no file changes and no completion signal abort the loop. Count-based stall and oscillation detectors back this up.
 
-**Stuck detection** — If two consecutive iterations produce no file changes and no completion signal, the loop aborts to avoid infinite cycling. Count-based stall and oscillation detectors back this up.
+```mermaid
+flowchart TD
+    A["Loop orchestrator"] --> B["Spawn sub agent<br/>(fresh context)"]
+    B --> C["Sub agent runs<br/>one iteration"]
+    C --> D{Promise tag?}
+    D -->|"Found"| E["Success — exit loop"]
+    D -->|"Not found"| F{Files changed<br/>since last iteration?}
+    F -->|"Yes"| G["Reset stuck counter"]
+    F -->|"No"| H{Stuck counter >= 2?}
+    H -->|"No"| I["Increment stuck counter"]
+    H -->|"Yes"| J["Abort: stuck"]
+    G --> K{Max iterations?}
+    I --> K
+    K -->|"No"| B
+    K -->|"Yes"| L["Report: max iterations reached"]
+```
 
 ## Customization
 
-### Quality gates (Ralph)
+### Quality gates
 
-Quality gates are defined in a single file: `.specify/quality-gates.sh`. This is the sole source of quality gate configuration — there are no CLI arguments or environment variable overrides.
+Two files, both optional to edit but required to be meaningful before Ralph will run:
 
-Ralph validates this file before starting:
+| File | When it runs | Scope |
+|------|--------------|-------|
+| `.specify/quality-gates-fast.sh` | every Ralph and Marge iteration | changed files only — fast feedback |
+| `.specify/quality-gates.sh` | once, after a loop terminates | the whole project |
 
-- The file must exist at `.specify/quality-gates.sh`
-- The file must contain at least one non-comment, non-whitespace line
-- The file must exit 0 for quality gates to pass
-
-Example for a shell script project:
-
-```bash
-shellcheck *.sh
-```
-
-Example for a Node.js project:
+The fast gate is optional; delete it and the full gate runs per iteration instead. Ralph refuses to start unless the full gate exists and holds at least one non-comment line. Both must exit 0 to pass.
 
 ```bash
+# .specify/quality-gates.sh — Node.js
 npm test && npm run lint
+
+# .specify/quality-gates-fast.sh — the same checks, scoped
+npx eslint $(git diff --name-only --diff-filter=d HEAD -- "*.ts" "*.tsx")
 ```
 
-### Dogfooding
-
-This repo can run its own loops on itself: run `bash setup.sh --self` to install the current source into the repo's `.claude/` and `.specify/`. The installed copies are gitignored — dogfood locally, but never commit the output; the non-hidden source directories are the only source of truth.
+There are no CLI arguments or environment overrides — these files are the entire configuration.
 
 ### Max iterations
 
-| Loop  | Default               |
-| ----- | --------------------- |
-| Homer | 10                    |
-| Lisa  | 10                    |
+| Loop | Default |
+|------|---------|
+| Homer, Lisa, Marge | 10 |
 | Ralph | incomplete tasks + 10 |
-| Marge | 10                    |
 
-All loops accept an optional numeric argument to override the default max iterations (e.g., `/speckit-homer-clarify 5`).
+### Marge review packs
 
-### Marge review packs & project packs
+Baseline rules live in `.specify/marge/baseline/` as plain markdown. Six packs ship: `generic-bugs.md`, `security.md`, `testing.md`, `architecture.md`, `one-way-doors.md`, and `concurrency.md`. The last two always produce `NEEDS_HUMAN` findings — irreversible changes and concurrency risks are not auto-fixable. Baseline files are never overwritten on re-install, so edit them freely.
 
-Marge's baseline review rules live in `.specify/marge/baseline/` as plain markdown files. `setup.sh` seeds six baseline packs:
+**Project packs** go in `.specify/marge/project/` and enforce repo-specific continuity rules ("these sibling files must change together", "this generated file tracks its source"). The extension picks the mode:
 
-- `generic-bugs.md` — null handling, off-by-one, race conditions, wrong-argument-order, swallowed exceptions
-- `security.md` — OWASP essentials: secrets, SQLi, command injection, authz, crypto misuse, PII in logs
-- `testing.md` — test-first discipline, coverage for new public functions, fixture hygiene, flaky patterns
-- `architecture.md` — scope creep, duplicated helpers, dead code, layer violations, broken invariants
-- `one-way-doors.md` — irreversible changes (schema destruction, API breaks, data deletion); always `NEEDS_HUMAN`
-- `concurrency.md` — TOCTOU, shared mutable state, lock ordering, transaction boundaries; always `NEEDS_HUMAN`
+- **`.sh` — script pack.** A deterministic shell script. Receives the diff via environment variables, prints findings on stdout. No LLM; best for mechanical, greppable rules.
+- **`.md` — prose pack.** An LLM-interpreted rule, optionally reading data from `.specify/marge/config/`. Best for judgment or data-driven rules.
 
-Baseline files are preserved on re-install — existing pack files are never overwritten. Add your own rules as **project packs** (next).
+Project-pack findings are tagged `PROJECT_GATE` and flow through the same pipeline as baseline findings — auto-fixed when mechanical, `NEEDS_HUMAN` otherwise. They run in three venues: the Marge loop, Lisa analysis (planning-stage packs, before code exists), and PR review. A pack opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage:` line containing `planning` (prose).
 
-#### Project packs
+The full authoring contract — environment inputs, stdout shape, exit semantics, templates — is in `.specify/marge/README.md`.
 
-Beyond the baseline packs, you can enforce **repo-specific continuity rules** — e.g. "these sibling files must change together", "a generated file stays in sync with its source". Drop a file in `.specify/marge/project/`; its extension decides the mode:
+### Dogfooding this repo
 
-- **Script pack** (`.sh`) — a deterministic shell script. It receives the diff via environment variables and prints findings on stdout. Best for mechanical, greppable rules; no LLM.
-- **Prose pack** (`.md`) — an LLM-interpreted rule, optionally **config-backed**: it reads data from `.specify/marge/config/` (e.g. groups of files that must change together). Best for data-driven or judgment rules.
-
-Findings from any `project/` pack are tagged `PROJECT_GATE` (derived from location) and flow into the **same review pipeline** as the baseline packs: Marge auto-remediates mechanical findings or leaves `NEEDS_HUMAN` ones for review. Project packs run in three venues — the **Marge** review loop, **Lisa** analysis (planning-stage packs, before code exists), and **PR review** (`PROJECT_GATE` findings are posted as inline comments). A pack opts into the planning stage with a `# speckit-stage: planning` marker (scripts) or a `Stage:` line that includes `planning` (prose packs).
-
-The full authoring contract — environment inputs, the stdout findings shape, exit semantics, and templates — is in `.specify/marge/README.md`.
+`bash setup.sh --self` installs the current source into this repo's own `.claude/` and `.specify/`. Those copies are gitignored: dogfood locally, never commit the output. The non-hidden directories (`speckit-skills/`, `claude-agents/`, `specify-marge/`, `scripts/`, `templates/`) are the only source of truth.
 
 ## References
 
