@@ -176,6 +176,70 @@ check_has "dir mode sees the untracked spec" "$(cat "$WORK/files.tsv")" "specs/9
 check_lacks "dir mode ignores files outside the dir" "$(cat "$WORK/files.tsv")" "base.txt"
 rm -rf "$WORK"; cleanup
 
+# ── Task 4: damage level ────────────────────────────────────────────────────
+
+make_repo fixtures
+mkdir -p app/models
+printf 'class User; end\n' > app/models/user.rb
+commit_all
+engine --base main
+check_rc "path-scoped question: exit 0 with no findings" "$rc" 0
+check_has "level from an exact path" "$out" "Damage level: money and trust (set by app/models/user.rb)"
+check_has "reviewer line follows" "$out" "Read every line. Work the checklist."
+check_has "plain question asked" "$out" "  - What happens if this runs twice?"
+check_has "path-scoped question asked when its path is touched" "$out" "  - Who can reach this?"
+check_lacks "other path-scoped question not asked" "$out" "told or agrees to"
+cleanup
+
+make_repo fixtures
+mkdir -p app/services/repayment_instances docs
+printf 'x\n' > app/services/repayment_instances/pay.rb
+printf 'y\n' > docs/a.md
+commit_all
+engine --base main
+check_has "path-scoped question skipped when untouched" "$out" "Damage level: money and trust (set by app/services/repayment_instances/pay.rb)"
+check_lacks "untouched path-scoped question" "$out" "Who can reach this?"
+cleanup
+
+make_repo fixtures
+mkdir -p app/jobs/repayment_instances
+printf 'x\n' > app/jobs/repayment_instances/run_job.rb
+commit_all
+engine --base main
+check_has "alias inherits the service directory level" "$out" "Damage level: money and trust (set by app/jobs/repayment_instances/run_job.rb)"
+cleanup
+
+make_repo fixtures
+mkdir -p app/services/notifications
+printf 'x\n' > app/services/notifications/mailer.rb
+printf 'x\n' > Gemfile
+printf 'x\n' > .rubocop.yml
+commit_all
+engine --base main
+check_has "most specific pattern wins over the catch-all" "$out" "Damage level: member-facing (set by Gemfile)"
+cleanup
+
+make_repo fixtures
+mkdir -p docs
+printf 'a\n' > docs/a.md; printf 'b\n' > docs/b.md; printf 'c\n' > docs/c.md; printf 'd\n' > docs/d.md
+commit_all
+engine --base main
+check_has "more than three files are summarized" "$out" "Damage level: no runtime effect (set by docs/a.md, docs/b.md, docs/c.md and 1 more)"
+check_has "a level with an empty checklist prints only its reviewer line" "$out" "Approve. Nobody is expected to read this line by line."
+cleanup
+
+make_repo fixtures
+engine --base main
+check_has "empty change set is the least serious level" "$out" "Damage level: no runtime effect (nothing in this change raises it)"
+cleanup
+
+make_repo fixtures
+sed -i.bak 's/^default_level: member-facing/default_level: nowhere/' .specify/marge/config/damage-levels.yml && rm .specify/marge/config/damage-levels.yml.bak
+engine --base main
+check_rc "default_level naming no level exits 2" "$rc" 2
+check_has "default_level error is explained" "$err" "default_level"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

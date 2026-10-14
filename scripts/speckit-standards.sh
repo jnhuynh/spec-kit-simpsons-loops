@@ -167,6 +167,27 @@ cfg_get() { awk -F'\t' -v k="$2" '$1 == k { print substr($0, length($1) + 2); ex
 cfg_list() {
   awk -F'\t' -v p="$2" 'index($1, p ".") == 1 && substr($1, length(p) + 2) ~ /^[0-9]+$/ { print substr($0, length($1) + 2) }' "$1"
 }
+# ── Globs ──────────────────────────────────────────────────────────────────
+# Shell globs → ERE: `**/` crosses directories, `*` and `?` stop at `/`.
+# Prepended to every awk program that matches paths.
+IFS= read -r -d '' AWK_GLOB <<'AWK' || true
+function glob_to_ere(g,   out, c, k, n) {
+  out = ""; n = length(g)
+  for (k = 1; k <= n; k++) {
+    c = substr(g, k, 1)
+    if (c == "*") {
+      if (substr(g, k, 3) == "**/") { out = out "(.*/)?"; k += 2 }
+      else if (substr(g, k, 2) == "**") { out = out ".*"; k += 1 }
+      else out = out "[^/]*"
+    } else if (c == "?") out = out "[^/]"
+    else if (c ~ /[.+(){}\[\]|^$\\]/) out = out "\\" c
+    else out = out c
+  }
+  return "^" out "$"
+}
+function specificity(g,   t) { t = g; gsub(/[*?\[\]{}]/, "", t); return length(t) }
+AWK
+
 # ── Change set ─────────────────────────────────────────────────────────────
 # git diff -U0 -M on stdin → "path<TAB>line<TAB>text" for every added line.
 IFS= read -r -d '' AWK_DIFF_ADDED <<'AWK' || true
@@ -277,9 +298,87 @@ collect_prose() {
 }
 
 prose_of() { awk -F'\t' -v p="$1" '$1 == p { print $2 "\t" substr($0, length($1) + length($2) + 3) }' "$WORK/prose.tsv"; }
-assess_damage() { :; }
+# ── Damage level ───────────────────────────────────────────────────────────
+# -v cfg=flattened damage-levels; stdin: one changed path per line.
+# Output: LEVEL name reviewer; PATH path level pattern; BY path; ASK question.
+IFS= read -r -d '' _AWK_LEVEL_BODY <<'AWK' || true
+BEGIN {
+  FS = "\t"
+  while ((getline line < cfg) > 0) {
+    split(line, kv, "\t"); key = kv[1]; val = substr(line, length(key) + 2)
+    if (key == "default_level") deflevel = val
+    else if (key ~ /^levels\.[0-9]+\.name$/) { split(key, p, "."); lname[p[2]] = val; nlevels = (p[2] + 1 > nlevels ? p[2] + 1 : nlevels) }
+    else if (key ~ /^levels\.[0-9]+\.reviewer$/) { split(key, p, "."); lrev[p[2]] = val }
+    else if (key ~ /^levels\.[0-9]+\.paths\.[0-9]+$/) { split(key, p, "."); np++; pat[np] = val; plev[np] = p[2] }
+    else if (key ~ /^levels\.[0-9]+\.checklist\.[0-9]+$/) { split(key, p, "."); q = p[2] "." p[4]; qtext[q] = val; qn[p[2]]++; qorder[p[2], qn[p[2]]] = q }
+    else if (key ~ /^levels\.[0-9]+\.checklist\.[0-9]+\.question$/) { split(key, p, "."); q = p[2] "." p[4]; qtext[q] = val; qn[p[2]]++; qorder[p[2], qn[p[2]]] = q }
+    else if (key ~ /^levels\.[0-9]+\.checklist\.[0-9]+\.paths\.[0-9]+$/) { split(key, p, "."); q = p[2] "." p[4]; qpn[q]++; qpat[q, qpn[q]] = val; np++; pat[np] = val; plev[np] = p[2] }
+    else if (key ~ /^aliases\.[0-9]+\.from$/) { split(key, p, "."); afrom[p[2]] = val; na = (p[2] + 1 > na ? p[2] + 1 : na) }
+    else if (key ~ /^aliases\.[0-9]+\.to$/) { split(key, p, "."); ato[p[2]] = val }
+  }
+  close(cfg)
+  if (nlevels == 0) { print "damage-levels.yml lists no levels" > "/dev/stderr"; exit 2 }
+  for (k = 1; k <= np; k++) { pere[k] = glob_to_ere(pat[k]); pspec[k] = specificity(pat[k]) }
+  defidx = -1
+  for (k = 0; k < nlevels; k++) if (lname[k] == deflevel) defidx = k
+  if (defidx < 0) { print "damage-levels.yml: default_level \"" deflevel "\" names no level" > "/dev/stderr"; exit 2 }
+}
+function rank(li) { return nlevels - li }
+function candidates(path, cand,   k, c) {
+  c = 1; cand[1] = path
+  for (k = 0; k < na; k++) if (index(path, afrom[k]) == 1) { c++; cand[c] = ato[k] substr(path, length(afrom[k]) + 1) }
+  return c
+}
+function level_for(path,   cand, c, k, j, best, bs, br) {
+  c = candidates(path, cand); best = -1; bs = -1; br = -1; WIN_PATTERN = ""
+  for (j = 1; j <= c; j++) for (k = 1; k <= np; k++) if (cand[j] ~ pere[k]) {
+    if (pspec[k] > bs || (pspec[k] == bs && rank(plev[k]) > br)) { bs = pspec[k]; br = rank(plev[k]); best = plev[k]; WIN_PATTERN = pat[k] }
+  }
+  return (best < 0 ? defidx : best)
+}
+{ paths[++n] = $0 }
+END {
+  if (nlevels == 0 || defidx < 0) exit 2
+  top = -1
+  for (k = 1; k <= n; k++) { lv = level_for(paths[k]); plv[k] = lv; ppat[k] = WIN_PATTERN; if (top < 0 || rank(lv) > rank(top)) top = lv }
+  if (n == 0) top = nlevels - 1
+  print "LEVEL\t" lname[top] "\t" lrev[top]
+  for (k = 1; k <= n; k++) { print "PATH\t" paths[k] "\t" lname[plv[k]] "\t" ppat[k]; if (plv[k] == top) print "BY\t" paths[k] }
+  for (k = 1; k <= qn[top]; k++) {
+    q = qorder[top, k]; asked = (qpn[q] == 0)
+    for (j = 1; j <= qpn[q] && !asked; j++) { re = glob_to_ere(qpat[q, j]); for (m = 1; m <= n && !asked; m++) { c = candidates(paths[m], cand); for (x = 1; x <= c; x++) if (cand[x] ~ re) asked = 1 } }
+    if (asked) print "ASK\t" qtext[q]
+  }
+}
+AWK
+AWK_LEVEL="$AWK_GLOB"$'\n'"$_AWK_LEVEL_BODY"
+
+assess_damage() {
+  cut -f1 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" "$AWK_LEVEL" > "$WORK/level.tsv" || fail_to_run "cannot assess the damage level (see above)"
+}
+
+# The level, what set it, the reviewer line, and the checklist, for --format text.
+level_header() {
+  [[ -s "$WORK/level.tsv" ]] || return 0
+  local name reviewer set_by count
+  name=$(awk -F'\t' '$1 == "LEVEL" { print $2; exit }' "$WORK/level.tsv")
+  reviewer=$(awk -F'\t' '$1 == "LEVEL" { print $3; exit }' "$WORK/level.tsv")
+  count=$(awk -F'\t' '$1 == "BY"' "$WORK/level.tsv" | wc -l | tr -d ' ')
+  if [[ "$count" -eq 0 ]]; then
+    set_by="nothing in this change raises it"
+  else
+    set_by="set by $(awk -F'\t' '$1 == "BY" { print $2 }' "$WORK/level.tsv" | head -n 3 | paste -sd, - | sed 's/,/, /g')"
+    [[ "$count" -gt 3 ]] && set_by="$set_by and $((count - 3)) more"
+  fi
+  echo "Damage level: $name ($set_by)"
+  echo "$reviewer"
+  awk -F'\t' '$1 == "ASK" { print "  - " $2 }' "$WORK/level.tsv"
+}
 run_rules() { :; }
-render() { [[ "$FORMAT" == text ]] && echo "No findings."; exit 0; }
+render() {
+  if [[ "$FORMAT" == text ]]; then level_header; echo "No findings."; fi
+  exit 0
+}
 
 main() {
   parse_args "$@"
