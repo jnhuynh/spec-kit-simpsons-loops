@@ -240,6 +240,47 @@ check_rc "default_level naming no level exits 2" "$rc" 2
 check_has "default_level error is explained" "$err" "default_level"
 cleanup
 
+# ── Task 5: formats and requirement-id-in-body ──────────────────────────────
+
+make_repo fixtures
+printf 'Implements FR-001 and SC-P1-003 for US2; see `FR-009` and https://x.y/FR-010 and NFR-2.\n' > body.md
+engine --base main --body-file body.md
+check_rc "requirement id in the body blocks" "$rc" 1
+check_has "ids listed once each, sorted" "$out" "BLOCK HIGH   PULL_REQUEST:0  requirement-id-in-body: the description leans on requirement ids: FR-001, NFR-2, SC-P1-003, US2"
+check_lacks "id inside inline code ignored" "$out" "FR-009"
+check_lacks "id inside a URL ignored" "$out" "FR-010"
+printf 'FR-001,FR-002\n' > body2.md
+engine --base main --body-file body2.md
+check_has "adjacent ids both found" "$out" "FR-001, FR-002"
+printf 'A reviewer can read this without the spec.\n' > clean.md
+engine --base main --body-file clean.md
+check_rc "clean body exits 0" "$rc" 0
+engine --base main --body-file body.md --format marge
+check_rc "marge format still exits 1" "$rc" 1
+check_has "marge file line" "$out" "- file: PULL_REQUEST:0"
+check_has "marge severity" "$out" "  severity: HIGH"
+check_has "marge pack label" "$out" "  pack: baseline/standards.sh"
+check_has "marge rule" "$out" "  rule: requirement-id-in-body"
+check_has "marge empty tags" "$out" "  tags: []"
+check_has "marge quoted issue" "$out" '  issue: "the description leans on requirement ids: FR-001, NFR-2, SC-P1-003, US2"'
+engine --base main --body-file clean.md --format marge
+check_eq "marge prints nothing when clean" "$out" ""
+engine --base main --body-file body.md --format hook
+check_has "hook decision" "$out" '{"decision":"block","reason":"A standards check blocks this change. Fix these before finishing:\nPULL_REQUEST:0  requirement-id-in-body: the description leans on requirement ids: FR-001, NFR-2, SC-P1-003, US2"}'
+engine --base main --body-file clean.md --format hook
+check_eq "hook prints nothing when clean" "$out" ""
+engine --base main --body-file body.md --only lexicon
+check_rc "--only without pr-shape skips the body rule" "$rc" 0
+check_has "--only without pr-shape reports clean" "$out" "No findings."
+cleanup
+
+# Escaping: a quote and a backslash inside a finding survive both formats.
+make_repo fixtures
+printf 'See FR-001 "quoted" and back\\slash.\n' > body.md
+engine --base main --body-file body.md --format marge
+check_has "marge escapes nothing in the id list" "$out" '  issue: "the description leans on requirement ids: FR-001"'
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

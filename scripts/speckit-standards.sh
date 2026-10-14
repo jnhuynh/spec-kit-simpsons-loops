@@ -374,10 +374,89 @@ level_header() {
   echo "$reviewer"
   awk -F'\t' '$1 == "ASK" { print "  - " $2 }' "$WORK/level.tsv"
 }
-run_rules() { :; }
+# ── Findings ───────────────────────────────────────────────────────────────
+# emit BLOCK(1|0) SEV FILE LINE RULE ISSUE FIX [TAGS]
+emit() {
+  local block="$1" sev="$2" file="$3" line="$4" rule="$5" issue="$6" fix="$7" tags="${8:-}"
+  local brank=1 srank=3
+  [[ "$block" == 1 ]] && brank=0
+  case "$sev" in HIGH) srank=0 ;; MEDIUM) srank=1 ;; LOW) srank=2 ;; esac
+  issue="${issue//$TAB/ }"
+  fix="${fix//$TAB/ }"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$brank" "$srank" "$file" "$line" "$sev" "$rule" "$issue" "$fix" "$tags" >> "$WORK/findings.tsv"
+}
+
+yaml_escape() { local s="${1//\\/\\\\}"; printf '%s' "${s//\"/\\\"}"; }
+json_escape() { local s="${1//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; s="${s//$'\t'/\\t}"; printf '%s' "$s"; }
+
+render_text() {
+  level_header
+  if [[ ! -s "$1" ]]; then echo "No findings."; return 0; fi
+  awk -F'\t' '{ printf("%s%-6s %s:%s  %s: %s\n", ($1 == 0 ? "BLOCK " : ""), $5, $3, $4, $6, $7) }' "$1"
+}
+
+render_marge() {
+  [[ -s "$1" ]] || return 0
+  local _b _s file line sev rule issue fix tags
+  while IFS="$TAB" read -r _b _s file line sev rule issue fix tags; do
+    printf -- '- file: %s:%s\n  severity: %s\n  confidence: 95\n  pack: %s\n  rule: %s\n  issue: "%s"\n  fix: "%s"\n  tags: [%s]\n' \
+      "$file" "$line" "$sev" "$PACK_LABEL" "$rule" "$(yaml_escape "$issue")" "$(yaml_escape "$fix")" "$tags"
+  done < "$1"
+}
+
+render_hook() {
+  grep -q "^0$TAB" "$1" || return 0
+  local reasons
+  reasons=$(grep "^0$TAB" "$1" | head -n "$MAX_HOOK_REASONS" | awk -F'\t' '{ printf("%s%s:%s  %s: %s", (NR > 1 ? "\n" : ""), $3, $4, $6, $7) }')
+  printf '{"decision":"block","reason":"A standards check blocks this change. Fix these before finishing:\\n%s"}\n' "$(json_escape "$reasons")"
+}
+
 render() {
-  if [[ "$FORMAT" == text ]]; then level_header; echo "No findings."; fi
-  exit 0
+  sort -t "$TAB" -k1,1n -k2,2n -k3,3 -k4,4n "$WORK/findings.tsv" > "$WORK/sorted.tsv"
+  local blocking=0
+  grep -q "^0$TAB" "$WORK/sorted.tsv" && blocking=1
+  if [[ "$BLOCKING_ONLY" == 1 ]]; then
+    grep "^0$TAB" "$WORK/sorted.tsv" > "$WORK/shown.tsv" || true
+  else
+    cp "$WORK/sorted.tsv" "$WORK/shown.tsv"
+  fi
+  case "$FORMAT" in
+    text) render_text "$WORK/shown.tsv" ;;
+    marge) render_marge "$WORK/shown.tsv" ;;
+    hook) render_hook "$WORK/shown.tsv" ;;
+  esac
+  exit "$blocking"
+}
+
+# ── Rules: pr-shape ────────────────────────────────────────────────────────
+# Requirement ids in prose, outside inline code and URLs. Consecutive ids share
+# their separator, so the loop keeps the trailing guard character for the next match.
+IFS= read -r -d '' AWK_REQUIREMENT_IDS <<'AWK' || true
+{
+  text = $0; gsub(/`[^`]*`/, " ", text); gsub(/https?:\/\/[^[:space:]]+/, " ", text)
+  rest = text
+  while (match(rest, /(^|[^[:alnum:]_])(FR|NFR|SR|SC|CHK|AS|US)-?(P[0-9]+-)?[0-9]+([^[:alnum:]_]|$)/)) {
+    id = substr(rest, RSTART, RLENGTH); sub(/^[^[:alnum:]_]/, "", id); sub(/[^[:alnum:]_]$/, "", id)
+    if (!(id in seen)) { seen[id] = 1; print id }
+    rest = substr(rest, RSTART + RLENGTH - 1)
+    if (RLENGTH <= 1) break
+  }
+}
+AWK
+
+rule_requirement_ids() {
+  [[ -n "$BODY_FILE" ]] || return 0
+  local ids
+  ids=$(awk "$AWK_REQUIREMENT_IDS" "$BODY_FILE" | sort -u | paste -sd, - | sed 's/,/, /g')
+  [[ -n "$ids" ]] || return 0
+  emit 1 HIGH PULL_REQUEST 0 requirement-id-in-body "the description leans on requirement ids: $ids" \
+    "say what changes in words a reviewer can read without opening the spec; link the spec once"
+}
+
+run_rules() {
+  if want pr-shape; then
+    rule_requirement_ids
+  fi
 }
 
 main() {
