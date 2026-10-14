@@ -19,3 +19,6 @@
 .specify/marge/config/README.md
 .specify/marge/run-gates.sh
 .specify/scripts/bash/speckit-commit.sh
+
+# Superpowers plan workspaces (scratch)
+.superpowers/
