@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # file-level: MODE, DIR, BASE_REF, WORK are read by the sourced engine, not here
 # Tests for scripts/speckit-standards.sh. Run from anywhere:
 #   bash scripts/tests/test-speckit-standards.sh
 set -uo pipefail
@@ -115,6 +116,65 @@ check_has "escaped double quotes" "$flat" "q${TAB}say \"hi\""
 check_has "doubled single quote" "$flat" "s${TAB}it's"
 check_has "fold skips blank lines" "$flat" "f${TAB}one two"
 rm -rf "$tmp"
+
+# ── Task 3: change set and prose ────────────────────────────────────────────
+
+# Drive the collectors directly: the engine is sourced, so set its globals.
+make_repo fixtures
+git checkout -q main
+mkdir -p "app/services/naïve dir" docs
+printf 'old\n' > "app/services/naïve dir/x.rb"
+printf 'x1\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\nx10\n' > old.rb
+printf 'Intro.\n\n```\nfenced before\n' > docs/open.md
+commit_all "seed"
+git checkout -q work
+git merge -q main
+printf 'base\nB1\nB2\n' > base.txt
+git mv old.rb new.rb
+printf 'x1\n# why one\n# why two\nx2\nx3\nx4\nx5\nx6\nx7\nx8\nx9\nx10\n' > new.rb
+printf 'new\n' > "app/services/naïve dir/x.rb"
+printf 'Intro.\n\n```\nfenced before\nadded inside fence\n```\nAfter `code` and https://x.y/z link.\n' > docs/open.md
+printf '# Spec\n\nText `code` here.\n\n```sh\necho inside fence\n```\nTail.\n' > spec.md
+commit_all "work"
+WORK=$(mktemp -d); MODE=base; BASE_REF=main
+collect_change_set
+check_has "modified file listed" "$(cat "$WORK/files.tsv")" "base.txt${TAB}M${TAB}prose"
+check_has "rename keeps the new path" "$(cat "$WORK/files.tsv")" "new.rb${TAB}R${TAB}comment"
+check_has "unicode and space path survive" "$(cat "$WORK/files.tsv")" "app/services/naïve dir/x.rb${TAB}M${TAB}comment"
+check_has "markdown is prose" "$(cat "$WORK/files.tsv")" "spec.md${TAB}A${TAB}prose"
+check_has "added line numbered from the hunk" "$(cat "$WORK/added.tsv")" "base.txt${TAB}2${TAB}B1"
+check_has "second added line follows" "$(cat "$WORK/added.tsv")" "base.txt${TAB}3${TAB}B2"
+check_has "rename contributes only its added lines" "$(cat "$WORK/added.tsv")" "new.rb${TAB}2${TAB}# why one"
+check_lacks "unchanged rename line not added" "$(cat "$WORK/added.tsv")" "new.rb${TAB}1${TAB}x1"
+collect_prose
+check_has "comment prefix stripped" "$(cat "$WORK/prose.tsv")" "new.rb${TAB}3${TAB}why two"
+check_lacks "code line is not prose" "$(cat "$WORK/prose.tsv")" "new.rb${TAB}4"
+check_has "markdown outside fences is prose" "$(cat "$WORK/prose.tsv")" "spec.md${TAB}3${TAB}Text \`code\` here."
+check_lacks "fenced markdown is not prose" "$(cat "$WORK/prose.tsv")" "echo inside fence"
+check_lacks "fence opened in context still fences" "$(cat "$WORK/prose.tsv")" "added inside fence"
+check_has "line after the fence closes is prose" "$(cat "$WORK/prose.tsv")" "docs/open.md${TAB}7${TAB}After"
+check_eq "prose_of prints one file" "$(prose_of new.rb | paste -sd'|' -)" "2${TAB}why one|3${TAB}why two"
+rm -rf "$WORK"; cleanup
+
+make_repo fixtures
+printf 'untracked prose line.\n' > notes.md
+printf '\x00\x01\x02' > blob.bin
+printf 'base\nmore\n' > base.txt
+WORK=$(mktemp -d); MODE=working-tree; BASE_REF=""
+collect_change_set
+check_has "working tree sees the uncommitted edit" "$(cat "$WORK/added.tsv")" "base.txt${TAB}2${TAB}more"
+check_has "untracked file is added" "$(cat "$WORK/files.tsv")" "notes.md${TAB}A${TAB}prose"
+check_has "untracked lines all added" "$(cat "$WORK/added.tsv")" "notes.md${TAB}1${TAB}untracked prose line."
+check_has "binary untracked file keeps its path" "$(cat "$WORK/files.tsv")" "blob.bin${TAB}A${TAB}none"
+check_lacks "binary untracked file carries no lines" "$(cat "$WORK/added.tsv")" "blob.bin"
+rm -rf "$WORK"
+mkdir -p specs/9cad-feat-x
+printf '# Spec\n' > specs/9cad-feat-x/spec.md
+WORK=$(mktemp -d); MODE=dir; DIR=specs/9cad-feat-x; BASE_REF=main
+collect_change_set
+check_has "dir mode sees the untracked spec" "$(cat "$WORK/files.tsv")" "specs/9cad-feat-x/spec.md${TAB}A${TAB}prose"
+check_lacks "dir mode ignores files outside the dir" "$(cat "$WORK/files.tsv")" "base.txt"
+rm -rf "$WORK"; cleanup
 
 echo
 if [[ "$failures" -eq 0 ]]; then
