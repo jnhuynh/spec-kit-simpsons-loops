@@ -111,11 +111,26 @@ Focus on high-signal findings. Limit to 50 findings total; aggregate remainder i
 - Task ordering contradictions (e.g., integration tasks before foundational setup tasks without dependency note)
 - Conflicting requirements (e.g., one requires Next.js while other specifies Vue)
 
+#### G. Pull Request Plan Integrity
+
+The `## Pull Request Plan` table in `tasks.md` is machine-read by Ralph, which implements one PR group at a time and halts at each boundary. A broken table breaks implementation, so these findings are CRITICAL rather than cosmetic. Skip this pass entirely when `spec.md` contains a `## Manifest` section — that spec was split and its `tasks.md` is reference documentation, so the section is correctly absent.
+
+Expand every range in the `Tasks` column and compare against the task IDs in the file:
+
+- **Missing section**: no `## Pull Request Plan` in a spec that should have one. Ralph falls back to treating all tasks as one group, so the whole feature lands as one PR
+- **Uncovered task**: a task ID in no PR group — Ralph reaches it with no group to place it in
+- **Double-covered task**: a task ID in two or more groups
+- **Phantom task**: an ID in the table that is not a task in the file (commonly left behind when tasks are renumbered)
+- **Non-sequential PR numbers**: gaps, repeats, or a start other than 1
+- **Backward dependency**: a task in a later PR that must land before a task in an earlier one, so the earlier PR cannot merge on its own. This is a judgment call, not a parse — interleaving with the file's task order (`| 2 | T022-T023, T028-T031 |` before `| 3 | T024-T027, ... |`) is expected and correct, since Ralph walks the table by PR number. Flag the dependency, never the interleaving
+- **Unparseable ranges**: en-dashes (`T001–T009`), prose inside the `Tasks` cell, more than one table under the heading, or columns other than `PR | Tasks | Ships`
+- **Phase boundary spanned**: a single PR covering tasks from two different deployment phases, where `spec.md` has a populated `## Phases` section
+
 ### 5. Severity Assignment
 
 Use this heuristic to prioritize findings:
 
-- **CRITICAL**: Violates constitution MUST, missing core spec artifact, or requirement with zero coverage that blocks baseline functionality
+- **CRITICAL**: Violates constitution MUST, missing core spec artifact, requirement with zero coverage that blocks baseline functionality, or a Pull Request Plan defect that stops Ralph resolving a task's group (uncovered, double-covered, phantom, unparseable)
 - **HIGH**: Duplicate or conflicting requirement, ambiguous security/performance attribute, untestable acceptance criterion
 - **MEDIUM**: Terminology drift, missing non-functional task coverage, underspecified edge case
 - **LOW**: Style/wording improvements, minor redundancy not affecting execution order
@@ -149,6 +164,7 @@ Output a Markdown report (no file writes) with the following structure:
 - Ambiguity Count
 - Duplication Count
 - Critical Issues Count
+- PR Plan: number of PR groups, and task coverage (covered / total), or `n/a (split parent)`
 
 ### 7. Provide Next Actions
 

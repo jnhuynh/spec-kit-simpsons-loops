@@ -96,6 +96,12 @@ You **MUST** consider the user input before proceeding (if not empty).
       > parent sections named under **Inherited Scope** before planning, implementing,
       > analyzing, or reviewing this phase.
 
+      ## Plain summary *(mandatory)*
+
+      {Who this phase is for, what changes for them when it ships, and what goes
+      wrong if it is wrong — in plain words, 150 words or fewer. Written for this
+      phase, never copied from the parent's summary.}
+
       ## Inherited Scope
 
       Authoritative source: `../{parent-directory-name}/spec.md`
@@ -157,7 +163,7 @@ You **MUST** consider the user input before proceeding (if not empty).
       A child spec holds exactly two kinds of content, and only one of them is derived:
 
       - **Derived** -- the title line, the metadata block, the opening phase-view directive blockquote, `## Inherited Scope`, and the `Inherited:` line under each canonical heading. It comes from the parent's `## Phases` section. Regenerate it in place on every run -- with two exceptions inside the metadata block: `**Created**` and `**Status**` are written once at first generation and preserved unchanged on every refresh (they are state, not derivation; restamping them would reset phase status and break byte-for-byte idempotency).
-      - **Authored** -- `## Phase Boundary` and the phase-local `FR-P{N}-###` / `SC-P{N}-###` entries. Written by a developer, or by the pipeline while the phase is worked. **Never overwrite, reorder, or delete them.**
+      - **Authored** -- `## Plain summary`, `## Phase Boundary`, and the phase-local `FR-P{N}-###` / `SC-P{N}-###` entries. Written by a developer, or by the pipeline while the phase is worked. **Never overwrite, reorder, or delete them.**
 
       Re-running split therefore needs no baseline regeneration, no section diffing, and no conflict markers. The parent holds exactly one copy of every inherited item, so a parent edit cannot conflict with a child -- it simply becomes visible to every child that references it. Re-phasing (a story moved between phases) surfaces as a changed Inherited Scope table and nothing else.
 

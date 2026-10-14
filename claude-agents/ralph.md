@@ -12,17 +12,27 @@ The feature directory and quality gates are provided in the invocation prompt (e
 
 ## Phase 0: Orient
 
-0a. **Read tasks.md** - Find the first incomplete task (`- [ ]`). Report the total count of incomplete tasks (including this one) as the work-remaining count in your final output — the orchestrator's stall detection depends on it.
+0a. **Read tasks.md** - Report the total count of incomplete tasks (`- [ ]`) across the whole file as the work-remaining count in your final output — the orchestrator's stall detection depends on it.
 
 0b. If NO incomplete tasks remain (no `- [ ]` in tasks.md), output the following promise tag and exit immediately:
 
 <promise>ALL_TASKS_COMPLETE</promise>
 
-0c. **Verify not already done** - Search codebase for existing implementation
+0c. **Resolve the current PR group** - If tasks.md has a `## Pull Request Plan` section, parse its table and take the **lowest-numbered PR group that still has an incomplete task**. That is the current group, and it is the only work this iteration may touch. Report its PR number and task range in your final output.
+
+   Walk the table **by PR number, not by file order**. A group's task IDs are often not contiguous (`T022-T023, T028-T031`), so the first incomplete task in the *file* frequently belongs to a later group — picking that one would start PR 3 while PR 2 is still open.
+
+   If there is no such section (an older tasks.md, or a split parent spec), treat all tasks as one group.
+
+0d. **Pick the task** - The next incomplete task **within the current group**, in task-ID order.
+
+0e. **Verify not already done** - Search codebase for existing implementation
 
 ## Phase 1: Implement
 
-Run `/speckit-implement Only implement the next incomplete task` to implement the single next incomplete task. This handles implementation, validation, and quality gates.
+Run `/speckit-implement Only implement <TASK_ID>, and no other task`, naming the task ID resolved in Phase 0d. This handles implementation, validation, and quality gates.
+
+Name the ID explicitly — do not say "the next incomplete task". When PR groups interleave with file order, the next incomplete task in the file can belong to a later group.
 
 ## Phase 2: Validate
 
@@ -44,7 +54,13 @@ If validation fails:
    ```bash
    bash .specify/scripts/bash/speckit-commit.sh "[task summary]"
    ```
-3. Exit immediately — you will restart with fresh context for the next task
+3. **PR boundary check** - Re-read tasks.md. If the current PR group (from Phase 0c) now has no incomplete tasks and a **higher-numbered** PR group still has some, this is a PR boundary. Output the following halt tag, followed by the PR number just finished, its task range, and the remaining groups with their ranges:
+
+   <promise>PR_BOUNDARY_REACHED</promise>
+
+   Then exit. The loop stops here so the finished group can be opened as a pull request, reviewed and merged before the next group starts.
+
+4. Otherwise exit immediately — you will restart with fresh context for the next task
 
 ## Guardrails
 
@@ -57,6 +73,7 @@ If validation fails:
 | 995 | **Exit on complexity** — If unexpectedly hard, finish and exit               |
 | 994 | **Mark complete immediately** — Update tasks.md right after validation       |
 | 993 | **Subagent discipline** — Up to 500 Sonnet for reads, only 1 for build/tests |
+| 992 | **Stay inside the PR group** — Never implement a task from a later PR group, even a trivial or blocking-looking one. The boundary exists so the current group ships reviewable on its own |
 
 ## File Paths
 

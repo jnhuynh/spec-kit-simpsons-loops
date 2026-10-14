@@ -60,6 +60,7 @@ Set the following LOOP_CONFIG values for this execution:
 - **AGENT_FILE**: .claude/agents/ralph.md
 - **SLASH_COMMAND_REF**: /speckit-implement
 - **PROMISE_TAG**: ALL_TASKS_COMPLETE
+- **HALT_TAG**: PR_BOUNDARY_REACHED
 - **PREREQ_FLAGS**: --json --require-tasks --include-tasks
 - **REQUIRED_ARTIFACTS**: spec.md, plan.md, tasks.md
 - **MAX_ITERATIONS**: (use the value calculated in Task Counting above)
@@ -70,9 +71,36 @@ Set the following LOOP_CONFIG values for this execution:
 
 Read and follow the instructions in `.claude/agents/loop-orchestrator.md`, using the LOOP_CONFIG values above. Pass `$ARGUMENTS` through for argument parsing.
 
+## Post-Loop: PR Boundary Halt
+
+Run only when the loop exited via the **halted** path (`<promise>PR_BOUNDARY_REACHED</promise>` observed). The PR group is finished and the next one has not started.
+
+1. Run the **full** quality gate via Bash tool — the group is about to be opened as a pull request, so it must be green on more than the files this group touched:
+
+   ```bash
+   bash .specify/quality-gates.sh
+   ```
+
+   If it exits non-zero, set the completion status to **failure** with reason "full quality gates failed at PR boundary", surface the failing output, and stop. Do not report the PR as ready.
+
+2. If it exits zero, report completion status **pr-boundary** with:
+   - The PR number just completed and its task range
+   - The remaining PR groups with their task ranges
+   - This instruction, with the real spec dir substituted:
+
+   ```
+   PR <N> is complete (<range>). Open it, get it reviewed and merged, then resume:
+     /speckit-ralph-implement <FEATURE_DIR>
+   Remaining: PR <N+1> (<range>), PR <N+2> (<range>), ...
+   ```
+
+   Ralph does not create branches or run `gh` — the commits for this group are already pushed to the feature branch.
+
+**Resuming is safe and needs no extra state.** On the next run, the first incomplete task is the head of the next group, so Phase 0c resolves that group as current and the loop works through it. The halt fires only in the iteration that completes a group's last task — so if the loop is interrupted (crash, timeout, manual stop) exactly at a boundary, a resume will roll straight into the next group without stopping. Check the plan against `tasks.md` before resuming after an abnormal exit.
+
 ## Post-Loop: End-of-Loop Full Quality Gate
 
-Run only when the loop exited via the **success** path (`<promise>ALL_TASKS_COMPLETE</promise>` observed). Skip this step on max-iterations, stuck, or failure exits.
+Run only when the loop exited via the **success** path (`<promise>ALL_TASKS_COMPLETE</promise>` observed). Skip this step on halted, max-iterations, stuck, or failure exits.
 
 Run via Bash tool:
 
@@ -87,6 +115,8 @@ If it exits zero, proceed to tasks verification.
 ## Post-Loop: Tasks Verification
 
 After the loop orchestrator reports completion via the promise tag, also verify `tasks.md` directly — if no `- [ ]` lines remain and at least one `- [x]` exists, confirm completion. If incomplete tasks remain despite the promise tag, report the discrepancy.
+
+Skip this check on a **pr-boundary** exit: incomplete tasks remaining is the expected state there, not a discrepancy.
 
 ## Examples
 

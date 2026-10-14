@@ -85,16 +85,20 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Dependencies section showing story completion order
    - Parallel execution examples per story
    - Implementation strategy section (MVP first, incremental delivery)
+   - `## Pull Request Plan` section (see Pull Request Plan Rules below)
 
-5. **Report**: Output path to generated tasks.md and summary:
+5. **Generate the Pull Request Plan**: Group the tasks into pull requests and emit the `## Pull Request Plan` section. See Pull Request Plan Rules below for applicability, grouping, and the validation that must pass before you finish.
+
+6. **Report**: Output path to generated tasks.md and summary:
    - Total task count
    - Task count per user story
    - Parallel opportunities identified
    - Independent test criteria for each story
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
+   - PR plan: the number of PRs, each one's task range, and confirmation that the coverage and ordering checks passed (or that the section was deliberately omitted for a split parent spec)
 
-6. **Check for extension hooks**: After tasks.md is generated, check if `.specify/extensions.yml` exists in the project root.
+7. **Check for extension hooks**: After tasks.md is generated, check if `.specify/extensions.yml` exists in the project root.
    - If it exists, read it and look for entries under the `hooks.after_tasks` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter to only hooks where `enabled: true`
@@ -198,3 +202,43 @@ Every task MUST strictly follow this format:
   - Within each story: Tests (if requested) → Models → Services → Endpoints → Integration
   - Each phase should be a complete, independently testable increment
 - **Final Phase**: Polish & Cross-Cutting Concerns
+
+## Pull Request Plan Rules
+
+The `## Pull Request Plan` section slices the task list into the pull requests that will deliver it. Ralph reads it at implementation time, works one PR group at a time, and halts at each boundary so the group can be opened, reviewed and merged before the next one starts. A malformed or incomplete table therefore breaks implementation, not just documentation.
+
+### Applicability
+
+Emit the section for every spec **except** a parent spec that was split into children. Detect that case by reading `spec.md`: if it contains a `## Manifest` section, its `tasks.md` describes the full feature for reference only and each child runs its own pipeline — skip the section and say so in the report. Every other spec gets one, including child specs (directories matching `--p{N}-`) and multi-phase parents being implemented as a monolith.
+
+### Placement and format
+
+Place the section after the final task phase and before `## Dependencies & Execution Order`, following the structure in `.specify/templates/tasks-template.md`. The format rules listed there are binding: one heading, one table, the columns `PR | Tasks | Ships`, ascending integer PR numbers with no gaps, ASCII hyphen ranges (`T001-T018`, never `T001–T018`), no prose between rows.
+
+A group's task IDs need **not** be contiguous, and groups may interleave with the file's task order: the tasks forming one reviewable change are rarely adjacent in a list ordered by user story. Ralph walks the table by PR number, so `| 2 | T022-T023, T028-T031 |` followed by `| 3 | T024-T027, T032-T039 |` is a correct plan. What is forbidden is a **backward dependency** — a task in a later PR that must land before a task in an earlier one. Check each boundary for that before you finish; it is the one ordering property the format cannot enforce for you.
+
+### Grouping rules
+
+Slice on these boundaries, in priority order:
+
+1. **A deployment-phase boundary is always a PR boundary.** If `spec.md` has a populated `## Phases` section, no PR may span two phases. Phases encode what forces a separate *release*; PRs encode what makes a reviewable *change*, so a phase boundary is necessarily also a review boundary.
+2. **Migrations ship alone.** Schema migrations go in their own PR ahead of the code that uses them — they get read differently from application code, and the deploy risk profile is different.
+3. **Additive units before the behaviour change that references them.** New classes, selectors and error types nothing calls yet make a low-risk PR; the change that wires them in is where the review attention belongs.
+4. **Human-gate tasks head the PR they gate.** A sign-off, confirmation or measurement task goes at the top of the PR whose merge it blocks, and that PR's `Ships` cell states the gate. Never leave such a task out of the table.
+5. **Keep a story's Red tests with the implementation that turns them Green.** Splitting them puts a knowingly failing suite on the default branch.
+6. **Quality-gate and polish tasks** go with the work they gate when they are scoped to it, or form a final PR when they cover the whole feature.
+
+### Sizing
+
+Target 5–15 tasks per PR. A spec with 8 or fewer tasks gets a single-row table covering all of them — that is a valid plan, not a missing one, and Ralph simply never halts. Cap the plan at 10 PRs; if the rules above produce more, merge adjacent groups within the same deployment phase until it fits.
+
+### The `Ships` cell
+
+One sentence naming what a reviewer is being asked to approve, plus the gate that proves it where one exists (e.g. "the frozen suite passes with zero lines modified"). Not a restatement of the task IDs. Where a PR is not safe to merge alone, say what holds it.
+
+### Validation before you finish
+
+Both checks must pass. If either fails, fix the table — do not report the plan as generated.
+
+1. **Total coverage**: collect every task ID in the file and every ID covered by the table (expanding ranges). The two sets must be identical — no task in zero PRs, no task in two, no ID in the table that does not exist as a task.
+2. **No backward dependency**: walk the groups in PR order and confirm that each one could be merged with only its predecessors in place. If a group needs something from a later group, move the task or merge the groups.
