@@ -110,6 +110,8 @@ Map the pack-native severity to the three-tier PR comment scheme:
 
 Findings from `one-way-doors.md` and `concurrency.md` packs, and ALL findings tagged `PROJECT_GATE` (every project pack — prose and script), are always kept regardless of the NEEDS_HUMAN tag — they encode repo-specific continuity an out-of-band reviewer cannot otherwise see.
 
+Findings from the shipped standards pack (`pack: baseline/standards.sh`) follow the ordinary rule: only those tagged `NEEDS_HUMAN` (`specs-mixed-with-code`, `many-boundaries`, `unrated-path`, `lexicon-new-term`) are posted. The rest are mechanical and Marge has already fixed them.
+
 ## Step 6: Check idempotency
 
 Before posting, check if a prior review from this command exists:

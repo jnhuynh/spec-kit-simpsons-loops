@@ -59,7 +59,7 @@ Each sub agent must return findings in this shape (one per finding):
 
 ## 3. Run script packs
 
-Project **script packs** are deterministic continuity checks under `.specify/marge/project/*.sh`, executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/README.md`). The runner discovers the script packs, applies the per-pack timeout, exports the contract env, and emits findings — or one `pack-execution` meta-finding per failed pack — on stdout; it never aborts.
+**Script packs** are deterministic checks: `.specify/marge/baseline/standards.sh` (shipped; runs the standards engine for the damage level, PR shape, plain language, and lexicon) and project continuity checks under `.specify/marge/project/*.sh`. All are executed by the shipped runner `.specify/marge/run-gates.sh` (contract: `.specify/marge/README.md`), baseline first. The runner discovers the script packs, applies the per-pack timeout, exports the contract env, and emits findings — or one `pack-execution` meta-finding per failed pack — on stdout; it never aborts.
 
 Run it **once, after the prose packs** (so script-pack findings can corroborate/refute prose-pack findings in §4) via the Bash tool, with the caller's RUNNER_ENV:
 
@@ -67,7 +67,7 @@ Run it **once, after the prose packs** (so script-pack findings can corroborate/
 <RUNNER_ENV> bash .specify/marge/run-gates.sh
 ```
 
-Treat the runner's stdout as a findings YAML sequence in the same shape as §2 — each item already carries `pack: project/<name>` and `PROJECT_GATE` (a failed pack appears as one LOW `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero script-pack findings. Append them to the aggregated findings list, then continue to §4. If `.specify/marge/project/` is absent the runner prints nothing — script packs are optional (only `.specify/marge/baseline/` is required).
+Treat the runner's stdout as a findings YAML sequence in the same shape as §2 — each item already carries its `pack:` label (`baseline/standards.sh` or `project/<name>`); project items carry `PROJECT_GATE`, baseline items never do (a failed pack appears as one LOW `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero script-pack findings. Append them to the aggregated findings list, then continue to §4. If neither directory holds a `*.sh` the runner prints nothing — script packs are optional (only `.specify/marge/baseline/` is required).
 
 ## 4. Aggregate
 
