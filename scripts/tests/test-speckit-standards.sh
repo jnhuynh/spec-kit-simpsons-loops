@@ -386,6 +386,67 @@ check_lacks "four comment lines are fine" "$out" "code.rb:8"
 check_has "slash comments count too" "$out" "MEDIUM code.ts:2  long-comment: 5 lines of comment in a row"
 cleanup
 
+# ── Task 8: lexicon ─────────────────────────────────────────────────────────
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x docs/standards
+{
+  printf '# Spec\n\n## Plain summary\n\nShort.\n\n'
+  printf 'Underwriting starts here. Consumers pay today.\n'
+  printf 'The direct-to-consumer flow and the consumer app are fine.\n'
+  printf 'We utilize the vendor-neutral seam and the dispatch surface, never the attack surface or the surface.\n'
+  printf 'The Risk Engine Service runs nightly. Nightly Job runs too. User Story 3 stays known.\n'
+  printf 'customers\n'
+  printf 'Borrower\n'
+  printf 'The `underwriting` module and https://underwriting.example are never scanned.\n'
+  printf '## Underwriting Heading Words\n'
+  printf '| Underwriting | table |\n'
+  printf 'subcustomers and borrowership stay.\n'
+} > specs/9cad-feat-x/spec.md
+printf 'underwriting is allowed here\n' > docs/standards/lexicon.md
+commit_all
+engine --base main
+check_rc "a banned word blocks" "$rc" 1
+check_has "banned word with its reason" "$out" 'BLOCK HIGH   specs/9cad-feat-x/spec.md:7  lexicon-banned: "Underwriting" — say "risk assessment". Reset does not do this.'
+check_has "preferred word" "$out" 'MEDIUM specs/9cad-feat-x/spec.md:7  lexicon-prefer: "Consumers" — say "member".'
+check_lacks "unless suppresses the whole line" "$out" "spec.md:8  lexicon-prefer"
+check_has "plain verb" "$out" 'LOW    specs/9cad-feat-x/spec.md:9  plain-verb: "utilize" — say "use".'
+check_has "compound invented phrase once" "$out" 'MEDIUM specs/9cad-feat-x/spec.md:9  invented-phrase: "vendor-neutral seam" is built from generic words.'
+check_eq "invented phrase reported once per line" "$(grep -c 'vendor-neutral seam' <<<"$out")" "1"
+check_has "modifier plus generic noun" "$out" '"dispatch surface" is built from generic words.'
+check_lacks "allowed phrase" "$out" '"attack surface"'
+check_lacks "noun after an article" "$out" '"the surface"'
+check_has "new Title Case term" "$out" 'LOW    specs/9cad-feat-x/spec.md:10  lexicon-new-term: "Risk Engine Service" looks like a new term.'
+check_lacks "sentence-start capital drops its first word" "$out" '"Nightly Job"'
+check_lacks "known term" "$out" '"User Story"'
+check_has "whole-line match at line start" "$out" 'specs/9cad-feat-x/spec.md:11  lexicon-prefer: "customers" — say "member".'
+check_has "whole-line match at line end" "$out" 'specs/9cad-feat-x/spec.md:12  lexicon-banned: "Borrower" — say "member".'
+check_lacks "inline code and URLs are never scanned" "$out" "spec.md:13"
+check_has "headings are scanned for words" "$out" 'spec.md:14  lexicon-banned: "Underwriting"'
+check_lacks "headings are not new terms" "$out" '"Underwriting Heading Words"'
+check_has "table cells are scanned for words" "$out" 'spec.md:15  lexicon-banned: "Underwriting"'
+check_lacks "a pattern never matches inside a longer word" "$out" "spec.md:16"
+check_lacks "exempt path never scanned" "$out" "docs/standards/lexicon.md"
+engine --base main --format marge
+check_has "new term needs a human" "$out" "  rule: lexicon-new-term"
+check_has "marge escapes quotes in the issue" "$out" '  issue: "\"Underwriting\" — say \"risk assessment\". Reset does not do this."'
+check_has "new term fix names the config" "$out" '  fix: "add it to known_terms in .specify/marge/config/lexicon.yml in this change, or write it in plain lower-case words"'
+cleanup
+
+make_repo fixtures
+printf 'Underwriting in a comment is found too.\n' > note.txt
+printf 'x\n# underwriting here\n' > code.rb
+commit_all
+engine --base main
+check_has "txt prose scanned" "$out" "note.txt:1  lexicon-banned"
+check_has "comment scanned" "$out" "code.rb:2  lexicon-banned"
+rm .specify/marge/config/lexicon.yml
+commit_all "drop lexicon"
+engine --base HEAD~1
+check_rc "without lexicon.yml nothing blocks" "$rc" 0
+check_lacks "without lexicon.yml no lexicon findings" "$out" "lexicon-"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
