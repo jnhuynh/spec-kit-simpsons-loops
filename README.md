@@ -307,7 +307,7 @@ Run it yourself from the repo root:
 ```bash
 bash .specify/scripts/bash/speckit-standards.sh --base origin/main            # the branch
 bash .specify/scripts/bash/speckit-standards.sh --working-tree                # uncommitted work
-bash .specify/scripts/bash/speckit-standards.sh --dir specs/1a2b-feat-x       # one spec directory
+bash .specify/scripts/bash/speckit-standards.sh --dir specs/1a2b-feat-x       # one spec directory (path relative to the repo root)
 bash .specify/scripts/bash/speckit-standards.sh --base origin/main --body-file pr.md --format marge
 ```
 

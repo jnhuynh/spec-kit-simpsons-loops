@@ -67,7 +67,7 @@ Run it **once, after the prose packs** (so script-pack findings can corroborate/
 <RUNNER_ENV> bash .specify/marge/run-gates.sh
 ```
 
-Treat the runner's stdout as a findings YAML sequence in the same shape as §2 — each item already carries its `pack:` label (`baseline/standards.sh` or `project/<name>`); project items carry `PROJECT_GATE`, baseline items never do (a failed pack appears as one LOW `pack-execution` finding tagged `[PROJECT_GATE, NEEDS_HUMAN]`). Empty stdout means zero script-pack findings. Append them to the aggregated findings list, then continue to §4. If neither directory holds a `*.sh` the runner prints nothing — script packs are optional (only `.specify/marge/baseline/` is required).
+Treat the runner's stdout as a findings YAML sequence in the same shape as §2 — each item already carries its `pack:` label (`baseline/standards.sh` or `project/<name>`); project items carry `PROJECT_GATE`, baseline items never do (a failed pack appears as one LOW `pack-execution` finding, tagged `[PROJECT_GATE, NEEDS_HUMAN]` for a project pack and `[NEEDS_HUMAN]` for a baseline pack). Empty stdout means zero script-pack findings. Append them to the aggregated findings list, then continue to §4. If neither directory holds a `*.sh` the runner prints nothing — script packs are optional (only `.specify/marge/baseline/` is required).
 
 ## 4. Aggregate
 

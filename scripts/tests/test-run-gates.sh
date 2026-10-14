@@ -111,6 +111,18 @@ check_has "planning sees the untracked spec" "$out" "rule: plain-summary-missing
 check_has "planning runs the lexicon group" "$out" "rule: lexicon-banned"
 cleanup
 
+# 7. Planning without SPECKIT_BASE_REF in a repo with no origin still sees the committed spec.
+make_repo
+cp "$WRAPPER" .specify/marge/baseline/standards.sh
+cp "$ENGINE" .specify/scripts/bash/speckit-standards.sh; chmod +x .specify/scripts/bash/speckit-standards.sh
+cp "$FIXTURES/damage-levels.yml" "$FIXTURES/lexicon.yml" .specify/marge/config/
+mkdir -p specs/9cad-feat-x
+printf '# Spec\n\n## User Scenarios\n\nUnderwriting.\n' > specs/9cad-feat-x/spec.md
+git add -A; git commit -qm spec
+out=$(SPECKIT_STAGE=planning SPECKIT_FEATURE_DIR=specs/9cad-feat-x SPECKIT_REPO_ROOT="$PWD" bash .specify/marge/run-gates.sh 2>/dev/null)
+check_has "planning without a base ref falls back to main" "$out" "rule: plain-summary-missing"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
