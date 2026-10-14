@@ -239,6 +239,11 @@ mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
 cp "$SCRIPT_DIR/scripts/speckit-commit.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
 chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
 
+# Standards engine (Pattern A: OVERWRITE). The baseline wrapper that calls it and
+# the two config files it reads are seeded once, below, so consumer edits survive.
+cp "$SCRIPT_DIR/scripts/speckit-standards.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-standards.sh"
+chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-standards.sh"
+
 echo "  Copied files:"
 echo "    .claude/agents/homer.md"
 echo "    .claude/agents/lisa.md"
@@ -252,6 +257,7 @@ echo "    .claude/agents/loop-orchestrator.md"
   done
 echo "    .specify/marge/run-gates.sh"
 echo "    .specify/scripts/bash/speckit-commit.sh"
+echo "    .specify/scripts/bash/speckit-standards.sh"
 
 # ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
 # Earlier installs used .specify/marge/checks/ (prose packs) and
@@ -297,7 +303,8 @@ if [[ -d "$MARGE_DIR/checks" || -d "$MARGE_DIR/gates" ]]; then
 fi
 
 # ── 2b. Seed Marge baseline packs ───────────────────────────────────
-# Baseline packs ship from the non-hidden source dir specify-marge/baseline/.
+# Baseline packs (prose *.md and the one shipped script pack, standards.sh) ship
+# from the non-hidden source dir specify-marge/baseline/.
 # Copy each into the consumer's .specify/marge/baseline/ only if it does not
 # already exist — preserving consumer customizations while bootstrapping fresh
 # installs. Consumer-added packs go in project/ and are never touched here.
@@ -307,7 +314,7 @@ MARGE_BASELINE_DIR="$PROJECT_DIR/.specify/marge/baseline"
 mkdir -p "$MARGE_BASELINE_DIR"
 
 marge_seeded=false
-for pack in "$SCRIPT_DIR/specify-marge/baseline/"*.md; do
+for pack in "$SCRIPT_DIR/specify-marge/baseline/"*.md "$SCRIPT_DIR/specify-marge/baseline/"*.sh; do
   [[ -f "$pack" ]] || continue
   pack_name=$(basename "$pack")
   target="$MARGE_BASELINE_DIR/$pack_name"
@@ -315,6 +322,7 @@ for pack in "$SCRIPT_DIR/specify-marge/baseline/"*.md; do
     echo "  .specify/marge/baseline/$pack_name already exists — skipped"
   else
     cp "$pack" "$target"
+    [[ "$pack" == *.sh ]] && chmod +x "$target"
     echo "  Seeded .specify/marge/baseline/$pack_name"
     marge_seeded=true
   fi
@@ -332,6 +340,16 @@ fi
 mkdir -p "$PROJECT_DIR/.specify/marge/project" "$PROJECT_DIR/.specify/marge/config"
 cp "$SCRIPT_DIR/specify-marge/README.md"        "$PROJECT_DIR/.specify/marge/README.md"
 cp "$SCRIPT_DIR/specify-marge/config/README.md" "$PROJECT_DIR/.specify/marge/config/README.md"
+
+# Standards config data: seeded once, never overwritten (consumer-owned data).
+for seed in damage-levels.yml lexicon.yml; do
+  if [[ -f "$PROJECT_DIR/.specify/marge/config/$seed" ]]; then
+    echo "  .specify/marge/config/$seed already exists — skipped"
+  else
+    cp "$SCRIPT_DIR/specify-marge/config/$seed" "$PROJECT_DIR/.specify/marge/config/$seed"
+    echo "  Seeded .specify/marge/config/$seed"
+  fi
+done
 echo "    .specify/marge/README.md"
 echo "    .specify/marge/config/README.md"
 
