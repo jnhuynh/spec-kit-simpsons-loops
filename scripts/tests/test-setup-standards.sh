@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Tests for the standards parts of setup.sh. Run from anywhere:
+#   bash scripts/tests/test-setup-standards.sh
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
+failures=0
+pass() { echo "PASS: $1"; }
+fail() { echo "FAIL: $1"; failures=$((failures + 1)); }
+check_file() { if [[ -f "$2" ]]; then pass "$1"; else fail "$1 (missing $2)"; fi; }
+check_exec() { if [[ -x "$2" ]]; then pass "$1"; else fail "$1 ($2 not executable)"; fi; }
+check_eq() { if [[ "$2" == "$3" ]]; then pass "$1"; else fail "$1 (got: $2, want: $3)"; fi; }
+
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude .specify/memory .specify/scripts/bash
+bash "$REPO/setup.sh" >/dev/null 2>&1; rc=$?
+check_eq "setup.sh exits 0" "$rc" 0
+check_exec "engine installed and executable" .specify/scripts/bash/speckit-standards.sh
+check_exec "baseline wrapper seeded and executable" .specify/marge/baseline/standards.sh
+check_file "damage-levels seeded" .specify/marge/config/damage-levels.yml
+check_file "lexicon seeded" .specify/marge/config/lexicon.yml
+
+printf '# mine\n' > .specify/marge/baseline/standards.sh
+printf '# mine\n' > .specify/marge/config/lexicon.yml
+printf '# old engine\n' > .specify/scripts/bash/speckit-standards.sh
+bash "$REPO/setup.sh" >/dev/null 2>&1
+check_eq "wrapper preserved on re-install" "$(cat .specify/marge/baseline/standards.sh)" "# mine"
+check_eq "lexicon preserved on re-install" "$(cat .specify/marge/config/lexicon.yml)" "# mine"
+check_eq "engine refreshed on re-install" "$(head -n 1 .specify/scripts/bash/speckit-standards.sh)" "#!/usr/bin/env bash"
+
+# The seeds parse and leave a fresh change clean.
+cp "$REPO/specify-marge/config/lexicon.yml" .specify/marge/config/lexicon.yml
+git add -A >/dev/null; git -c user.email=t@t -c user.name=t commit -qm init
+git checkout -qb work
+printf 'A short note.\n' > note.md
+git add -A; git -c user.email=t@t -c user.name=t commit -qm note
+out=$(bash .specify/scripts/bash/speckit-standards.sh --base "$(git rev-parse main 2>/dev/null || git rev-parse master)" 2>&1); rc=$?
+check_eq "seeded config runs clean" "$rc" 0
+check_eq "seeded default level" "$(head -n 1 <<<"$out")" "Damage level: no runtime effect (set by note.md)"
+printf 'We utilize the dispatch surface.\n' > note.md
+git add -A; git -c user.email=t@t -c user.name=t commit -qm words
+out=$(bash .specify/scripts/bash/speckit-standards.sh --base "$(git rev-parse main 2>/dev/null || git rev-parse master)" 2>&1)
+if grep -q 'plain-verb: "utilize"' <<<"$out" && grep -q 'invented-phrase: "dispatch surface"' <<<"$out"; then pass "seeded lexicon finds filler and invented phrases"; else fail "seeded lexicon rules (got: $out)"; fi
+cd / && rm -rf "$consumer"
+
+echo
+if [[ "$failures" -eq 0 ]]; then echo "ALL TESTS PASSED"; else echo "$failures TEST(S) FAILED"; exit 1; fi

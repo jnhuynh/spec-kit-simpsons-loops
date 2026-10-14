@@ -1,0 +1,117 @@
+# How much damage a mistake could do, decided by which files changed.
+# Read by .specify/scripts/bash/speckit-standards.sh. Guide: README.md "Standards checks".
+#
+# A file gets the level of the most specific pattern it matches (a tie goes to
+# the more serious level). A change gets the highest level of any file in it.
+# A path that matches nothing gets `default_level`. Levels are listed from most
+# to least serious. The level says how hard to look, not how big the change is:
+# a large change with no runtime effect is a skim, a one-line change to a
+# payment calculator is not.
+#
+# `reviewer` and `checklist` go into the pull request description. A checklist
+# entry is a question, or a `question` with `paths`: asked only when the change
+# touches one of them. Those paths belong to the level too.
+#
+# Patterns are shell globs: `*` stops at `/`, `**` crosses directories. Quote a
+# pattern that starts with `.` or `*`. Out of the box only specification,
+# internal, and no-runtime-effect paths are set; everything else is
+# user-facing until you list your critical paths under `critical`.
+
+default_level: user-facing
+
+# A path under `from` is also matched as if it lived under `to`, so a job can
+# inherit its service directory's level. Example:
+#   - from: app/jobs/
+#     to: app/services/
+aliases: []
+
+# Places where a new directory or file deserves a level of its own. A new unit
+# rated only by a catch-all pattern is reported (unrated-path) so someone decides.
+# Example:
+#   - app/services/*
+#   - app/models/*.rb
+unit_dirs: []
+
+# Globs whose first wildcard segment names a boundary: a vendor integration, a
+# bounded context. A change touching two or more is reported (many-boundaries).
+# Example:
+#   - app/services/vendor_*/**
+boundaries: []
+
+levels:
+  - name: critical
+    reviewer: >-
+      Read every line. Work the checklist.
+    checklist:
+      - What happens if this runs twice?
+      - What happens if it fails halfway through?
+      - Can a user see or change data that is not theirs?
+      - Is the migration reversible? Does it lock a large table?
+      - Is the failure path tested, not just the happy path?
+      - question: >-
+          Who can reach this? Can a secret, a credential or personal data end
+          up in a log, a response or an unencrypted column?
+        paths: []
+        # Sign-in, sessions, permissions, secrets, encrypted columns, for example:
+        #   - app/policies/**/*
+        #   - config/initializers/**/*
+      - question: >-
+          Does this change what a user is told or agrees to? Should users who
+          accepted the old version accept again?
+        paths: []
+        # Disclosures, terms, agreements, for example:
+        #   - app/views/legal/**/*
+    paths: []
+    # Code that moves money or data of record, decides who may act, or stores
+    # secrets or personal data, for example:
+    #   - db/migrate/**/*
+    #   - app/services/payments/**/*
+
+  - name: user-facing
+    reviewer: >-
+      Read every hunk. Confirm the author's screenshot or live check.
+    checklist:
+      - Does the screenshot or live check match what the code does?
+      - What does a user see when a dependency fails?
+      - Does the change alter what an existing user already sees?
+    paths: []
+    # Everything a user can see or do; often the whole application tree:
+    #   - src/**/*
+    #   - app/**/*
+
+  - name: specification
+    reviewer: >-
+      Read all of it. This is the feature. Send it back if a sentence needs
+      decoding.
+    checklist:
+      - Can you say in two sentences what a user or an operator gets when this ships?
+      - Is there a phrase built from generic words where the thing has a name?
+      - Is there a word the lexicon and the code do not use?
+      - Did any sentence need a second read?
+    paths:
+      - specs/**/*
+
+  - name: internal
+    reviewer: >-
+      Skim. Look closely at the one hunk the author flagged in "Where to look".
+    checklist:
+      - Does the flagged hunk do what the description says?
+    paths:
+      - .specify/**/*
+      - .claude/**/*
+      - .github/**/*
+      - ".*"
+      # Staff tools, metrics, scripts, deploy tooling, for example:
+      #   - script/**/*
+      #   - app/services/metrics/**/*
+
+  - name: no runtime effect
+    reviewer: >-
+      Approve. Nobody is expected to read this line by line.
+    checklist: []
+    paths:
+      - docs/**/*
+      - "**/*.md"
+      # Test-only directories, for example:
+      #   - test/**/*
+      #   - spec/**/*
