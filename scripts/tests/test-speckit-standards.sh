@@ -281,6 +281,77 @@ engine --base main --body-file body.md --format marge
 check_has "marge escapes nothing in the id list" "$out" '  issue: "the description leans on requirement ids: FR-001"'
 cleanup
 
+# ── Task 6: PR shape ────────────────────────────────────────────────────────
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x app
+printf '# Spec\n\n## Plain summary\n\nShort.\n' > specs/9cad-feat-x/spec.md
+printf 'x\n' > app/x.rb
+commit_all
+engine --base main
+check_rc "specs mixed with code is advice" "$rc" 0
+check_has "specs mixed with code finding" "$out" "MEDIUM specs/9cad-feat-x/spec.md:0  specs-mixed-with-code: this change edits specs/ and application code together"
+engine --base main --format marge
+check_has "specs mixed with code needs a human" "$out" "  tags: [NEEDS_HUMAN]"
+cleanup
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x docs
+printf '# Spec\n\n## Plain summary\n\nShort.\n' > specs/9cad-feat-x/spec.md
+printf 'notes\n' > docs/notes.md
+commit_all
+engine --base main
+check_lacks "specs with docs only is not mixed" "$out" "specs-mixed-with-code"
+cleanup
+
+make_repo fixtures
+mkdir -p app/services/reset_plaid app/jobs/reset_pave app/services/reset_x
+printf 'a\n' > app/services/reset_plaid/a.rb
+printf 'b\n' > app/services/reset_plaid/b.rb
+printf 'j\n' > app/jobs/reset_pave/j.rb
+commit_all
+engine --base main
+check_has "two boundaries reported once" "$out" "MEDIUM PULL_REQUEST:0  many-boundaries: touches 2 boundaries: reset_pave, reset_plaid"
+cleanup
+
+make_repo fixtures
+mkdir -p app/services/reset_plaid
+printf 'a\n' > app/services/reset_plaid/a.rb
+commit_all
+engine --base main
+check_lacks "one boundary is fine" "$out" "many-boundaries"
+cleanup
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x
+printf '# Spec\n\n## User Scenarios\n\nText.\n' > specs/9cad-feat-x/spec.md
+commit_all
+engine --base main
+check_rc "missing plain summary blocks" "$rc" 1
+check_has "missing plain summary finding" "$out" 'BLOCK HIGH   specs/9cad-feat-x/spec.md:1  plain-summary-missing: a new spec must open with a "## Plain summary" section'
+cleanup
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x
+{ printf '# Spec\n\n## Plain summary\n\n'; for _ in $(seq 1 151); do printf 'word '; done; printf '\n\n## Next\n\nMore.\n'; } > specs/9cad-feat-x/spec.md
+commit_all
+engine --base main
+check_rc "long plain summary blocks" "$rc" 1
+check_has "long plain summary finding at the heading line" "$out" "BLOCK HIGH   specs/9cad-feat-x/spec.md:3  plain-summary-too-long: the plain summary is 151 words; the limit is 150"
+cleanup
+
+make_repo fixtures
+mkdir -p specs/9cad-feat-x
+printf '# Spec\n\n## Plain Summary *(mandatory)*\n\nWho, what, and what goes wrong.\n\n## Next\n' > specs/9cad-feat-x/spec.md
+commit_all
+engine --base main
+check_lacks "case-insensitive heading with suffix passes" "$out" "plain-summary"
+printf '# Spec\n\n## Plain Summary\n\nEdited later.\n' > specs/9cad-feat-x/spec.md
+commit_all
+engine --base HEAD~1
+check_lacks "an existing spec is never checked for a summary" "$out" "plain-summary"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

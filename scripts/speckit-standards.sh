@@ -453,9 +453,80 @@ rule_requirement_ids() {
     "say what changes in words a reviewer can read without opening the spec; link the spec once"
 }
 
+rule_specs_mixed() {
+  local spec code
+  spec=$(awk -F'\t' '$1 ~ /^specs\// { print $1; exit }' "$WORK/files.tsv")
+  [[ -n "$spec" ]] || return 0
+  code=$(awk -F'\t' '$1 !~ /^(specs|docs)\// && $1 !~ /\.(md|markdown|txt)$/ { print $1; exit }' "$WORK/files.tsv")
+  [[ -n "$code" ]] || return 0
+  emit 0 MEDIUM "$spec" 0 specs-mixed-with-code "this change edits specs/ and application code together" \
+    "open a separate pull request for the specs/ changes so the code can be read on its own" NEEDS_HUMAN
+}
+
+# -v cfg=flattened damage-levels; stdin: changed paths → distinct boundary names.
+# A boundary glob's first wildcard segment names the boundary.
+IFS= read -r -d '' _AWK_BOUNDARIES_BODY <<'AWK' || true
+BEGIN {
+  FS = "\t"
+  while ((getline l < cfg) > 0) {
+    split(l, kv, "\t")
+    if (kv[1] ~ /^boundaries\.[0-9]+$/) {
+      nb++; bre[nb] = glob_to_ere(kv[2]); m = split(kv[2], seg, "/"); bseg[nb] = 0
+      for (k = 1; k <= m; k++) if (seg[k] ~ /[*?]/) { bseg[nb] = k; break }
+    }
+  }
+  close(cfg)
+}
+{ for (b = 1; b <= nb; b++) if (bseg[b] > 0 && $0 ~ bre[b]) { split($0, ps, "/"); if (!(ps[bseg[b]] in seen)) { seen[ps[bseg[b]]] = 1; print ps[bseg[b]] } } }
+AWK
+AWK_BOUNDARIES="$AWK_GLOB"$'\n'"$_AWK_BOUNDARIES_BODY"
+
+rule_many_boundaries() {
+  local names count
+  names=$(cut -f1 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" "$AWK_BOUNDARIES" | sort)
+  count=$(grep -c . <<<"$names" 2>/dev/null || true)
+  [[ "${count:-0}" -ge 2 ]] || return 0
+  emit 0 MEDIUM PULL_REQUEST 0 many-boundaries "touches $count boundaries: $(paste -sd, - <<<"$names" | sed 's/,/, /g')" \
+    "read each boundary on its own; split the change if the work in one does not need the others" NEEDS_HUMAN
+}
+
+# A new specs/*/spec.md opens with "## Plain summary" of at most SUMMARY_MAX_WORDS words.
+IFS= read -r -d '' AWK_PLAIN_SUMMARY <<'AWK' || true
+BEGIN { FS = "\t" }
+$1 == p { n++; ln[n] = $2; tx[n] = substr($0, length($1) + length($2) + 3) }
+END {
+  start = 0
+  for (k = 1; k <= n; k++) if (tolower(tx[k]) ~ /^##[[:space:]]+plain summary/) { start = k; break }
+  if (!start) { print "missing\t1\t0"; exit }
+  words = 0
+  for (k = start + 1; k <= n && tx[k] !~ /^#+[[:space:]]/; k++) {
+    t = tx[k]; gsub(/^[[:space:]]+|[[:space:]]+$/, "", t)
+    if (t != "") words += split(t, w, /[[:space:]]+/)
+  }
+  print (words > max ? "long" : "ok") "\t" ln[start] "\t" words
+}
+AWK
+
+rule_plain_summary() {
+  local path status kind verdict line words
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$status" == A && "$path" =~ ^specs/[^/]+/spec\.md$ ]] || continue
+    IFS="$TAB" read -r verdict line words < <(awk -v p="$path" -v max="$SUMMARY_MAX_WORDS" "$AWK_PLAIN_SUMMARY" "$WORK/added.tsv")
+    case "$verdict" in
+      missing) emit 1 HIGH "$path" 1 plain-summary-missing 'a new spec must open with a "## Plain summary" section' \
+                 "add \"## Plain summary\" ($SUMMARY_MAX_WORDS words or fewer) before the first user story" ;;
+      long) emit 1 HIGH "$path" "$line" plain-summary-too-long "the plain summary is $words words; the limit is $SUMMARY_MAX_WORDS" \
+              "cut it to the three questions: who is this for, what changes for them, what goes wrong if it is wrong" ;;
+    esac
+  done < "$WORK/files.tsv"
+}
+
 run_rules() {
   if want pr-shape; then
     rule_requirement_ids
+    rule_specs_mixed
+    rule_many_boundaries
+    rule_plain_summary
   fi
 }
 
