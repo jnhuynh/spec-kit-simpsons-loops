@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034  # file-level: settings consumed by functions that later tasks add; remove once all rules exist
 # speckit-standards.sh — deterministic standards checks over a change set:
 # damage level, PR shape, plain language, lexicon.
 #
@@ -687,6 +686,55 @@ rule_lexicon() {
   done < "$WORK/files.tsv"
 }
 
+# ── Rules: unrated-path ────────────────────────────────────────────────────
+# -v cfg=flattened damage-levels -v levels=level.tsv; stdin: "path<TAB>status".
+# Output: "UNIT<TAB>unit<TAB>dir|file<TAB>level<TAB>pattern" for an added file whose
+# unit (per unit_dirs) is rated only by a pattern above the unit, or by the default.
+IFS= read -r -d '' _AWK_UNRATED_BODY <<'AWK' || true
+function literal_prefix(g) { sub(/[*?].*$/, "", g); return g }
+BEGIN {
+  FS = "\t"
+  while ((getline l < cfg) > 0) { split(l, kv, "\t"); if (kv[1] ~ /^unit_dirs\.[0-9]+$/) { nu++; ure[nu] = glob_to_ere(kv[2]); useg[nu] = split(kv[2], tmp, "/") } }
+  close(cfg)
+  while ((getline l < levels) > 0) { split(l, kv, "\t"); if (kv[1] == "PATH") { plevel[kv[2]] = kv[3]; ppat[kv[2]] = kv[4] } }
+  close(levels)
+}
+$2 == "A" {
+  path = $1; n = split(path, seg, "/")
+  for (u = 1; u <= nu; u++) {
+    if (useg[u] > n) continue
+    prefix = seg[1]; for (k = 2; k <= useg[u]; k++) prefix = prefix "/" seg[k]
+    if (prefix !~ ure[u]) continue
+    unit = prefix; kind = (useg[u] < n ? "dir" : "file")
+    pat = ppat[path]
+    if (pat == "") catchall = 1
+    else { lp = literal_prefix(pat); sub(/\/$/, "", lp); catchall = (lp != unit && index(unit, lp "/") == 1) }
+    if (catchall && !(unit in reported)) { reported[unit] = 1; print "UNIT\t" unit "\t" kind "\t" plevel[path] "\t" pat }
+    break
+  }
+}
+AWK
+AWK_UNRATED="$AWK_GLOB"$'\n'"$_AWK_UNRATED_BODY"
+
+rule_unrated_path() {
+  local _u unit kind level pattern what file f new
+  awk -F'\t' '$2 == "A" { print $1 }' "$WORK/files.tsv" > "$WORK/added-paths.txt"
+  while IFS="$TAB" read -r _u unit kind level pattern; do
+    if [[ "$kind" == dir ]]; then
+      new=1
+      while IFS= read -r f; do
+        grep -qxF -- "$f" "$WORK/added-paths.txt" || { new=0; break; }
+      done < <(find "$unit" -type f 2>/dev/null)
+      [[ "$new" == 1 ]] || continue
+      what="new directory"; file="$unit/"
+    else
+      what="new file"; file="$unit"
+    fi
+    emit 0 MEDIUM "$file" 0 unrated-path "$what, rated $level only by ${pattern:-the default level}" \
+      "decide its level in $CONFIG_DIR/damage-levels.yml: list it under a more serious level if a mistake there would do more damage than \"$level\" implies" NEEDS_HUMAN
+  done < <(cut -f1,2 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" -v levels="$WORK/level.tsv" "$AWK_UNRATED")
+}
+
 run_rules() {
   if want pr-shape; then
     rule_requirement_ids
@@ -700,6 +748,9 @@ run_rules() {
   fi
   if want lexicon; then
     rule_lexicon
+  fi
+  if want unrated-path; then
+    rule_unrated_path
   fi
 }
 

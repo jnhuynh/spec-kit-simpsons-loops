@@ -447,6 +447,38 @@ check_rc "without lexicon.yml nothing blocks" "$rc" 0
 check_lacks "without lexicon.yml no lexicon findings" "$out" "lexicon-"
 cleanup
 
+# ── Task 9: unrated-path ────────────────────────────────────────────────────
+
+make_repo fixtures
+mkdir -p app/services/reset_visa app/services/repayment_instances app/models lib
+printf 'a\n' > app/services/reset_visa/a.rb
+printf 'b\n' > app/services/reset_visa/b.rb
+printf 'n\n' > app/services/repayment_instances/new.rb
+printf 't\n' > app/models/thing.rb
+printf 'p\n' > app/models/partner.rb
+printf 'l\n' > lib/x.rb
+commit_all
+engine --base main
+check_has "new directory rated only by the catch-all" "$out" "MEDIUM app/services/reset_visa/:0  unrated-path: new directory, rated member-facing only by app/services/**/*"
+check_eq "directory reported once" "$(grep -c 'app/services/reset_visa/' <<<"$out")" "1"
+check_has "new model file rated only by the catch-all" "$out" "MEDIUM app/models/thing.rb:0  unrated-path: new file, rated member-facing only by app/models/**/*"
+check_lacks "directory with its own pattern is rated" "$out" "repayment_instances/:0"
+check_lacks "file with its own pattern is rated" "$out" "partner.rb:0"
+check_lacks "path outside unit_dirs is ignored" "$out" "lib/x.rb"
+engine --base main --format marge
+check_has "unrated path needs a human" "$out" "  rule: unrated-path"
+cleanup
+
+make_repo fixtures
+mkdir -p app/services/reset_visa
+printf 'old\n' > app/services/reset_visa/old.rb
+commit_all "existing unit"
+printf 'b\n' > app/services/reset_visa/b.rb
+commit_all
+engine --base HEAD~1
+check_lacks "a file added to an existing directory is not a new unit" "$out" "unrated-path"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
