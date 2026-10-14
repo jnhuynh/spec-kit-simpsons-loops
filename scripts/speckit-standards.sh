@@ -69,7 +69,104 @@ parse_args() {
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 
 # ── Stubs replaced by later tasks ──────────────────────────────────────────
-yaml_flatten() { :; }
+# ── YAML subset → "keypath<TAB>value" ──────────────────────────────────────
+# Two-space indentation; `key: value`, `key:` with a nested block, `- item`,
+# `- key: value` opening a mapping; plain, 'single', "double" or >- folded
+# scalars; inline lists [a, b]; # comments. Anything else exits 2.
+IFS= read -r -d '' AWK_FLATTEN <<'AWK' || true
+function die(msg) { printf("%s:%d: unsupported YAML: %s\n", FILENAME, FNR, msg) > "/dev/stderr"; exit 2 }
+function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+function joinpath(a, b) { return (a == "" ? b : a "." b) }
+function unquote(s) {
+  s = trim(s)
+  if (s ~ /^"/) {
+    if (s !~ /"[[:space:]]*(#.*)?$/) die("unterminated double quote")
+    sub(/^"/, "", s); sub(/"[[:space:]]*(#.*)?$/, "", s)
+    gsub(/\\"/, "\"", s); gsub(/\\\\/, "\\", s)
+    return s
+  }
+  if (s ~ /^'/) {
+    if (s !~ /'[[:space:]]*(#.*)?$/) die("unterminated single quote")
+    sub(/^'/, "", s); sub(/'[[:space:]]*(#.*)?$/, "", s)
+    gsub(/''/, "'", s)
+    return s
+  }
+  sub(/[[:space:]]+#.*$/, "", s)
+  return trim(s)
+}
+function emit_list(keypath, text,   inner, parts, k, m) {
+  inner = trim(text); sub(/^\[/, "", inner); sub(/\][[:space:]]*(#.*)?$/, "", inner)
+  if (trim(inner) == "") return
+  m = split(inner, parts, ",")
+  for (k = 1; k <= m; k++) print keypath "." (k - 1) "\t" unquote(parts[k])
+}
+function handle_key(text, col,   key, rest) {
+  key = text; sub(/:.*$/, "", key)
+  rest = text; sub(/^[^:]*:/, "", rest); rest = trim(rest)
+  pend[depth] = ""
+  if (rest == "") { pend[depth] = key; return }
+  if (rest == ">-" || rest == ">") { folding = joinpath(path[depth], key); foldind = col; foldbuf = ""; return }
+  if (rest ~ /^[|]/) die("literal block scalars are not supported")
+  if (rest ~ /^\[/) { emit_list(joinpath(path[depth], key), rest); return }
+  if (rest ~ /^[{&*]/) die("flow mappings, anchors and aliases are not supported")
+  print joinpath(path[depth], key) "\t" unquote(rest)
+}
+BEGIN { depth = 0; ind[0] = 0; path[0] = ""; kind[0] = "m"; pend[0] = ""; folding = "" }
+{
+  line = $0
+  if (line ~ /^[[:space:]]*\t/) die("tab indentation")
+  if (folding != "") {
+    if (line ~ /^[[:space:]]*$/) next
+    n = match(line, /[^ ]/) - 1
+    if (n > foldind) { foldbuf = (foldbuf == "" ? trim(line) : foldbuf " " trim(line)); next }
+    print folding "\t" foldbuf; folding = ""; foldbuf = ""
+  }
+  if (line ~ /^[[:space:]]*$/ || line ~ /^[[:space:]]*#/) next
+  n = match(line, /[^ ]/) - 1
+  rest = substr(line, n + 1)
+  if (rest ~ /^- / || rest == "-") {
+    while (ind[depth] > n) depth--
+    if (!(kind[depth] == "s" && ind[depth] == n)) {
+      if (kind[depth] != "m" || pend[depth] == "" || ind[depth] > n) die("sequence item without a key")
+      depth++; ind[depth] = n; kind[depth] = "s"; path[depth] = joinpath(path[depth-1], pend[depth-1]); pend[depth] = ""
+      pend[depth-1] = ""; count[path[depth]] = 0
+    }
+    item = trim(substr(rest, 3))
+    i = count[path[depth]]++
+    itempath = path[depth] "." i
+    if (item ~ /^[A-Za-z_][A-Za-z0-9_-]*:([[:space:]]|$)/) {
+      depth++; ind[depth] = n + 2; kind[depth] = "m"; path[depth] = itempath; pend[depth] = ""
+      handle_key(item, n + 2)
+    } else if (item ~ /^\[/) {
+      emit_list(itempath, item)
+    } else {
+      print itempath "\t" unquote(item)
+    }
+    next
+  }
+  if (rest ~ /^[A-Za-z_][A-Za-z0-9_-]*:([[:space:]]|$)/) {
+    while (ind[depth] > n || (ind[depth] == n && kind[depth] == "s")) depth--
+    if (kind[depth] != "m") die("key inside a sequence")
+    if (ind[depth] < n) {
+      if (pend[depth] == "") die("bad indentation")
+      depth++; ind[depth] = n; kind[depth] = "m"; path[depth] = joinpath(path[depth-1], pend[depth-1]); pend[depth] = ""
+      pend[depth-1] = ""
+    } else if (ind[depth] != n) die("bad indentation")
+    handle_key(rest, n)
+    next
+  }
+  die("unrecognized line")
+}
+END { if (folding != "") print folding "\t" foldbuf }
+AWK
+
+yaml_flatten() { awk "$AWK_FLATTEN" "$1"; }
+
+# cfg_get FLAT KEY → the scalar at KEY; cfg_list FLAT PREFIX → PREFIX.0, PREFIX.1, ... in order.
+cfg_get() { awk -F'\t' -v k="$2" '$1 == k { print substr($0, length($1) + 2); exit }' "$1"; }
+cfg_list() {
+  awk -F'\t' -v p="$2" 'index($1, p ".") == 1 && substr($1, length(p) + 2) ~ /^[0-9]+$/ { print substr($0, length($1) + 2) }' "$1"
+}
 collect_change_set() { :; }
 collect_prose() { :; }
 assess_damage() { :; }

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034  # file-level: TAB is used from the Task 2 cases on; remove then
 # Tests for scripts/speckit-standards.sh. Run from anywhere:
 #   bash scripts/tests/test-speckit-standards.sh
 set -uo pipefail
@@ -67,6 +66,55 @@ engine --base main
 check_rc "clean change set exits 0" "$rc" 0
 check_has "clean change set says so" "$out" "No findings."
 cleanup
+
+# ── Task 2: YAML flattener ──────────────────────────────────────────────────
+
+# shellcheck source=../speckit-standards.sh
+source "$ENGINE"
+
+flat=$(yaml_flatten "$FIXTURES/damage-levels.yml"); rc=$?
+check_rc "fixture damage-levels flattens" "$rc" 0
+check_eq "fixture damage-levels line count" "$(wc -l <<<"$flat" | tr -d ' ')" "48"
+check_eq "five levels" "$(grep -c '^levels\.[0-9]*\.name' <<<"$flat")" "5"
+check_has "folded reviewer joined with spaces" "$flat" "levels.2.reviewer${TAB}Read all of it. This is the feature. Send it back if a sentence needs decoding."
+check_has "folded question inside a sequence item" "$flat" "levels.0.checklist.2.question${TAB}Who can reach this? Can a secret, a card number or personal data end up in a log, a response or an unencrypted column?"
+check_has "path-scoped question paths" "$flat" "levels.0.checklist.2.paths.1${TAB}app/models/user.rb"
+check_has "plain scalar question" "$flat" "levels.0.checklist.3.question${TAB}Does this change what a member is told or agrees to?"
+check_has "double-quoted glob unquoted" "$flat" "levels.3.paths.5${TAB}.*"
+check_has "quoted star glob unquoted" "$flat" "levels.3.paths.6${TAB}*.yml"
+check_has "comment between list items skipped" "$flat" "levels.0.checklist.2.paths.0${TAB}app/policies/**/*"
+check_lacks "empty inline list emits nothing" "$flat" "levels.4.checklist"
+check_has "aliases parsed" "$flat" "aliases.0.to${TAB}app/services/"
+
+flat=$(yaml_flatten "$FIXTURES/lexicon.yml"); rc=$?
+check_rc "fixture lexicon flattens" "$rc" 0
+check_eq "fixture lexicon line count" "$(wc -l <<<"$flat" | tr -d ' ')" "43"
+check_has "single-quoted pattern unquoted" "$flat" "banned.0.pattern${TAB}underwrit[[:alnum:]_]*"
+check_has "unless list" "$flat" "prefer.0.unless.1${TAB}consumer (product|app|codebase|side|flow)"
+check_has "inline list items" "$flat" "invented_phrases.nouns.7${TAB}facade"
+check_has "inline list of suffixes" "$flat" "invented_phrases.compound_suffixes.3${TAB}driven"
+check_eq "cfg_get reads one scalar" "$(cfg_get <(printf '%s\n' "$flat") banned.0.use)" "risk assessment"
+check_eq "cfg_list reads a sequence in order" "$(cfg_list <(printf '%s\n' "$flat") known_terms | paste -sd, -)" "Jack Henry,User Story,Success Criteria,Plain Summary,Eastern Time"
+
+tmp=$(mktemp -d)
+printf 'a:\n\t- b\n' > "$tmp/tab.yml"
+flat=$(yaml_flatten "$tmp/tab.yml" 2>"$tmp/err"); rc=$?
+check_rc "tab indentation exits 2" "$rc" 2
+check_has "tab error names the line" "$(cat "$tmp/err")" "$tmp/tab.yml:2: unsupported YAML: tab indentation"
+printf 'a: &x 1\n' > "$tmp/anchor.yml"
+yaml_flatten "$tmp/anchor.yml" >/dev/null 2>&1; rc=$?
+check_rc "anchor exits 2" "$rc" 2
+printf 'a: |\n  text\n' > "$tmp/literal.yml"
+yaml_flatten "$tmp/literal.yml" >/dev/null 2>&1; rc=$?
+check_rc "literal block exits 2" "$rc" 2
+printf 'k: [a, "b c", d]\nq: "say \\"hi\\""\ns: '"'"'it'"'"''"'"'s'"'"'\nf: >-\n  one\n\n  two\n' > "$tmp/ok.yml"
+flat=$(yaml_flatten "$tmp/ok.yml"); rc=$?
+check_rc "escapes and folds parse" "$rc" 0
+check_has "inline list with quoted item" "$flat" "k.1${TAB}b c"
+check_has "escaped double quotes" "$flat" "q${TAB}say \"hi\""
+check_has "doubled single quote" "$flat" "s${TAB}it's"
+check_has "fold skips blank lines" "$flat" "f${TAB}one two"
+rm -rf "$tmp"
 
 echo
 if [[ "$failures" -eq 0 ]]; then
