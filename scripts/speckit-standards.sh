@@ -588,6 +588,105 @@ rule_long_comment() {
   done < "$WORK/files.tsv"
 }
 
+# ── Rules: lexicon ─────────────────────────────────────────────────────────
+# -v cfg=flattened lexicon -v status=A|M|D|R -v path=PATH; stdin: "line<TAB>text"
+# prose lines of one file. Output: "line<TAB>group<TAB>word<TAB>use<TAB>why"
+# for banned/prefer/soft_verbs, "line<TAB>invented<TAB>phrase", "line<TAB>newterm<TAB>phrase".
+IFS= read -r -d '' _AWK_LEXICON_BODY <<'AWK' || true
+BEGIN {
+  FS = "\t"
+  NOTMOD = " the a an this that each every any no its their our your one per to and or not then also must may can will would should could we it they you "
+  while ((getline l < cfg) > 0) {
+    split(l, kv, "\t"); key = kv[1]; val = substr(l, length(key) + 2)
+    if (key ~ /^(banned|prefer|soft_verbs)\.[0-9]+\.(pattern|use|why)$/) {
+      split(key, p, "."); id = p[1] "." p[2]
+      if (!(id in rid)) { rid[id] = ++nr; rgroup[nr] = p[1] }
+      k = rid[id]
+      if (p[3] == "pattern") rpat[k] = val; else if (p[3] == "use") ruse[k] = val; else rwhy[k] = val
+    }
+    else if (key ~ /^(banned|prefer|soft_verbs)\.[0-9]+\.unless\.[0-9]+$/) {
+      split(key, p, "."); id = p[1] "." p[2]
+      if (!(id in rid)) { rid[id] = ++nr; rgroup[nr] = p[1] }
+      k = rid[id]; nun[k]++; runless[k, nun[k]] = tolower(val)
+    }
+    else if (key ~ /^invented_phrases\.nouns\.[0-9]+$/) nouns = (nouns == "" ? val : nouns "|" val)
+    else if (key ~ /^invented_phrases\.compound_suffixes\.[0-9]+$/) sufs = (sufs == "" ? val : sufs "|" val)
+    else if (key ~ /^invented_phrases\.allowed\.[0-9]+$/) allowed[tolower(val)] = 1
+    else if (key ~ /^known_terms\.[0-9]+$/) known[val] = 1
+  }
+  close(cfg)
+  for (k = 1; k <= nr; k++) rre[k] = "(^|[^[:alnum:]_])(" tolower(rpat[k]) ")([^[:alnum:]_]|$)"
+  if (nouns != "") nounre = "(^|[^[:alnum:]_-])[a-z][a-z0-9_-]*[[:space:]]+(" nouns ")s?([^[:alnum:]_]|$)"
+  if (sufs != "") sufre = "(^|[^[:alnum:]_-])[a-z]+-(" sufs ")[[:space:]]+[a-z]+([^[:alnum:]_]|$)"
+}
+function word_of(s) { sub(/^[^[:alnum:]_]/, "", s); sub(/[^[:alnum:]_]$/, "", s); return s }
+function allowed_phrase(ph,   l) { l = tolower(ph); if (l in allowed) return 1; sub(/s$/, "", l); return (l in allowed) }
+function report_phrase(ln, ph) { if (!((ln, ph) in rep)) { rep[ln, ph] = 1; print ln "\tinvented\t" ph } }
+{
+  ln = $1; text = substr($0, length($1) + 2); gsub(/`[^`]*`/, " ", text); gsub(/https?:\/\/[^[:space:]]+/, " ", text)
+  low = tolower(text)
+  for (k = 1; k <= nr; k++) {
+    if (match(low, rre[k])) {
+      skip = 0; for (u = 1; u <= nun[k]; u++) if (low ~ runless[k, u]) skip = 1
+      if (skip) continue
+      w = word_of(substr(text, RSTART, RLENGTH))
+      print ln "\t" rgroup[k] "\t" w "\t" ruse[k] "\t" rwhy[k]
+    }
+  }
+  rest = low
+  while (nounre != "" && match(rest, nounre)) {
+    ph = word_of(substr(rest, RSTART, RLENGTH)); rest = substr(rest, RSTART + RLENGTH - 1)
+    mod = ph; sub(/[[:space:]].*$/, "", mod)
+    if (index(NOTMOD, " " mod " ") == 0 && !allowed_phrase(ph)) report_phrase(ln, ph)
+    if (RLENGTH <= 1) break
+  }
+  rest = low
+  while (sufre != "" && match(rest, sufre)) {
+    ph = word_of(substr(rest, RSTART, RLENGTH)); rest = substr(rest, RSTART + RLENGTH - 1)
+    if (!allowed_phrase(ph)) report_phrase(ln, ph)
+    if (RLENGTH <= 1) break
+  }
+  if (status == "A" && path ~ /^specs\// && text !~ /^[[:space:]]*(#|\|)/) {
+    rest = text; off = 0
+    while (match(rest, /[A-Z][a-z]+( [A-Z][a-z]+)+/)) {
+      ph = substr(rest, RSTART, RLENGTH); pre = substr(text, 1, off + RSTART - 1)
+      nw = split(ph, pw, " ")
+      if (nw > 4) ph = pw[1] " " pw[2] " " pw[3] " " pw[4]
+      if (!(ph in known)) {
+        if (pre ~ /(^|[.!?][[:space:]]+|["'(\[])$/ || pre ~ /^[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]+$/) sub(/^[A-Za-z]+ ?/, "", ph)
+        if (index(ph, " ") > 0 && !(ph in known) && !(ph in seen)) { seen[ph] = 1; print ln "\tnewterm\t" ph }
+      }
+      off += RSTART + RLENGTH - 1; rest = substr(rest, RSTART + RLENGTH)
+    }
+  }
+}
+AWK
+AWK_LEXICON="$AWK_GLOB"$'\n'"$_AWK_LEXICON_BODY"
+
+lexicon_exempt() {
+  awk -F'\t' -v p="$1" "$AWK_GLOB"$'\n''$1 ~ /^exempt_paths\.[0-9]+$/ && p ~ glob_to_ere(substr($0, length($1) + 2)) { found = 1; exit } END { exit !found }' "$WORK/lx.tsv"
+}
+
+rule_lexicon() {
+  [[ -f "$WORK/lx.tsv" ]] || return 0
+  local path status kind line group word use why
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$kind" != none ]] || continue
+    lexicon_exempt "$path" && continue
+    while IFS="$TAB" read -r line group word use why; do
+      case "$group" in
+        banned) emit 1 HIGH "$path" "$line" lexicon-banned "\"$word\" — say \"$use\".${why:+ $why}" "say \"$use\"" ;;
+        prefer) emit 0 MEDIUM "$path" "$line" lexicon-prefer "\"$word\" — say \"$use\".${why:+ $why}" "say \"$use\"" ;;
+        soft_verbs) emit 0 LOW "$path" "$line" plain-verb "\"$word\" — say \"$use\".${why:+ $why}" "say \"$use\"" ;;
+        invented) emit 0 MEDIUM "$path" "$line" invented-phrase "\"$word\" is built from generic words." \
+                    "name the thing — the class, the endpoint, the table, or the vendor's own word" ;;
+        newterm) emit 0 LOW "$path" "$line" lexicon-new-term "\"$word\" looks like a new term." \
+                   "add it to known_terms in $CONFIG_DIR/lexicon.yml in this change, or write it in plain lower-case words" NEEDS_HUMAN ;;
+      esac
+    done < <(prose_of "$path" | awk -v cfg="$WORK/lx.tsv" -v status="$status" -v path="$path" "$AWK_LEXICON")
+  done < "$WORK/files.tsv"
+}
+
 run_rules() {
   if want pr-shape; then
     rule_requirement_ids
@@ -598,6 +697,9 @@ run_rules() {
   if want plain-language; then
     rule_long_sentence
     rule_long_comment
+  fi
+  if want lexicon; then
+    rule_lexicon
   fi
 }
 
