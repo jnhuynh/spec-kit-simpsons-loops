@@ -33,7 +33,7 @@ This produces a Specification Analysis Report with a findings table, coverage su
 
 Project packs that opt into the **planning** stage check spec artifacts before code exists (contract: `.specify/marge/README.md`). Run them and fold findings into Phase 2. If none exist, skip silently.
 
-1. **Script packs** — run the shipped runner in planning mode. It discovers `.specify/marge/project/*.sh` and runs ONLY packs that opt in via `# speckit-stage: planning` (diff-scoped packs are skipped automatically):
+1. **Script packs** — run the shipped runner in planning mode. It discovers `.specify/marge/baseline/*.sh` and `.specify/marge/project/*.sh` and runs ONLY packs that opt in via `# speckit-stage: planning` (diff-scoped packs are skipped automatically):
 
    ```bash
    SPECKIT_STAGE=planning \
@@ -42,7 +42,7 @@ Project packs that opt into the **planning** stage check spec artifacts before c
    bash .specify/marge/run-gates.sh
    ```
 
-   Treat stdout as findings (each tagged `PROJECT_GATE`; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed pack appears as one `pack-execution` finding). Fold these into Phase 2.
+   Treat stdout as findings (project items tagged `PROJECT_GATE`, baseline items untagged; `file:` points at `spec.md`/`plan.md`/`tasks.md`; a failed pack appears as one `pack-execution` finding). Fold these into Phase 2.
 
 2. **Config-backed prose packs** — for each `.specify/marge/baseline/*.md` and `.specify/marge/project/*.md` whose `Stage:` line includes `planning`, spawn a sub agent (Agent tool, `general-purpose`) with `spec.md`/`plan.md`/`tasks.md`, the pack text, and its `.specify/marge/config/` data file; collect its findings (those from `project/` are tagged `PROJECT_GATE`).
 
