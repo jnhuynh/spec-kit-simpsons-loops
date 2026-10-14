@@ -1,0 +1,49 @@
+# Fixture: a condensed copy of Reset's lexicon.yml in the shipped ERE dialect.
+banned:
+  - pattern: 'underwrit[[:alnum:]_]*'
+    use: risk assessment
+    why: Reset does not do this.
+  - pattern: 'borrowers?'
+    use: member
+
+prefer:
+  - pattern: 'consumers?'
+    use: member
+    why: >-
+      Vendor-speak for the person using Reset. Warns, not blocks, because the
+      word has other senses.
+    unless:
+      - 'to-consumer'
+      - 'consumer (product|app|codebase|side|flow)'
+  - pattern: 'customers?'
+    use: member
+  - pattern: 'compensation'
+    use: income
+
+soft_verbs:
+  - pattern: 'utili[sz][[:alnum:]_]+'
+    use: use
+  - pattern: 'leverag[[:alnum:]_]+'
+    use: use
+  - pattern: 'ensur[[:alnum:]_]+'
+    use: check, make sure
+  - pattern: 'surfac(e|es|ed|ing) (the|a|an|to|it|them|this|that)'
+    use: show
+
+invented_phrases:
+  nouns: [seam, surface, layer, boundary, mechanism, harness, lever, facade]
+  compound_suffixes: [neutral, agnostic, aware, driven]
+  allowed:
+    - test harness
+    - attack surface
+
+exempt_paths:
+  - docs/standards/lexicon.md
+  - .specify/marge/config/lexicon.yml
+
+known_terms:
+  - Jack Henry
+  - User Story
+  - Success Criteria
+  - Plain Summary
+  - Eastern Time
