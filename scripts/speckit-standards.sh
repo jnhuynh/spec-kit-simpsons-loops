@@ -521,12 +521,83 @@ rule_plain_summary() {
   done < "$WORK/files.tsv"
 }
 
+# ── Rules: plain-language ──────────────────────────────────────────────────
+# input: "line<TAB>text" prose lines of one file → "line<TAB>words<TAB>excerpt"
+# for every sentence over `max` words. Sentences live in the paragraph, not the
+# line: consecutive lines up to a blank, a heading, a list item, a table row, or a quote.
+IFS= read -r -d '' AWK_SENTENCES <<'AWK' || true
+BEGIN { FS = "\t" }
+{ n++; ln[n] = $1; tx[n] = substr($0, length($1) + 2) }
+function strip_md(t,   s) {
+  gsub(/`[^`]*`/, "CODE", t)
+  gsub(/https?:\/\/[^[:space:]]+/, "URL", t)
+  while (match(t, /\[[^\]]*\]\([^)]*\)/)) { s = substr(t, RSTART, RLENGTH); sub(/^\[/, "", s); sub(/\]\(.*$/, "", s); t = substr(t, 1, RSTART - 1) s substr(t, RSTART + RLENGTH) }
+  gsub(/<!--[^>]*-->/, "", t)
+  gsub(/\*\*|__|\*|_/, "", t)
+  return t
+}
+function flush(first, text,   rest, pos, words, w, sentence, nl, before, excerpt, parts) {
+  text = strip_md(text); rest = text; pos = 0
+  while (rest != "") {
+    if (match(rest, /[.!?]["')]*[[:space:]]+/)) { sentence = substr(rest, 1, RSTART + RLENGTH - 1); rest = substr(rest, RSTART + RLENGTH) }
+    else { sentence = rest; rest = "" }
+    before = substr(text, 1, pos); nl = gsub(/\n/, "", before)
+    pos += length(sentence)
+    w = sentence; gsub(/\n/, " ", w); gsub(/^[[:space:]]+|[[:space:]]+$/, "", w)
+    if (w == "") continue
+    words = split(w, parts, /[[:space:]]+/)
+    if (words > max) { excerpt = substr(w, 1, 70); gsub(/\t/, " ", excerpt); printf("%d\t%d\t%s\n", first + nl, words, excerpt) }
+  }
+}
+END {
+  first = 0; buf = ""
+  for (k = 1; k <= n; k++) {
+    t = tx[k]
+    blank = (t ~ /^[[:space:]]*$/); blockstart = (t ~ /^[[:space:]]*(#|[-*+][[:space:]]|[0-9]+\.[[:space:]]|\||>)/)
+    broken = (k > 1 && (ln[k] != ln[k-1] + 1 || blank || blockstart || tx[k-1] ~ /^[[:space:]]*#/ || tx[k-1] ~ /^[[:space:]]*$/))
+    if (broken && buf != "") { flush(first, buf); buf = "" }
+    if (blank) continue
+    if (t ~ /^[[:space:]]*\|/) continue
+    hdr = t; if (sub(/^[[:space:]]*#+[[:space:]]*/, "", hdr)) t = hdr
+    lst = t; if (sub(/^[[:space:]]*([-*+]|[0-9]+\.)[[:space:]]+/, "", lst)) t = lst
+    if (buf == "") { first = ln[k]; buf = t } else buf = buf "\n" t
+  }
+  if (buf != "") flush(first, buf)
+}
+AWK
+
+rule_long_sentence() {
+  local path status kind line words excerpt
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$kind" != none ]] || continue
+    while IFS="$TAB" read -r line words excerpt; do
+      emit 0 MEDIUM "$path" "$line" long-sentence "$words words: \"${excerpt}…\"" "split it; aim for 15 words, never more than $MAX_WORDS"
+    done < <(prose_of "$path" | awk -v max="$MAX_WORDS" "$AWK_SENTENCES")
+  done < "$WORK/files.tsv"
+}
+
+rule_long_comment() {
+  local path status kind start run
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$kind" == comment ]] || continue
+    while IFS="$TAB" read -r start run; do
+      emit 0 MEDIUM "$path" "$start" long-comment "$run lines of comment in a row" "say why in one or two sentences; link the source for the rest"
+    done < <(prose_of "$path" | awk -F'\t' -v max="$MAX_COMMENT_LINES" '
+      { if (n && $1 == last + 1) run++; else { if (run > max) print start "\t" run; run = 1; start = $1 } last = $1; n = 1 }
+      END { if (run > max) print start "\t" run }')
+  done < "$WORK/files.tsv"
+}
+
 run_rules() {
   if want pr-shape; then
     rule_requirement_ids
     rule_specs_mixed
     rule_many_boundaries
     rule_plain_summary
+  fi
+  if want plain-language; then
+    rule_long_sentence
+    rule_long_comment
   fi
 }
 

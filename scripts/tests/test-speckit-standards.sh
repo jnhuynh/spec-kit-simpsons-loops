@@ -352,6 +352,40 @@ engine --base HEAD~1
 check_lacks "an existing spec is never checked for a summary" "$out" "plain-summary"
 cleanup
 
+# ── Task 7: plain language ──────────────────────────────────────────────────
+
+make_repo fixtures
+mkdir -p docs
+{
+  printf '# Title\n\n'
+  printf 'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six.\n\n'
+  printf 'Short first. One two three four five six seven eight nine ten eleven twelve thirteen\nfourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six twenty-seven.\n\n'
+  printf '```\none two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six.\n```\n\n'
+  printf '| one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six |\n\n'
+  printf -- '- A list item with [a link](https://example.com/x) and `code` stays short.\n'
+} > docs/long.md
+commit_all
+engine --base main
+check_rc "long sentences are advice" "$rc" 0
+check_has "26-word sentence flagged with its count" "$out" "MEDIUM docs/long.md:3  long-sentence: 26 words: \"One two three four five six seven eight nine ten eleven twelve thirtee…\""
+check_has "sentence wrapped over two lines reported on its own line" "$out" "MEDIUM docs/long.md:5  long-sentence: 27 words:"
+check_lacks "fenced code is not a sentence" "$out" "docs/long.md:9"
+check_lacks "table row is not a sentence" "$out" "docs/long.md:12"
+check_eq "exactly two long sentences" "$(grep -c 'long-sentence' <<<"$out")" "2"
+engine --base main --format marge
+check_has "long sentence has a fix" "$out" '  fix: "split it; aim for 15 words, never more than 25"'
+cleanup
+
+make_repo fixtures
+printf 'x = 1\n# one\n# two\n# three\n# four\n# five\ny = 2\n# a\n# b\n# c\n# d\n' > code.rb
+printf 'let x = 1;\n// one\n// two\n// three\n// four\n// five\n' > code.ts
+commit_all
+engine --base main
+check_has "five hash comment lines flagged at the first" "$out" "MEDIUM code.rb:2  long-comment: 5 lines of comment in a row"
+check_lacks "four comment lines are fine" "$out" "code.rb:8"
+check_has "slash comments count too" "$out" "MEDIUM code.ts:2  long-comment: 5 lines of comment in a row"
+cleanup
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"
