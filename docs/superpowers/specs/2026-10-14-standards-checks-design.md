@@ -181,7 +181,7 @@ Patterns are **POSIX ERE**, matched case-insensitively. The engine adds the word
 - `#` starts a comment outside quotes. Blank lines are ignored.
 - Anything else (anchors, flow mappings, multi-line quoted scalars, tabs) is a usage error: exit 2 with the file and line.
 
-Reset's real `damage-levels.yml` and `lexicon.yml` are the parser's fixtures (copied into `scripts/tests/fixtures/standards/`, lookbehind patterns rewritten as `unless:`).
+Condensed copies of Reset's `damage-levels.yml` and `lexicon.yml`, keeping every syntax feature they use (folded scalars, path-scoped questions, quoted globs, comments between list items), are the parser's fixtures under `scripts/tests/fixtures/standards/`, with the lookbehind patterns rewritten as `unless:`.
 
 ### 1.6 Finding fields
 
@@ -365,7 +365,7 @@ Same style as `scripts/tests/test-speckit-commit.sh`: a sandbox repo per case, `
 
 `scripts/tests/test-speckit-standards.sh`:
 
-- Parser: Reset's two files load; level count, order, folded `reviewer`, a path-scoped question's `paths`, inline list, `>-` with blank continuation; a tab or an anchor exits 2 naming the line.
+- Parser: the two fixture files load; level count, order, folded `reviewer`, a path-scoped question's `paths`, inline list, `>-` with blank continuation; a tab or an anchor exits 2 naming the line.
 - Damage level: most specific wins; tie goes to the more serious level; alias; default level; `set by` list; path-scoped question asked only when touched; empty change set.
 - Each rule: one positive and one negative case, including inline code and URL blanking, fence handling, comment prefix stripping, `unless:`, `allowed:`, `exempt_paths:`, `known_terms:`, sentence-start handling for `lexicon-new-term`, catch-all detection for `unrated-path`.
 - Modes: `--base`, `--working-tree` with an untracked file, `--dir` with an untracked spec; a rename; a binary file.
