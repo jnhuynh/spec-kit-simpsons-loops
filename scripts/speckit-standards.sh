@@ -167,8 +167,116 @@ cfg_get() { awk -F'\t' -v k="$2" '$1 == k { print substr($0, length($1) + 2); ex
 cfg_list() {
   awk -F'\t' -v p="$2" 'index($1, p ".") == 1 && substr($1, length(p) + 2) ~ /^[0-9]+$/ { print substr($0, length($1) + 2) }' "$1"
 }
-collect_change_set() { :; }
-collect_prose() { :; }
+# ── Change set ─────────────────────────────────────────────────────────────
+# git diff -U0 -M on stdin → "path<TAB>line<TAB>text" for every added line.
+IFS= read -r -d '' AWK_DIFF_ADDED <<'AWK' || true
+/^diff --git / { path = ""; inhunk = 0; next }
+/^\+\+\+ / { if ($0 !~ /^\+\+\+ \/dev\/null/) path = substr($0, 7); next }
+/^--- / { next }
+/^@@ / { match($0, /\+[0-9]+/); cur = substr($0, RSTART + 1, RLENGTH - 1) + 0; inhunk = 1; next }
+/^Binary files / { next }
+/^\\ No newline/ { next }
+inhunk && /^\+/ { if (path != "") print path "\t" cur "\t" substr($0, 2); cur++; next }
+inhunk && /^-/ { next }
+AWK
+
+# prose | comment | none, by extension.
+kind_of() {
+  case "${1##*.}" in
+    md|markdown|txt) echo prose ;;
+    rb|rake|py|sh|bash|zsh|yml|yaml|toml|ts|tsx|js|jsx|mjs|cjs|go|rs|java|kt|swift|c|h|cc|cpp|cs|scala) echo comment ;;
+    *) echo none ;;
+  esac
+}
+
+comment_prefix() {
+  case "${1##*.}" in
+    rb|rake|py|sh|bash|zsh|yml|yaml|toml) echo '^[[:space:]]*#[[:space:]]?' ;;
+    *) echo '^[[:space:]]*//[[:space:]]?' ;;
+  esac
+}
+
+# A file the engine may read line by line: known kind, on disk, at most 1 MB, valid UTF-8.
+readable_text() {
+  [[ "$(kind_of "$1")" != none && -f "$1" ]] || return 1
+  [[ $(( $(wc -c < "$1") )) -le 1000000 ]] || return 1
+  iconv -f UTF-8 -t UTF-8 "$1" >/dev/null 2>&1
+}
+
+merge_base() { git merge-base "${BASE_REF:-origin/main}" HEAD 2>/dev/null || echo HEAD; }
+
+# Writes $WORK/files.tsv (path, status, kind) and $WORK/added.tsv (path, line, text).
+collect_change_set() {
+  local -a diff_args
+  case "$MODE" in
+    base) diff_args=("$BASE_REF...HEAD") ;;
+    working-tree) diff_args=(HEAD) ;;
+    dir) diff_args=("$(merge_base)" -- "$DIR") ;;
+  esac
+  git -c core.quotePath=false diff --name-status -M "${diff_args[@]}" > "$WORK/name-status.txt" 2>"$WORK/git-err.txt" \
+    || fail_to_run "git diff failed: $(tail -n 1 "$WORK/git-err.txt")"
+  : > "$WORK/files.tsv"
+  local status p1 p2 path
+  while IFS="$TAB" read -r status p1 p2; do
+    [[ -n "$status" ]] || continue
+    path="${p2:-$p1}"
+    printf '%s\t%s\t%s\n' "$path" "${status:0:1}" "$(kind_of "$path")" >> "$WORK/files.tsv"
+  done < "$WORK/name-status.txt"
+  git -c core.quotePath=false diff -U0 -M "${diff_args[@]}" 2>/dev/null | awk "$AWK_DIFF_ADDED" > "$WORK/added.tsv"
+  if [[ "$MODE" != base ]]; then
+    local -a ls_args=(ls-files --others --exclude-standard)
+    [[ "$MODE" == dir ]] && ls_args+=(-- "$DIR")
+    git -c core.quotePath=false "${ls_args[@]}" | while IFS= read -r path; do
+      printf '%s\tA\t%s\n' "$path" "$(kind_of "$path")" >> "$WORK/files.tsv"
+      readable_text "$path" && awk -v p="$path" '{ print p "\t" NR "\t" $0 }' "$path" >> "$WORK/added.tsv"
+    done
+  fi
+  return 0
+}
+
+# ── Prose: the added lines a person reads ──────────────────────────────────
+# -v mode=md|comment [-v prefix=REGEX] [-v disk=FILE]; input: added lines of ONE
+# file as "path<TAB>line<TAB>text"; output: "line<TAB>text". For Markdown, fence
+# state comes from the whole file on disk when every added line agrees with it.
+IFS= read -r -d '' AWK_PROSE <<'AWK' || true
+BEGIN { FS = "\t" }
+{ n++; ln[n] = $2; tx[n] = $0; sub(/^[^\t]*\t[^\t]*\t/, "", tx[n]) }
+END {
+  if (mode == "comment") {
+    for (k = 1; k <= n; k++) if (tx[k] ~ prefix) { t = tx[k]; sub(prefix, "", t); sub(/[[:space:]]+$/, "", t); print ln[k] "\t" t }
+    exit
+  }
+  usedisk = 0
+  if (disk != "") {
+    usedisk = 1; d = 0
+    while ((getline line < disk) > 0) dl[++d] = line
+    close(disk)
+    for (k = 1; k <= n; k++) if (!(ln[k] in dl) || dl[ln[k]] != tx[k]) { usedisk = 0; break }
+  }
+  if (usedisk) { inside = 0; for (k = 1; k <= d; k++) { if (dl[k] ~ /^[[:space:]]*```/) { inside = !inside; fenced[k] = 1 } else if (inside) fenced[k] = 1 } }
+  else { inside = 0; for (k = 1; k <= n; k++) { if (tx[k] ~ /^[[:space:]]*```/) { inside = !inside; fenced[ln[k]] = 1 } else if (inside) fenced[ln[k]] = 1 } }
+  for (k = 1; k <= n; k++) if (!(ln[k] in fenced)) print ln[k] "\t" tx[k]
+}
+AWK
+
+collect_prose() {
+  : > "$WORK/prose.tsv"
+  local path status kind disk
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$kind" != none ]] || continue
+    awk -F'\t' -v p="$path" '$1 == p' "$WORK/added.tsv" > "$WORK/one.tsv"
+    [[ -s "$WORK/one.tsv" ]] || continue
+    if [[ "$kind" == prose ]]; then
+      disk=""; [[ -f "$path" ]] && disk="$path"
+      awk -v mode=md -v disk="$disk" "$AWK_PROSE" "$WORK/one.tsv"
+    else
+      awk -v mode=comment -v prefix="$(comment_prefix "$path")" "$AWK_PROSE" "$WORK/one.tsv"
+    fi | awk -F'\t' -v p="$path" '{ print p "\t" $0 }' >> "$WORK/prose.tsv"
+  done < "$WORK/files.tsv"
+  return 0
+}
+
+prose_of() { awk -F'\t' -v p="$1" '$1 == p { print $2 "\t" substr($0, length($1) + length($2) + 3) }' "$WORK/prose.tsv"; }
 assess_damage() { :; }
 run_rules() { :; }
 render() { [[ "$FORMAT" == text ]] && echo "No findings."; exit 0; }
