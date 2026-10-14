@@ -1,15 +1,18 @@
 # The words this project uses, machine half. Read by
 # .specify/scripts/bash/speckit-standards.sh, which scans ADDED prose only:
 # Markdown outside code fences, and comment lines in code. Identifiers are
-# never scanned. Patterns are POSIX extended regular expressions matched
-# case-insensitively at word boundaries (the engine adds the boundaries; never
-# write \b). No lookaround: `unless` lists patterns that, when any matches the
-# same line, suppress the entry for that line.
-#
+# never scanned.
+
+# Patterns are POSIX extended regular expressions matched case-insensitively
+# at word boundaries (the engine adds the boundaries; never write \b). No
+# lookaround: `unless` lists patterns that, when any matches the same line,
+# suppress the entry for that line.
+
 #   banned            blocks: the Stop hook and Marge treat it as a must-fix.
 #   prefer            warns. The canonical word is preferred; the other has real uses.
 #   soft_verbs        warns. Filler verbs with a plain replacement.
 #   invented_phrases  warns. Generic words chained into a term that names nothing.
+
 #   known_terms       Title Case phrases that are not new terms (headings, products).
 #   exempt_paths      files never scanned (the lexicon has to name the words it bans).
 
@@ -21,7 +24,6 @@ banned: []
 prefer: []
 #   - pattern: 'customers?'
 #     use: member
-#     why: One word for the person.
 #     unless:
 #       - 'customer_state'
 

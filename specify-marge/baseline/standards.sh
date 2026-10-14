@@ -7,7 +7,13 @@ set -uo pipefail
 
 engine=".specify/scripts/bash/speckit-standards.sh"
 [ -x "$engine" ] || exit 0
-base="${SPECKIT_BASE_REF:-origin/main}"
+base="${SPECKIT_BASE_REF:-}"
+if [ -z "$base" ]; then
+  for candidate in origin/main main master; do
+    if git rev-parse --verify --quiet "$candidate^{commit}" >/dev/null 2>&1; then base="$candidate"; break; fi
+  done
+fi
+[ -n "$base" ] || base=origin/main
 
 # /speckit-review-pr passes the pull request's file list without checking out
 # its head. When the two disagree the checkout is some other branch, or stale:

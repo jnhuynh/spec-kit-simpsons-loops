@@ -46,5 +46,22 @@ out=$(bash .specify/scripts/bash/speckit-standards.sh --base "$(git rev-parse ma
 if grep -q 'plain-verb: "utilize"' <<<"$out" && grep -q 'invented-phrase: "dispatch surface"' <<<"$out"; then pass "seeded lexicon finds filler and invented phrases"; else fail "seeded lexicon rules (got: $out)"; fi
 cd / && rm -rf "$consumer"
 
+# The seeds themselves pass the shipped rules when they arrive as a change.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
+git config user.email t@t; git config user.name t
+mkdir -p .specify/marge/config .specify/scripts/bash
+cp "$REPO/scripts/speckit-standards.sh" .specify/scripts/bash/
+printf 'base\n' > base.txt
+git add -A; git commit -qm init
+git checkout -qb work
+cp "$REPO/specify-marge/config/damage-levels.yml" "$REPO/specify-marge/config/lexicon.yml" .specify/marge/config/
+git add -A; git commit -qm seeds
+out=$(bash .specify/scripts/bash/speckit-standards.sh --base main 2>&1); rc=$?
+check_eq "seeds as a change exit 0" "$rc" 0
+if grep -q 'No findings.' <<<"$out"; then pass "seeds as a change are clean"; else fail "seeds as a change are clean (got: $out)"; fi
+cd / && rm -rf "$consumer"
+
 echo
 if [[ "$failures" -eq 0 ]]; then echo "ALL TESTS PASSED"; else echo "$failures TEST(S) FAILED"; exit 1; fi

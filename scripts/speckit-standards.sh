@@ -62,6 +62,7 @@ parse_args() {
   for group in $ONLY; do
     [[ " $ALL_GROUPS " == *" $group "* ]] || fail_to_run "unknown group: $group (choose from ${ALL_GROUPS// /, })"
   done
+  [[ -z "$BODY_FILE" || "$BODY_FILE" == /* ]] || BODY_FILE="$PWD/$BODY_FILE"
   [[ -z "$BODY_FILE" || -r "$BODY_FILE" ]] || fail_to_run "cannot read body file: $BODY_FILE"
 }
 
@@ -166,6 +167,18 @@ cfg_get() { awk -F'\t' -v k="$2" '$1 == k { print substr($0, length($1) + 2); ex
 cfg_list() {
   awk -F'\t' -v p="$2" 'index($1, p ".") == 1 && substr($1, length(p) + 2) ~ /^[0-9]+$/ { print substr($0, length($1) + 2) }' "$1"
 }
+
+# Every regex in lexicon.yml must compile, or a typo would silently disable a rule.
+validate_lexicon_patterns() {
+  local key pat
+  while IFS="$TAB" read -r key pat; do
+    case "$key" in
+      banned.*.pattern|prefer.*.pattern|soft_verbs.*.pattern|*.unless.*|invented_phrases.nouns.*|invented_phrases.compound_suffixes.*) ;;
+      *) continue ;;
+    esac
+    awk -v p="$pat" 'BEGIN { if ("" ~ p) exit 0 }' >/dev/null 2>&1 || fail_to_run "lexicon.yml: invalid pattern at $key: $pat"
+  done < "$WORK/lx.tsv"
+}
 # ── Globs ──────────────────────────────────────────────────────────────────
 # Shell globs → ERE: `**/` crosses directories, `*` and `?` stop at `/`.
 # Prepended to every awk program that matches paths.
@@ -191,8 +204,8 @@ AWK
 # git diff -U0 -M on stdin → "path<TAB>line<TAB>text" for every added line.
 IFS= read -r -d '' AWK_DIFF_ADDED <<'AWK' || true
 /^diff --git / { path = ""; inhunk = 0; next }
-/^\+\+\+ / { if ($0 !~ /^\+\+\+ \/dev\/null/) path = substr($0, 7); next }
-/^--- / { next }
+/^\+\+\+ / && !inhunk { if ($0 !~ /^\+\+\+ \/dev\/null/) { path = substr($0, 7); sub(/\t$/, "", path) }; next }
+/^--- / && !inhunk { next }
 /^@@ / { match($0, /\+[0-9]+/); cur = substr($0, RSTART + 1, RLENGTH - 1) + 0; inhunk = 1; next }
 /^Binary files / { next }
 /^\\ No newline/ { next }
@@ -223,7 +236,36 @@ readable_text() {
   iconv -f UTF-8 -t UTF-8 "$1" >/dev/null 2>&1
 }
 
-merge_base() { git merge-base "${BASE_REF:-origin/main}" HEAD 2>/dev/null || echo HEAD; }
+# The commit the branch grew from: the given base, else origin/main, main, master; HEAD when none resolves.
+merge_base() {
+  local ref
+  for ref in "${BASE_REF:-}" origin/main main master; do
+    [[ -n "$ref" ]] || continue
+    if git rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1; then
+      git merge-base "$ref" HEAD 2>/dev/null && return 0
+    fi
+  done
+  echo HEAD
+}
+
+# Files no check can read keep their path (the damage level still counts them)
+# but carry no lines: over 1 MB, not valid UTF-8, or deleted.
+drop_unreadable_lines() {
+  local path status kind size
+  : > "$WORK/unreadable.txt"
+  while IFS="$TAB" read -r path status kind; do
+    [[ "$kind" != none && "$status" != D ]] || continue
+    if [[ -f "$path" ]]; then
+      readable_text "$path" || printf '%s\n' "$path" >> "$WORK/unreadable.txt"
+    else
+      size=$(git cat-file -s "HEAD:$path" 2>/dev/null || echo 0)
+      [[ "$size" -le 1000000 ]] || printf '%s\n' "$path" >> "$WORK/unreadable.txt"
+    fi
+  done < "$WORK/files.tsv"
+  [[ -s "$WORK/unreadable.txt" ]] || return 0
+  awk -F'\t' -v list="$WORK/unreadable.txt" 'BEGIN { while ((getline l < list) > 0) skip[l] = 1 } !($1 in skip)' "$WORK/added.tsv" > "$WORK/added.keep" \
+    && mv "$WORK/added.keep" "$WORK/added.tsv"
+}
 
 # Writes $WORK/files.tsv (path, status, kind) and $WORK/added.tsv (path, line, text).
 collect_change_set() {
@@ -233,8 +275,11 @@ collect_change_set() {
     working-tree) diff_args=(HEAD) ;;
     dir) diff_args=("$(merge_base)" -- "$DIR") ;;
   esac
-  git -c core.quotePath=false diff --name-status -M "${diff_args[@]}" > "$WORK/name-status.txt" 2>"$WORK/git-err.txt" \
-    || fail_to_run "git diff failed: $(tail -n 1 "$WORK/git-err.txt")"
+  # Plain, prefixed, uncoloured diffs whatever the consumer's git config says.
+  local -a git_diff=(-c core.quotePath=false -c diff.noprefix=false -c diff.mnemonicPrefix=false -c color.ui=never
+                     diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/)
+  git "${git_diff[@]}" --name-status -M "${diff_args[@]}" > "$WORK/name-status.txt" 2>"$WORK/git-err.txt" \
+    || fail_to_run "git diff failed: $(head -n 1 "$WORK/git-err.txt")"
   : > "$WORK/files.tsv"
   local status p1 p2 path
   while IFS="$TAB" read -r status p1 p2; do
@@ -242,7 +287,8 @@ collect_change_set() {
     path="${p2:-$p1}"
     printf '%s\t%s\t%s\n' "$path" "${status:0:1}" "$(kind_of "$path")" >> "$WORK/files.tsv"
   done < "$WORK/name-status.txt"
-  git -c core.quotePath=false diff -U0 -M "${diff_args[@]}" 2>/dev/null | awk "$AWK_DIFF_ADDED" > "$WORK/added.tsv"
+  git "${git_diff[@]}" -U0 -M "${diff_args[@]}" 2>/dev/null | awk "$AWK_DIFF_ADDED" > "$WORK/added.tsv"
+  drop_unreadable_lines
   if [[ "$MODE" != base ]]; then
     local -a ls_args=(ls-files --others --exclude-standard)
     [[ "$MODE" == dir ]] && ls_args+=(-- "$DIR")
@@ -482,7 +528,7 @@ AWK_BOUNDARIES="$AWK_GLOB"$'\n'"$_AWK_BOUNDARIES_BODY"
 
 rule_many_boundaries() {
   local names count
-  names=$(cut -f1 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" "$AWK_BOUNDARIES" | sort)
+  names=$(cut -f1 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" "$AWK_BOUNDARIES" | sort) || fail_to_run "the many-boundaries rule failed"
   count=$(grep -c . <<<"$names" 2>/dev/null || true)
   [[ "${count:-0}" -ge 2 ]] || return 0
   emit 0 MEDIUM PULL_REQUEST 0 many-boundaries "touches $count boundaries: $(paste -sd, - <<<"$names" | sed 's/,/, /g')" \
@@ -510,7 +556,8 @@ rule_plain_summary() {
   local path status kind verdict line words
   while IFS="$TAB" read -r path status kind; do
     [[ "$status" == A && "$path" =~ ^specs/[^/]+/spec\.md$ ]] || continue
-    IFS="$TAB" read -r verdict line words < <(awk -v p="$path" -v max="$SUMMARY_MAX_WORDS" "$AWK_PLAIN_SUMMARY" "$WORK/added.tsv")
+    awk -v p="$path" -v max="$SUMMARY_MAX_WORDS" "$AWK_PLAIN_SUMMARY" "$WORK/added.tsv" > "$WORK/rule.out" || fail_to_run "the plain-summary rule failed for $path"
+    IFS="$TAB" read -r verdict line words < "$WORK/rule.out"
     case "$verdict" in
       missing) emit 1 HIGH "$path" 1 plain-summary-missing 'a new spec must open with a "## Plain summary" section' \
                  "add \"## Plain summary\" ($SUMMARY_MAX_WORDS words or fewer) before the first user story" ;;
@@ -535,17 +582,20 @@ function strip_md(t,   s) {
   gsub(/\*\*|__|\*|_/, "", t)
   return t
 }
-function flush(first, text,   rest, pos, words, w, sentence, nl, before, excerpt, parts) {
-  text = strip_md(text); rest = text; pos = 0
+function flush(first, text,   rest, words, w, sentence, nl, at, excerpt, parts) {
+  text = strip_md(text); rest = text; nl = 0
   while (rest != "") {
     if (match(rest, /[.!?]["')]*[[:space:]]+/)) { sentence = substr(rest, 1, RSTART + RLENGTH - 1); rest = substr(rest, RSTART + RLENGTH) }
     else { sentence = rest; rest = "" }
-    before = substr(text, 1, pos); nl = gsub(/\n/, "", before)
-    pos += length(sentence)
-    w = sentence; gsub(/\n/, " ", w); gsub(/^[[:space:]]+|[[:space:]]+$/, "", w)
+    at = first + nl
+    w = sentence; nl += gsub(/\n/, " ", w); gsub(/^[[:space:]]+|[[:space:]]+$/, "", w)
     if (w == "") continue
     words = split(w, parts, /[[:space:]]+/)
-    if (words > max) { excerpt = substr(w, 1, 70); gsub(/\t/, " ", excerpt); printf("%d\t%d\t%s\n", first + nl, words, excerpt) }
+    if (words > max) {
+      excerpt = substr(w, 1, 70)
+      if (length(w) > 70) sub(/ [^ ]*$/, "", excerpt)   # never end inside a word (or a multibyte character)
+      gsub(/\t/, " ", excerpt); printf("%d\t%d\t%s\n", at, words, excerpt)
+    }
   }
 }
 END {
@@ -569,9 +619,10 @@ rule_long_sentence() {
   local path status kind line words excerpt
   while IFS="$TAB" read -r path status kind; do
     [[ "$kind" != none ]] || continue
+    prose_of "$path" | LC_ALL=C awk -v max="$MAX_WORDS" "$AWK_SENTENCES" > "$WORK/rule.out" || fail_to_run "the long-sentence rule failed for $path"
     while IFS="$TAB" read -r line words excerpt; do
       emit 0 MEDIUM "$path" "$line" long-sentence "$words words: \"${excerpt}…\"" "split it; aim for 15 words, never more than $MAX_WORDS"
-    done < <(prose_of "$path" | awk -v max="$MAX_WORDS" "$AWK_SENTENCES")
+    done < "$WORK/rule.out"
   done < "$WORK/files.tsv"
 }
 
@@ -579,11 +630,12 @@ rule_long_comment() {
   local path status kind start run
   while IFS="$TAB" read -r path status kind; do
     [[ "$kind" == comment ]] || continue
+    prose_of "$path" | awk -F'\t' -v max="$MAX_COMMENT_LINES" '
+      { if (n && $1 == last + 1) run++; else { if (run > max) print start "\t" run; run = 1; start = $1 } last = $1; n = 1 }
+      END { if (run > max) print start "\t" run }' > "$WORK/rule.out" || fail_to_run "the long-comment rule failed for $path"
     while IFS="$TAB" read -r start run; do
       emit 0 MEDIUM "$path" "$start" long-comment "$run lines of comment in a row" "say why in one or two sentences; link the source for the rest"
-    done < <(prose_of "$path" | awk -F'\t' -v max="$MAX_COMMENT_LINES" '
-      { if (n && $1 == last + 1) run++; else { if (run > max) print start "\t" run; run = 1; start = $1 } last = $1; n = 1 }
-      END { if (run > max) print start "\t" run }')
+    done < "$WORK/rule.out"
   done < "$WORK/files.tsv"
 }
 
@@ -672,6 +724,7 @@ rule_lexicon() {
   while IFS="$TAB" read -r path status kind; do
     [[ "$kind" != none ]] || continue
     lexicon_exempt "$path" && continue
+    prose_of "$path" | awk -v cfg="$WORK/lx.tsv" -v status="$status" -v path="$path" "$AWK_LEXICON" > "$WORK/rule.out" || fail_to_run "the lexicon rules failed for $path"
     while IFS="$TAB" read -r line group word use why; do
       case "$group" in
         banned) emit 1 HIGH "$path" "$line" lexicon-banned "\"$word\" — say \"$use\".${why:+ $why}" "say \"$use\"" ;;
@@ -682,7 +735,7 @@ rule_lexicon() {
         newterm) emit 0 LOW "$path" "$line" lexicon-new-term "\"$word\" looks like a new term." \
                    "add it to known_terms in $CONFIG_DIR/lexicon.yml in this change, or write it in plain lower-case words" NEEDS_HUMAN ;;
       esac
-    done < <(prose_of "$path" | awk -v cfg="$WORK/lx.tsv" -v status="$status" -v path="$path" "$AWK_LEXICON")
+    done < "$WORK/rule.out"
   done < "$WORK/files.tsv"
 }
 
@@ -719,6 +772,7 @@ AWK_UNRATED="$AWK_GLOB"$'\n'"$_AWK_UNRATED_BODY"
 rule_unrated_path() {
   local _u unit kind level pattern what file f new
   awk -F'\t' '$2 == "A" { print $1 }' "$WORK/files.tsv" > "$WORK/added-paths.txt"
+  cut -f1,2 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" -v levels="$WORK/level.tsv" "$AWK_UNRATED" > "$WORK/rule.out" || fail_to_run "the unrated-path rule failed"
   while IFS="$TAB" read -r _u unit kind level pattern; do
     if [[ "$kind" == dir ]]; then
       new=1
@@ -732,7 +786,7 @@ rule_unrated_path() {
     fi
     emit 0 MEDIUM "$file" 0 unrated-path "$what, rated $level only by ${pattern:-the default level}" \
       "decide its level in $CONFIG_DIR/damage-levels.yml: list it under a more serious level if a mistake there would do more damage than \"$level\" implies" NEEDS_HUMAN
-  done < <(cut -f1,2 "$WORK/files.tsv" | awk -v cfg="$WORK/dl.tsv" -v levels="$WORK/level.tsv" "$AWK_UNRATED")
+  done < "$WORK/rule.out"
 }
 
 run_rules() {
@@ -765,6 +819,7 @@ main() {
   yaml_flatten "$CONFIG_DIR/damage-levels.yml" > "$WORK/dl.tsv" || exit 2
   if [[ -f "$CONFIG_DIR/lexicon.yml" ]]; then
     yaml_flatten "$CONFIG_DIR/lexicon.yml" > "$WORK/lx.tsv" || exit 2
+    validate_lexicon_patterns
   fi
   : > "$WORK/findings.tsv"
   collect_change_set

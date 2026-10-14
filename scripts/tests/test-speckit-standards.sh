@@ -367,7 +367,7 @@ mkdir -p docs
 commit_all
 engine --base main
 check_rc "long sentences are advice" "$rc" 0
-check_has "26-word sentence flagged with its count" "$out" "MEDIUM docs/long.md:3  long-sentence: 26 words: \"One two three four five six seven eight nine ten eleven twelve thirtee…\""
+check_has "26-word sentence flagged with its count" "$out" "MEDIUM docs/long.md:3  long-sentence: 26 words: \"One two three four five six seven eight nine ten eleven twelve…\""
 check_has "sentence wrapped over two lines reported on its own line" "$out" "MEDIUM docs/long.md:5  long-sentence: 27 words:"
 check_lacks "fenced code is not a sentence" "$out" "docs/long.md:9"
 check_lacks "table row is not a sentence" "$out" "docs/long.md:12"
@@ -477,6 +477,89 @@ printf 'b\n' > app/services/reset_visa/b.rb
 commit_all
 engine --base HEAD~1
 check_lacks "a file added to an existing directory is not a new unit" "$out" "unrated-path"
+cleanup
+
+# ── Final review fixes ──────────────────────────────────────────────────────
+
+# Git diff settings must not hide added lines.
+make_repo fixtures
+git config diff.noprefix true
+printf 'Underwriting here.\n' > note.md; commit_all
+engine --base main
+check_rc "diff.noprefix still finds added lines" "$rc" 1
+check_has "diff.noprefix finding" "$out" "note.md:1  lexicon-banned"
+git config color.ui always
+engine --base main
+check_rc "color.ui=always still finds added lines" "$rc" 1
+git config diff.external /bin/false
+engine --base main
+check_rc "diff.external is bypassed" "$rc" 1
+cleanup
+
+# A path with a space keeps its lines; a content line starting with ++ does not retarget.
+make_repo fixtures
+printf 'x\n++ not a header\nUnderwriting here.\n' > "docs with space.md"
+commit_all
+engine --base main
+check_has "path with a space keeps its lines" "$out" "docs with space.md:3  lexicon-banned"
+check_has "path with a space in the level header" "$out" "(set by docs with space.md)"
+cleanup
+
+# A relative --body-file resolves against the caller's directory.
+make_repo fixtures
+mkdir -p sub
+printf 'Implements FR-001.\n' > sub/body.md
+cd sub || exit 1
+out=$(bash "$ENGINE" --base main --body-file body.md 2>/dev/null); rc=$?
+cd "$sandbox" || exit 1
+check_rc "relative body file from a subdirectory blocks" "$rc" 1
+cleanup
+
+# A multibyte character at the excerpt boundary never aborts the sentence rule.
+make_repo fixtures
+mkdir -p docs
+printf 'One two three four five six seven eight nine ten eleven twelve thirteén fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one twenty-two twenty-three twenty-four twenty-five twenty-six.\n' > docs/accent.md
+commit_all
+engine --base main
+check_rc "accented sentence does not abort" "$rc" 0
+check_has "excerpt is cut at a word boundary" "$out" 'long-sentence: 26 words: "One two three four five six seven eight nine ten eleven twelve…"'
+cleanup
+
+# An invalid lexicon pattern is an engine error, never a clean verdict.
+make_repo fixtures
+printf 'banned:\n  - pattern: "underwrit("\n    use: x\n' > .specify/marge/config/lexicon.yml
+printf 'text\n' > note.md; commit_all
+engine --base main
+check_rc "invalid lexicon pattern exits 2" "$rc" 2
+check_has "invalid pattern is named" "$err" "underwrit("
+printf 'invented_phrases:\n  nouns: ["bad("]\n' > .specify/marge/config/lexicon.yml
+engine --base main
+check_rc "invalid invented-phrase noun exits 2" "$rc" 2
+cleanup
+
+# A tracked prose file over 1 MB carries no lines but still sets the level.
+make_repo fixtures
+{ printf 'Underwriting here.\n'; awk 'BEGIN { for (i = 0; i < 30000; i++) print "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }'; } > big.md
+commit_all
+engine --base main
+check_rc "oversized tracked file carries no lines" "$rc" 0
+check_has "oversized file still sets the level" "$out" "(set by big.md)"
+cleanup
+
+# A long single paragraph finishes and reports.
+make_repo fixtures
+mkdir -p docs
+{ for _ in $(seq 1 2000); do printf 'A plain line of prose that stays short.\n'; done; printf 'Underwriting at the end.\n'; } > docs/para.md
+commit_all
+engine --base main
+check_has "long paragraph still reports its last line" "$out" "docs/para.md:2001  lexicon-banned"
+cleanup
+
+# --dir without --base falls back to a local main.
+make_repo fixtures
+mkdir -p specs/9cad-feat-x; printf '# Spec\n\nUnderwriting.\n' > specs/9cad-feat-x/spec.md; commit_all
+engine --dir specs/9cad-feat-x
+check_has "--dir without --base falls back to main" "$out" "plain-summary-missing"
 cleanup
 
 echo
