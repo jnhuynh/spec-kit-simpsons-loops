@@ -72,7 +72,7 @@ If validation fails:
 | 996 | **Follow existing patterns** — Match codebase conventions                    |
 | 995 | **Exit on complexity** — If unexpectedly hard, finish and exit               |
 | 994 | **Mark complete immediately** — Update tasks.md right after validation       |
-| 993 | **Subagent discipline** — Up to 500 Sonnet for reads, only 1 for build/tests |
+| 993 | **Sub agent discipline** — Spawn as many sub agents as you like to read and search; run builds and tests in one at a time, never in parallel |
 | 992 | **Stay inside the PR group** — Never implement a task from a later PR group, even a trivial or blocking-looking one. The boundary exists so the current group ships reviewable on its own |
 
 ## File Paths

@@ -1,6 +1,6 @@
 ---
 name: speckit-reconcile
-description: Detect drift between what completed phases actually shipped and what the parent spec says, and correct the parent.
+description: Use when a later phase of a split spec is about to start and earlier phases have shipped. Corrects the parent spec where reality diverged from it.
 ---
 
 ## User Input

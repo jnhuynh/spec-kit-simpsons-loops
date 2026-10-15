@@ -1,6 +1,6 @@
 ---
 name: speckit-review
-description: Analyze a feature branch diff against baseline and project-specific review packs; optionally remediate the auto-fixable findings in severity order.
+description: Use when a feature branch diff needs one review pass against the baseline and project packs, reported or auto-fixed, without the Marge loop.
 ---
 
 ## User Input

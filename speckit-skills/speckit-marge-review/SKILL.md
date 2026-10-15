@@ -1,6 +1,6 @@
 ---
 name: speckit-marge-review
-description: Orchestrate iterative code review and remediation (Marge loop) over the feature branch diff until all findings are resolved.
+description: Use when a feature branch is implemented and its diff needs review and mechanical fixes before a human reviews it.
 ---
 
 ## User Input
@@ -109,13 +109,9 @@ If it exits zero, proceed to review report verification.
 
 ## Post-Loop: Review Report Verification
 
-After the loop completes, confirm `<FEATURE_DIR>/review-report.md` exists and was written by the final sub agent — the persisted review report is the audit trail of what was found and fixed, and the ledger the next Marge run uses for reappearance detection. If the file is absent after the loop completes, surface this as a failure and instruct the user to re-run `/speckit-marge-review`.
+Every iteration's Marge sub agent (per `.claude/agents/marge.md`) overwrites `<FEATURE_DIR>/review-report.md` before exiting; this command never writes it directly. Its schema and status lifecycle live in `.claude/agents/findings-ledger.md`. The report is the audit trail of what was found and fixed, and the ledger the next Marge run loads for reappearance detection.
 
-## Persisted Review Report
-
-Every iteration of this loop spawns a Marge sub agent (per `.claude/agents/marge.md`) that MUST overwrite `<FEATURE_DIR>/review-report.md` before exiting. This command does NOT write the file directly. The authoritative schema and status lifecycle live in the shared ledger protocol `.claude/agents/findings-ledger.md` (sourced from `claude-agents/findings-ledger.md`), which `claude-agents/marge.md` configures with `REPORT_FILE: <FEATURE_DIR>/review-report.md`. The report is the audit trail of what was found and fixed, and the ledger the next Marge run loads for reappearance detection — do not restate its schema here.
-
-The orchestrator MUST treat absence of `<FEATURE_DIR>/review-report.md` after the loop completes as a Marge failure — without it the next Marge run has no ledger for reappearance detection.
+After the loop completes, confirm the file exists. If it is absent, treat that as a Marge failure and instruct the user to re-run `/speckit-marge-review`. Without the ledger, reappearance detection silently never fires.
 
 ## Examples
 

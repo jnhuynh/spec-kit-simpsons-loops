@@ -1,6 +1,6 @@
 ---
 name: speckit-ralph-implement
-description: Orchestrate task-by-task implementation (Ralph loop) until all tasks are complete.
+description: Use when tasks.md is ready and the feature should be implemented one task at a time with quality gates between tasks.
 ---
 
 ## User Input
@@ -97,7 +97,7 @@ Run only when the loop exited via the **halted** path (`<promise>PR_BOUNDARY_REA
 
    Ralph does not create branches or run `gh` — the commits for this group are already pushed to the feature branch.
 
-**Resuming is safe and needs no extra state.** On the next run, the first incomplete task is the head of the next group, so Phase 0c resolves that group as current and the loop works through it. The halt fires only in the iteration that completes a group's last task — so if the loop is interrupted (crash, timeout, manual stop) exactly at a boundary, a resume will roll straight into the next group without stopping. Check the plan against `tasks.md` before resuming after an abnormal exit.
+**Resuming needs no extra state.** On the next run, the first incomplete task is the head of the next group, so the agent's Phase 0c resolves that group as current. The halt fires only in the iteration that completes a group's last task. A loop interrupted exactly at a boundary (crash, timeout, manual stop) therefore resumes straight into the next group without stopping. Check the plan against `tasks.md` before resuming after an abnormal exit.
 
 ## Post-Loop: End-of-Loop Full Quality Gate
 

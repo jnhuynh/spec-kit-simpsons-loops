@@ -1,6 +1,6 @@
 ---
 name: speckit-phase
-description: Detect deployment boundaries in a spec's user stories and generate phase annotations.
+description: Use when a clarified and premortemed spec.md needs its deployment boundaries found and a ## Phases section written, before /speckit-plan.
 ---
 
 ## User Input

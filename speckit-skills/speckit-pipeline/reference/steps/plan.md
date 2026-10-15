@@ -9,5 +9,4 @@ Skip if `plan.md` already exists. Otherwise, spawn a sub agent:
 
 > This spec is a phase view, not a standalone spec — it references its parent by ID and holds no copy of the user stories, requirements, key entities, or success criteria. Before planning anything, read the parent spec at `<PARENT_DIR>/spec.md` and resolve every ID listed under the child's `## Inherited Scope`; the parent's text is authoritative. Treat the child's `## Phase Boundary` and its `FR-P{N}-###` / `SC-P{N}-###` entries as additive requirements layered on the inherited ones. Plan for the inherited IDs plus the phase-local ones and nothing else — anything the child lists under "Deferred elsewhere" belongs to another phase. Cite IDs in plan.md; do not copy parent prose into it.
 
-**Post-step stop check**: After the plan step completes (whether it was executed or skipped because `plan.md` already exists), check if `STOP_AFTER_STEP` is set and equals `plan`. If it does, output: `Pipeline stopped after plan per --stop-after parameter. Skipping: tasks, lisa, split, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
-
+**Stop check**: apply the pipeline skill's post-step stop check (its Step 5) with the step name `plan`.
