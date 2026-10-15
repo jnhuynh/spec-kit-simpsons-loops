@@ -1,8 +1,7 @@
 # Standards checks: damage level, PR shape, plain language, `/speckit-pr`
 
 **Date**: 2026-10-14
-**Status**: design approved in conversation; awaiting written review
-**Branch**: `9cad-feat-standards-checks` (stacked on `6625-chore-port-reset-dogfood`)
+**Status**: shipped. Phases 1 and 2 landed in PR #25, phase 3 in PR #27. Usage lives in `README.md` under "Standards checks"; this document keeps the design rationale.
 
 ## Goal
 

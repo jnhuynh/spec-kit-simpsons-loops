@@ -74,7 +74,7 @@ flowchart TD
 - Upstream Spec Kit commands or skills present: `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-analyze`, `speckit-clarify`, `speckit-implement`
 - For PR boundaries: your upstream `speckit-tasks` and `speckit-analyze` commands must carry the Pull Request Plan rules. `setup.sh` does not patch upstream Spec Kit files, so copy the `## Pull Request Plan Rules` section from this repo's `.claude/commands/speckit.tasks.md`, the `G. Pull Request Plan Integrity` pass from `.claude/commands/speckit.analyze.md`, and the `## Pull Request Plan` section from `.specify/templates/tasks-template.md` into yours. Without them Ralph treats `tasks.md` as one PR group and never halts.
 
-Everything else — the loop skills, `speckit-review`, `speckit-split`, `speckit-reconcile`, `speckit-premortem` — is installed by `setup.sh`.
+Everything else is installed by `setup.sh`.
 
 ### API key vs. Claude subscription
 
@@ -110,11 +110,10 @@ It is idempotent — re-run it to upgrade.
 | `scripts/speckit-standards-stop.sh` | `.claude/hooks/` | overwritten (the Stop hook); its `Stop` entry in `.claude/settings.json` is added once — delete the entry to opt out |
 | `templates/CLAUDE.md` | `CLAUDE.md` | merged — content below the separator is yours |
 | `templates/constitution.md` | `.specify/memory/constitution.md` | merged — content below the separator is yours |
-| `gitignore` | appended to `.gitignore` | skipped if the marker line is present |
 
-It also creates `.specify/quality-gates.sh` and `.specify/quality-gates-fast.sh` placeholders if they do not exist (both exit 1 until you edit them), creates the empty `.specify/marge/project/` and `.specify/marge/config/` directories for your own packs, and removes superseded artifacts from earlier versions (bash loop scripts, legacy per-command skill copies, and their `settings.local.json` permissions).
+It also creates placeholder `.specify/quality-gates.sh` and `.specify/quality-gates-fast.sh` if they do not exist; both exit 1 until you edit them. It creates `.specify/marge/project/` for your own packs. And it removes what earlier versions installed: bash loop scripts, per-command skill copies, and their `settings.local.json` permissions.
 
-To do it manually, copy each row above with `cp` (`cp -n` for the preserved row), `chmod +x` the five `.sh` files, add the `Stop` entry that `setup.sh` prints to `.claude/settings.json`, and append this repo's `gitignore` to yours.
+To do it by hand, copy each row above with `cp`, using `cp -n` for the preserved rows. Then `chmod +x` the five `.sh` files and add the `Stop` entry that `setup.sh` prints to `.claude/settings.json`.
 
 </details>
 
@@ -167,7 +166,7 @@ All four loops take an optional numeric argument to override max iterations (`/s
 
 `/speckit-review-pr` posts a GitHub review with `COMMENT` event type — informational, never a merge gate — covering one-way doors (CRITICAL), concurrency risks and architectural decisions (WARNING), and project patterns (INFO). It is idempotent per commit.
 
-`/speckit-pr` writes the pull request description from the diff, not the spec: what changed, how much damage if it is wrong, where to look, how it was verified, links. The damage section copies the standards engine's level, reviewer line, and checklist (see [Standards checks](#standards-checks)). It edits the open PR, creates one when the branch is pushed, and otherwise prints the description. It never pushes and never lowers the level.
+`/speckit-pr` reads the diff, not the spec. The damage section copies the standards engine's level, reviewer line, and checklist (see [Standards checks](#standards-checks)). It edits the open PR, creates one when the branch is pushed, and otherwise prints the description.
 
 **Automation amplifies whatever it is given.** A sharp spec is worth more than any number of iterations, so brainstorm and clarify before you let the loops run.
 

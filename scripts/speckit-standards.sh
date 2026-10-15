@@ -68,7 +68,6 @@ parse_args() {
 
 want() { [[ " $ONLY " == *" $1 "* ]]; }
 
-# ── Stubs replaced by later tasks ──────────────────────────────────────────
 # ── YAML subset → "keypath<TAB>value" ──────────────────────────────────────
 # Two-space indentation; `key: value`, `key:` with a nested block, `- item`,
 # `- key: value` opening a mapping; plain, 'single', "double" or >- folded
