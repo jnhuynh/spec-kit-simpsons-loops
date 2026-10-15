@@ -75,7 +75,7 @@ This produces a Code Review Report with a findings table grouped by severity, th
 - Review report (ledger): `<FEATURE_DIR>/review-report.md`
 - Ledger protocol: `.claude/agents/findings-ledger.md`
 - Constitution: `.specify/memory/constitution.md`
-- Baseline review packs: `.specify/marge/baseline/*.md`
+- Baseline review packs: `.specify/marge/baseline/*.md` (prose) and `.specify/marge/baseline/standards.sh` (the standards engine wrapper; findings untagged)
 - Project packs: `.specify/marge/project/*.md` (prose) and `.specify/marge/project/*.sh` (script) — findings tagged `PROJECT_GATE`
 - Project pack config data: `.specify/marge/config/`
 - Project guidelines: `CLAUDE.md` (repo root)

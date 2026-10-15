@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # run-gates.sh — deterministic SpecKit script-pack runner.
 #
-# Discovers .specify/marge/project/*.sh (script packs), runs each under a timeout
+# Discovers .specify/marge/baseline/*.sh and .specify/marge/project/*.sh (script
+# packs), runs each under a timeout
 # with the pack-contract environment exported, and emits the concatenated findings
 # (a YAML sequence) on stdout. A pack that exits non-zero or times out yields ONE
 # `pack-execution` meta-finding instead of aborting. ONLY findings go to stdout
@@ -35,8 +36,10 @@ export SPECKIT_DIFF_FILES="$diff_files"
 export SPECKIT_BASE_REF="$base_ref"
 export SPECKIT_FEATURE_DIR="${SPECKIT_FEATURE_DIR:-}"
 
-packs_dir="$repo_root/.specify/marge/project"
-[ -d "$packs_dir" ] || exit 0
+# Baseline script packs (shipped, seeded once) run first; project packs after.
+baseline_dir="$repo_root/.specify/marge/baseline"
+project_dir="$repo_root/.specify/marge/project"
+[ -d "$baseline_dir" ] || [ -d "$project_dir" ] || exit 0
 
 # Script packs always run with the repo root as working directory, in every venue.
 cd "$repo_root"
@@ -54,40 +57,48 @@ run_pack() {  # $1 = script-pack path; runs under a timeout, degrading where abs
 errfile="$(mktemp)"
 trap 'rm -f "$errfile"' EXIT
 
-for pack in "$packs_dir"/*.sh; do
-  [ -e "$pack" ] || continue          # literal-glob guard: no matches in dir
-  name="$(basename "$pack")"
+run_packs_in() {  # $1 = directory, $2 = origin label (baseline|project)
+  local dir="$1" origin="$2" pack name header rc out last_err issue tags
+  [ -d "$dir" ] || return 0
+  if [ "$origin" = baseline ]; then tags="NEEDS_HUMAN"; else tags="PROJECT_GATE, NEEDS_HUMAN"; fi
+  for pack in "$dir"/*.sh; do
+    [ -e "$pack" ] || continue          # literal-glob guard: no matches in dir
+    name="$(basename "$pack")"
 
-  # Planning runs only script packs that opt in. Capture the header to a variable
-  # (no pipe) so a pipefail + `grep -q` early-exit SIGPIPE on `head` can't cause a
-  # false skip of a marked pack.
-  if [ "$stage" = "planning" ]; then
-    header="$(head -n 20 "$pack" 2>/dev/null || true)"
-    grep -qF '# speckit-stage: planning' <<<"$header" || continue
-  fi
+    # Planning runs only script packs that opt in. Capture the header to a variable
+    # (no pipe) so a pipefail + `grep -q` early-exit SIGPIPE on `head` can't cause a
+    # false skip of a marked pack.
+    if [ "$stage" = "planning" ]; then
+      header="$(head -n 20 "$pack" 2>/dev/null || true)"
+      grep -qF '# speckit-stage: planning' <<<"$header" || continue
+    fi
 
-  # Capture pack stdout (findings) and stderr (diagnostics) separately; tolerate
-  # a non-zero exit under `set -e` via the `|| rc=$?` test.
-  rc=0
-  out="$(run_pack "$pack" 2>"$errfile")" || rc=$?
-  if [ "$rc" -eq 0 ]; then
-    if [ -n "$out" ]; then printf '%s\n' "$out"; fi
-  else
-    # Strip quotes/backslashes so arbitrary stderr text cannot break the
-    # double-quoted YAML scalar below.
-    last_err="$(tail -n 1 "$errfile" 2>/dev/null | tr -d '\n\r"\\')"
-    issue="script pack failed to run (exit $rc)"
-    if [ -n "$last_err" ]; then issue="$issue: $last_err"; fi
-    cat <<YAML
-- file: .specify/marge/project/$name:0
+    # Capture pack stdout (findings) and stderr (diagnostics) separately; tolerate
+    # a non-zero exit under `set -e` via the `|| rc=$?` test.
+    rc=0
+    out="$(run_pack "$pack" 2>"$errfile")" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      if [ -n "$out" ]; then printf '%s\n' "$out"; fi
+    else
+      # Strip quotes/backslashes so arbitrary stderr text cannot break the
+      # double-quoted YAML scalar below.
+      last_err="$(tail -n 1 "$errfile" 2>/dev/null | tr -d '\n\r"\\')"
+      issue="script pack failed to run (exit $rc)"
+      if [ -n "$last_err" ]; then issue="$issue: $last_err"; fi
+      cat <<YAML
+- file: .specify/marge/$origin/$name:0
   severity: LOW
   confidence: 100
-  pack: project/$name
+  pack: $origin/$name
   rule: pack-execution
   issue: "$issue"
-  tags: [PROJECT_GATE, NEEDS_HUMAN]
+  tags: [$tags]
 YAML
-  fi
-done
+    fi
+  done
+}
+
+run_packs_in "$baseline_dir" baseline
+run_packs_in "$project_dir" project
 
 exit 0

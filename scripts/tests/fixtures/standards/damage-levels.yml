@@ -1,0 +1,83 @@
+# Fixture: a condensed copy of Reset's damage-levels.yml, keeping every YAML
+# feature the parser must handle: folded scalars, path-scoped questions,
+# quoted globs, comments between list items, blank lines.
+default_level: member-facing
+
+aliases:
+  - from: app/jobs/
+    to: app/services/
+
+unit_dirs:
+  - app/services/*
+  - app/models/*.rb
+
+boundaries:
+  - app/services/reset_*/**
+  - app/jobs/reset_*/**
+
+levels:
+  - name: money and trust
+    reviewer: >-
+      Read every line. Work the checklist.
+    checklist:
+      - What happens if this runs twice?
+      - What happens if it fails halfway through?
+      - question: >-
+          Who can reach this? Can a secret, a card number or personal data end
+          up in a log, a response or an unencrypted column?
+        paths:
+          # Sign-in, sessions, and who may act.
+          - app/policies/**/*
+          - app/models/user.rb
+      - question: Does this change what a member is told or agrees to?
+        paths:
+          - app/views/static_pages/*_agreement.html.erb
+    paths:
+      - app/services/repayment_instances/**/*
+      - app/services/risk_assessments/**/*
+      - app/services/reset_synctera/**/*
+      - db/migrate/**/*
+      - app/models/partner.rb
+
+  - name: member-facing
+    reviewer: >-
+      Read every hunk. Confirm the author's screenshot or live check.
+    checklist:
+      - Does the screenshot or live check match what the code does?
+    paths:
+      - app/services/**/*
+      - app/jobs/**/*
+      - app/models/**/*
+      - app/views/**/*
+
+  - name: specification
+    reviewer: >-
+      Read all of it. This is the feature. Send it back if a sentence needs
+      decoding.
+    checklist:
+      - Can you say in two sentences what a member gets when this ships?
+    paths:
+      - specs/**/*
+
+  - name: internal
+    reviewer: Skim. Look closely at the one hunk the author flagged.
+    checklist:
+      - Does the flagged hunk do what the description says?
+    paths:
+      - app/services/notifications/**/*
+      - script/**/*
+      - lib/**/*
+      - config/**/*
+      - .specify/**/*
+      - ".*"
+      - "*.yml"
+      - Procfile*
+
+  - name: no runtime effect
+    reviewer: >-
+      Approve. Nobody is expected to read this line by line.
+    checklist: []
+    paths:
+      - docs/**/*
+      - spec/**/*
+      - "**/*.md"

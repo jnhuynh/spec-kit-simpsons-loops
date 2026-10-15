@@ -7,7 +7,7 @@ Marge (`/speckit-review`) and Lisa (`/speckit-lisa-analyze`) find issues by runn
 Three terms get confused because they share words. They are different things:
 
 - **Pack** — a finding source the review/planning loops run; *everything that finds issues is a pack*. Every pack emits findings in one shared YAML shape (below), and is described by two independent axes:
-  - **origin** — *where it lives*: `baseline/` (shipped, generic code-quality) or `project/` (yours, repo-specific). Origin is the directory.
+  - **origin** — *where it lives*: `baseline/` (shipped: generic code-quality prose packs and the one shipped script pack, `standards.sh`) or `project/` (yours, repo-specific). Origin is the directory.
   - **mode** — *how it runs*, set by the file extension: a **prose pack** (`.md`) is LLM-interpreted (a sub-agent reads the rule text and applies it); a **script pack** (`.sh`) is deterministic, run by `run-gates.sh` with no LLM.
 
   The directory is the origin; the extension is the mode — never the reverse.
@@ -20,10 +20,10 @@ Three terms get confused because they share words. They are different things:
 
 | Path | Holds | Owner |
 |------|-------|-------|
-| `baseline/` | shipped prose packs (`security.md`, `concurrency.md`, …) — generic code-quality rules | framework. `setup.sh` seeds them; customize in `project/`, not here. |
+| `baseline/` | shipped prose packs (`security.md`, `concurrency.md`, …) and the shipped standards script pack (`standards.sh`, a wrapper around `.specify/scripts/bash/speckit-standards.sh`). Findings never carry `PROJECT_GATE`. | framework. `setup.sh` seeds them; customize in `project/`, not here. |
 | `project/` | your repo's packs: `.md` (prose) and `.sh` (script), side by side. Findings are tagged `PROJECT_GATE`. | you |
-| `config/` | `*.yml` / `*.json` data read by config-backed prose packs in `project/` | you |
-| `run-gates.sh` | the runner that executes every `project/*.sh` script pack | framework |
+| `config/` | `*.yml` / `*.json` data read by config-backed prose packs in `project/`, plus the seeded `damage-levels.yml` and `lexicon.yml` the standards engine reads | you |
+| `run-gates.sh` | the runner that executes every `baseline/*.sh` and `project/*.sh` script pack | framework |
 
 A file's path and suffix tell you everything: `baseline/security.md` is a shipped prose pack; `project/dsl-sync.md` is a project prose pack (its findings get `PROJECT_GATE`); `project/sibling-sync.sh` is a project script pack (same tag).
 
@@ -67,7 +67,7 @@ Both modes emit a YAML sequence; each item:
 
 ### Script pack contract (`project/*.sh`)
 
-The shipped runner `.specify/marge/run-gates.sh` discovers every `*.sh` in `project/` and runs each under a ~120s timeout, folding stdout into the findings pipeline. **Findings — not exit codes — drive enforcement.** All three venues call this one runner.
+The shipped runner `.specify/marge/run-gates.sh` discovers every `*.sh` in `baseline/` (run first) and `project/` and runs each under a ~120s timeout, folding stdout into the findings pipeline. **Findings — not exit codes — drive enforcement.** All three venues call this one runner.
 
 **Inputs (environment).** The runner exports these before running each script pack:
 
@@ -86,12 +86,12 @@ For **review**, the runner derives `SPECKIT_DIFF_FILES` from `SPECKIT_BASE_REF` 
 - **No findings → print nothing** and exit 0. Empty stdout means clean.
 - Write diagnostics to **stderr** (never parsed as findings).
 - **Emit your own `pack:` line** (`project/<this-file>.sh`). The runner passes stdout through verbatim — it only ever *adds* the `pack-execution` meta-finding when your script exits non-zero.
-- Always include `PROJECT_GATE` in `tags`. Add `NEEDS_HUMAN` when resolution needs judgment.
+- A project pack always includes `PROJECT_GATE` in `tags`; the baseline standards pack never does. Add `NEEDS_HUMAN` when resolution needs judgment.
 
 **Exit code (decoupled from findings).**
 
 - **`0`** — ran successfully, with or without findings. The normal case, even when emitting findings.
-- **non-zero / timeout** — treated as an execution error: the runner records one `LOW` / `NEEDS_HUMAN` meta-finding (`rule: pack-execution`) and continues. A failing script pack never aborts the review.
+- **non-zero / timeout** — treated as an execution error: the runner records one `LOW` meta-finding (`rule: pack-execution`, `pack: <origin>/<name>`), tagged `[PROJECT_GATE, NEEDS_HUMAN]` for a project pack and `[NEEDS_HUMAN]` for a baseline pack, and continues. A failing script pack never aborts the review.
 
 **Stage opt-in.** A script pack runs at the **review** stage by default (Marge + PR, diff-scoped). To ALSO run it at the **planning** stage (Lisa, against spec/plan/tasks), add this line near the top:
 

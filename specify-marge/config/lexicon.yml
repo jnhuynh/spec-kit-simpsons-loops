@@ -1,0 +1,76 @@
+# The words this project uses, machine half. Read by
+# .specify/scripts/bash/speckit-standards.sh, which scans ADDED prose only:
+# Markdown outside code fences, and comment lines in code. Identifiers are
+# never scanned.
+
+# Patterns are POSIX extended regular expressions matched case-insensitively
+# at word boundaries (the engine adds the boundaries; never write \b). No
+# lookaround: `unless` lists patterns that, when any matches the same line,
+# suppress the entry for that line.
+
+#   banned            blocks: the Stop hook and Marge treat it as a must-fix.
+#   prefer            warns. The canonical word is preferred; the other has real uses.
+#   soft_verbs        warns. Filler verbs with a plain replacement.
+#   invented_phrases  warns. Generic words chained into a term that names nothing.
+
+#   known_terms       Title Case phrases that are not new terms (headings, products).
+#   exempt_paths      files never scanned (the lexicon has to name the words it bans).
+
+banned: []
+#   - pattern: 'underwrit[[:alnum:]_]*'
+#     use: risk assessment
+#     why: We do not do this.
+
+prefer: []
+#   - pattern: 'customers?'
+#     use: member
+#     unless:
+#       - 'customer_state'
+
+soft_verbs:
+  - pattern: 'utili[sz][[:alnum:]_]+'
+    use: use
+  - pattern: 'leverag[[:alnum:]_]+'
+    use: use
+  - pattern: 'facilitat[[:alnum:]_]+'
+    use: let, help
+  - pattern: 'materiali[sz][[:alnum:]_]+'
+    use: build, write
+  - pattern: 'ensur[[:alnum:]_]+'
+    use: check, make sure
+  - pattern: 'perform(s|ed|ing)? validation'
+    use: check
+  - pattern: 'provid[[:alnum:]_]+ the ability to'
+    use: let
+  - pattern: 'surfac(e|es|ed|ing) (the|a|an|to|it|them|this|that)'
+    use: show
+
+# Phrases built from generic words instead of the name of the thing. Any word
+# before one of these nouns is flagged, and so is any "<word>-neutral",
+# "-agnostic", ... before a noun. A listed noun after an article, or on its
+# own, is not. Warns; never blocks: the check cannot know the right name.
+invented_phrases:
+  nouns: [seam, surface, layer, boundary, primitive, fabric, substrate, plane, mechanism, machinery, scaffold, scaffolding, shim, harness, lever, indirection, facade, touchpoint, affordance, construct, topology, chokepoint]
+  compound_suffixes: [neutral, agnostic, aware, driven, centric, oriented]
+  allowed:
+    - test harness
+    - attack surface
+
+exempt_paths:
+  - .specify/marge/config/lexicon.yml
+  - .specify/marge/README.md
+
+known_terms:
+  - User Story
+  - User Scenarios
+  - Success Criteria
+  - Functional Requirements
+  - Key Entities
+  - Edge Cases
+  - Plain Summary
+  - Acceptance Scenarios
+  - Independent Test
+  - Pull Request Plan
+  - Phase Boundary
+  - Inherited Scope
+  - Minimum Viable Product
