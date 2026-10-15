@@ -107,13 +107,14 @@ It is idempotent — re-run it to upgrade.
 | `scripts/speckit-standards.sh` | `.specify/scripts/bash/` | overwritten (the standards engine) |
 | `specify-marge/baseline/standards.sh` | `.specify/marge/baseline/` | **preserved** — the wrapper that runs the engine; edit `--only` or delete to opt out |
 | `specify-marge/config/damage-levels.yml`, `config/lexicon.yml` | `.specify/marge/config/` | **preserved** — your damage levels and your words |
+| `scripts/speckit-standards-stop.sh` | `.claude/hooks/` | overwritten (the Stop hook); its `Stop` entry in `.claude/settings.json` is added once — delete the entry to opt out |
 | `templates/CLAUDE.md` | `CLAUDE.md` | merged — content below the separator is yours |
 | `templates/constitution.md` | `.specify/memory/constitution.md` | merged — content below the separator is yours |
 | `gitignore` | appended to `.gitignore` | skipped if the marker line is present |
 
 It also creates `.specify/quality-gates.sh` and `.specify/quality-gates-fast.sh` placeholders if they do not exist (both exit 1 until you edit them), creates the empty `.specify/marge/project/` and `.specify/marge/config/` directories for your own packs, and removes superseded artifacts from earlier versions (bash loop scripts, legacy per-command skill copies, and their `settings.local.json` permissions).
 
-To do it manually, copy each row above with `cp` (`cp -n` for the preserved row), `chmod +x` the four `.sh` files, and append this repo's `gitignore` to yours.
+To do it manually, copy each row above with `cp` (`cp -n` for the preserved row), `chmod +x` the five `.sh` files, add the `Stop` entry that `setup.sh` prints to `.claude/settings.json`, and append this repo's `gitignore` to yours.
 
 </details>
 
@@ -316,6 +317,8 @@ bash .specify/scripts/bash/speckit-standards.sh --base origin/main --body-file p
 ```
 
 Exit 0 is clean or advice, 1 means a finding blocks, 2 means the engine could not run. `--only lexicon,plain-language,pr-shape,unrated-path` picks groups; `--blocking-only` hides advice; `--format hook` emits the Claude Code Stop-hook JSON. If `damage-levels.yml` is absent the engine prints nothing and exits 0; if `lexicon.yml` is absent only the lexicon rules are skipped. The wrapper opts into Lisa's planning stage with the `lexicon`, `plain-language`, and `pr-shape` groups against the spec directory.
+
+**Stop hook.** `setup.sh` installs `.claude/hooks/speckit-standards-stop.sh` and, on the install that first creates it, registers it under `Stop` in `.claude/settings.json` (with `jq`; without `jq` it prints the entry for you to add). When an interactive session tries to finish with a blocking finding in its uncommitted work — a banned word, a new spec without its plain summary — the hook sends the session back with the reason, once each time it tries to stop. It runs only the `lexicon` and `pr-shape` groups, so advice never interrupts anyone, and it fails open: any error means no opinion, and so does a tree with more than 300 uncommitted files, which would outrun the 30 s hook timeout. Delete the `Stop` entry to opt out; `setup.sh` never adds it again.
 
 ### Dogfooding this repo
 

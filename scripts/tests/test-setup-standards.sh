@@ -22,6 +22,11 @@ check_exec "engine installed and executable" .specify/scripts/bash/speckit-stand
 check_exec "baseline wrapper seeded and executable" .specify/marge/baseline/standards.sh
 check_file "damage-levels seeded" .specify/marge/config/damage-levels.yml
 check_file "lexicon seeded" .specify/marge/config/lexicon.yml
+check_exec "stop hook installed and executable" .claude/hooks/speckit-standards-stop.sh
+check_eq "stop hook registered once" "$(jq '.hooks.Stop | length' .claude/settings.json 2>/dev/null)" 1
+check_eq "stop hook command" "$(jq -r '.hooks.Stop[0].hooks[0].command' .claude/settings.json 2>/dev/null)" '"$CLAUDE_PROJECT_DIR"/.claude/hooks/speckit-standards-stop.sh'
+check_eq "stop hook timeout" "$(jq '.hooks.Stop[0].hooks[0].timeout' .claude/settings.json 2>/dev/null)" 30
+check_eq "settings.json mode" "$(stat -f '%Lp' .claude/settings.json 2>/dev/null || stat -c '%a' .claude/settings.json)" 644
 check_file "speckit-pr skill installed" .claude/skills/speckit-pr/SKILL.md
 check_eq "speckit-pr skill is named" "$(sed -n 2p .claude/skills/speckit-pr/SKILL.md 2>/dev/null)" "name: speckit-pr"
 for phrase in 'reads the local tree' 'change nothing' 'never push' 'Never lower' '--body-file' 'origin/<BRANCH>' 'Only a `PULL_REQUEST:0` line' 'damage-levels.yml' 'Recount' 'names a branch that is not the current branch' 'read-only' 'git fetch origin' 'no pull requests found' 'uncommitted changes are not in this description' 'MEDIUM specs/9cad-feat-x/spec.md:5' '## What changed' '## How much damage if it is wrong' '## Where to look' '## How it was verified' '## Links'; do
@@ -35,10 +40,14 @@ if grep -qF 'Open the spec with a "## Plain summary" section' .claude/skills/spe
 printf '# mine\n' > .specify/marge/baseline/standards.sh
 printf '# mine\n' > .specify/marge/config/lexicon.yml
 printf '# old engine\n' > .specify/scripts/bash/speckit-standards.sh
+printf '# old hook\n' > .claude/hooks/speckit-standards-stop.sh
+jq 'del(.hooks)' .claude/settings.json > settings.tmp && mv settings.tmp .claude/settings.json   # the consumer opted out
 bash "$REPO/setup.sh" >/dev/null 2>&1
 check_eq "wrapper preserved on re-install" "$(cat .specify/marge/baseline/standards.sh)" "# mine"
 check_eq "lexicon preserved on re-install" "$(cat .specify/marge/config/lexicon.yml)" "# mine"
 check_eq "engine refreshed on re-install" "$(head -n 1 .specify/scripts/bash/speckit-standards.sh)" "#!/usr/bin/env bash"
+check_eq "hook refreshed on re-install" "$(head -n 1 .claude/hooks/speckit-standards-stop.sh)" "#!/usr/bin/env bash"
+check_eq "entry not re-added when the hook existed" "$(jq '.hooks.Stop // [] | length' .claude/settings.json)" 0
 
 # The seeds parse and leave a fresh change clean.
 cp "$REPO/specify-marge/config/lexicon.yml" .specify/marge/config/lexicon.yml
@@ -70,6 +79,97 @@ git add -A; git commit -qm seeds
 out=$(bash .specify/scripts/bash/speckit-standards.sh --base main 2>&1); rc=$?
 check_eq "seeds as a change exit 0" "$rc" 0
 if grep -q 'No findings.' <<<"$out"; then pass "seeds as a change are clean"; else fail "seeds as a change are clean (got: $out)"; fi
+cd / && rm -rf "$consumer"
+
+# Existing settings keep their keys and other hooks, and gain the entry once.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude .specify/memory .specify/scripts/bash
+printf '{"permissions":{"allow":["Bash(ls:*)"]},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo other"}]}]}}\n' > .claude/settings.json
+chmod 664 .claude/settings.json
+bash "$REPO/setup.sh" >/dev/null 2>&1
+check_eq "existing settings preserved: permissions" "$(jq -r '.permissions.allow[0]' .claude/settings.json)" 'Bash(ls:*)'
+check_eq "existing settings preserved: other Stop hook" "$(jq -r '.hooks.Stop[0].hooks[0].command' .claude/settings.json)" 'echo other'
+check_eq "existing settings gain the entry" "$(jq '.hooks.Stop | length' .claude/settings.json)" 2
+check_eq "existing settings keep their mode" "$(stat -f '%Lp' .claude/settings.json 2>/dev/null || stat -c '%a' .claude/settings.json)" 664
+bash "$REPO/setup.sh" >/dev/null 2>&1
+check_eq "entry not duplicated on re-install" "$(jq '.hooks.Stop | length' .claude/settings.json)" 2
+cd / && rm -rf "$consumer"
+
+# A hook that already existed with no entry: the snippet is printed, nothing merged.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude/hooks .specify/memory .specify/scripts/bash
+printf '# mine\n' > .claude/hooks/speckit-standards-stop.sh
+out=$(bash "$REPO/setup.sh" 2>&1)
+if grep -qF '"Stop"' <<<"$out"; then pass "pre-existing hook: snippet printed"; else fail "pre-existing hook: snippet printed (got: ${out:0:300})"; fi
+if [[ -f .claude/settings.json ]]; then fail "pre-existing hook: settings.json left alone"; else pass "pre-existing hook: settings.json left alone"; fi
+if grep -qF 'already existed' <<<"$out"; then pass "pre-existing hook: reason given"; else fail "pre-existing hook: reason given"; fi
+cd / && rm -rf "$consumer"
+
+# Without jq: the hook is installed, the snippet is printed, settings.json is not written.
+path_without_jq() {
+  local shim dir f
+  shim=$(mktemp -d)
+  IFS=: read -r -a dirs <<<"$PATH"
+  for dir in "${dirs[@]}"; do
+    [[ -d "$dir" ]] || continue
+    for f in "$dir"/*; do
+      [[ -x "$f" && ! -d "$f" ]] || continue
+      [[ "$(basename "$f")" == jq || -e "$shim/$(basename "$f")" ]] && continue
+      ln -s "$f" "$shim/"
+    done
+  done
+  printf '%s' "$shim"
+}
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude .specify/memory .specify/scripts/bash
+shim=$(path_without_jq)
+out=$(PATH="$shim" bash "$REPO/setup.sh" 2>&1); rc=$?
+rm -rf "$shim"
+check_eq "without jq: setup.sh exits 0" "$rc" 0
+check_exec "without jq: hook still installed" .claude/hooks/speckit-standards-stop.sh
+if grep -qF '"Stop"' <<<"$out"; then pass "without jq: snippet printed"; else fail "without jq: snippet printed (got: ${out:0:300})"; fi
+if [[ -f .claude/settings.json ]]; then fail "without jq: settings.json not written"; else pass "without jq: settings.json not written"; fi
+if grep -qF 'jq is not installed' <<<"$out"; then pass "without jq: reason given"; else fail "without jq: reason given"; fi
+cd / && rm -rf "$consumer"
+
+# A symlinked settings.json stays a symlink; its target gains the entry.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude dotfiles .specify/memory .specify/scripts/bash
+printf '{"permissions":{"allow":[]}}\n' > dotfiles/settings.json
+ln -s ../dotfiles/settings.json .claude/settings.json
+bash "$REPO/setup.sh" >/dev/null 2>&1
+if [[ -L .claude/settings.json ]]; then pass "symlinked settings.json stays a symlink"; else fail "symlinked settings.json stays a symlink"; fi
+check_eq "symlinked settings.json target gains the entry" "$(jq '.hooks.Stop | length' dotfiles/settings.json 2>/dev/null)" 1
+cd / && rm -rf "$consumer"
+
+# The script name elsewhere in settings.json does not count as registered.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude .specify/memory .specify/scripts/bash
+printf '{"permissions":{"deny":["Bash(.claude/hooks/speckit-standards-stop.sh)"]}}\n' > .claude/settings.json
+bash "$REPO/setup.sh" >/dev/null 2>&1
+check_eq "name elsewhere in settings.json does not count as registered" "$(jq '.hooks.Stop | length' .claude/settings.json 2>/dev/null)" 1
+cd / && rm -rf "$consumer"
+
+# Invalid settings.json is left untouched, and the reason is printed with the snippet.
+consumer=$(mktemp -d)
+cd "$consumer" || exit 1
+git init -q
+mkdir -p .claude .specify/memory .specify/scripts/bash
+printf '{bad' > .claude/settings.json
+out=$(bash "$REPO/setup.sh" 2>&1)
+check_eq "invalid settings.json left untouched" "$(cat .claude/settings.json)" '{bad'
+if grep -qF 'valid JSON' <<<"$out"; then pass "invalid settings.json: reason given"; else fail "invalid settings.json: reason given (got: ${out:0:300})"; fi
+if grep -qF '"Stop"' <<<"$out"; then pass "invalid settings.json: snippet printed"; else fail "invalid settings.json: snippet printed"; fi
 cd / && rm -rf "$consumer"
 
 echo

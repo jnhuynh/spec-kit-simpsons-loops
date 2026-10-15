@@ -259,6 +259,69 @@ echo "    .specify/marge/run-gates.sh"
 echo "    .specify/scripts/bash/speckit-commit.sh"
 echo "    .specify/scripts/bash/speckit-standards.sh"
 
+# ── 2a. Stop hook ───────────────────────────────────────────────────
+# The hook script is framework code (Pattern A: OVERWRITE). Its Stop entry in
+# .claude/settings.json is merged once, on the install that first creates the
+# script, so a consumer who deletes the entry has opted out for good.
+HOOK_REL=".claude/hooks/speckit-standards-stop.sh"
+HOOK_DEST="$PROJECT_DIR/$HOOK_REL"
+HOOK_CMD='"$CLAUDE_PROJECT_DIR"/.claude/hooks/speckit-standards-stop.sh'
+PROJECT_SETTINGS="$PROJECT_DIR/.claude/settings.json"
+hook_existed=false
+[[ -f "$HOOK_DEST" ]] && hook_existed=true
+mkdir -p "$PROJECT_DIR/.claude/hooks"
+cp "$SCRIPT_DIR/scripts/speckit-standards-stop.sh" "$HOOK_DEST"
+chmod +x "$HOOK_DEST"
+echo "    $HOOK_REL"
+
+print_hook_snippet() { # $1 = why it was not registered
+  echo "  Stop hook not registered: $1"
+  echo "  To be sent back when a standards check blocks uncommitted work, add it to .claude/settings.json:"
+  echo '    {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}'
+}
+
+# Registered means a Stop command names the script, not the name appearing
+# anywhere in the file. Without jq the grep is the best available guess.
+hook_registered() {
+  [[ -f "$PROJECT_SETTINGS" ]] || return 1
+  if command -v jq &>/dev/null; then
+    jq -e '[.hooks.Stop[]?.hooks[]?.command? // "" | select(contains("speckit-standards-stop.sh"))] | length > 0' "$PROJECT_SETTINGS" >/dev/null 2>&1
+  else
+    grep -qF 'speckit-standards-stop.sh' "$PROJECT_SETTINGS"
+  fi
+}
+
+if hook_registered; then
+  echo "  Stop hook already registered in .claude/settings.json"
+elif $hook_existed; then
+  print_hook_snippet "the hook script already existed, so the entry is not added again (add it to opt in)"
+elif ! command -v jq &>/dev/null; then
+  print_hook_snippet "jq is not installed"
+else
+  # Write through a symlink to its target, keep the file's mode, swap atomically.
+  settings_file="$PROJECT_SETTINGS"
+  if [[ -L "$settings_file" ]]; then
+    link_target=$(readlink "$settings_file")
+    [[ "$link_target" == /* ]] || link_target="$(dirname "$settings_file")/$link_target"
+    settings_file="$link_target"
+  fi
+  if [[ -f "$settings_file" ]]; then
+    settings_mode=$(stat -f '%Lp' "$settings_file" 2>/dev/null || stat -c '%a' "$settings_file" 2>/dev/null || echo 644)
+  else
+    echo '{}' > "$settings_file"
+    settings_mode=644
+  fi
+  tmp=$(mktemp)
+  if jq --arg cmd "$HOOK_CMD" '.hooks.Stop = ((.hooks.Stop // []) + [{hooks: [{type: "command", command: $cmd, timeout: 30}]}])' "$settings_file" > "$tmp" 2>/dev/null; then
+    chmod "$settings_mode" "$tmp"
+    mv "$tmp" "$settings_file"
+    echo "  Registered the Stop hook in .claude/settings.json"
+  else
+    rm -f "$tmp"
+    print_hook_snippet ".claude/settings.json could not be updated (is it valid JSON with a Stop array?)"
+  fi
+fi
+
 # ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
 # Earlier installs used .specify/marge/checks/ (prose packs) and
 # .specify/marge/gates/ (script packs). The current layout splits by ORIGIN:
