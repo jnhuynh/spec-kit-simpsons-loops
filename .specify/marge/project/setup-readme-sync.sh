@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# setup-readme-sync — a project continuity gate for THIS repo (dogfood).
-#
-# Invariant: every .claude/ file that setup.sh copies must also appear in the
-# README "Option B: Manual" copy list, and vice versa. Those two lists drift
-# easily whenever a command/agent is added. Emits PROJECT_GATE findings on
-# drift. Contract: .specify/marge/README.md (review stage, diff-scoped).
+# setup-readme-sync — a project continuity pack for THIS repo (dogfood).
+
+# Invariant: what setup.sh installs and what the README install table lists
+# are the same set. One PROJECT_GATE finding per path found on one side only.
+# Contract: .specify/marge/README.md (review stage, diff-scoped).
 set -euo pipefail
 
 root="${SPECKIT_REPO_ROOT:-$(pwd)}"
@@ -18,14 +17,31 @@ case "${SPECKIT_DIFF_FILES:-}" in
 esac
 [ -f "$setup" ] && [ -f "$readme" ] || exit 0
 
-# .claude/ destinations setup.sh copies: cp "$SCRIPT_DIR/..." "$PROJECT_DIR/.claude/...".
-setup_targets=$(grep -E '^cp ' "$setup" \
-  | grep -oE '\$PROJECT_DIR/\.claude/[^"]+' \
-  | sed 's#\$PROJECT_DIR/##' | sort -u || true)
+# Ship-source paths setup.sh reads: every "$SCRIPT_DIR/..." on a cp or for line,
+# or the templates/setup.sh call, cut at the first variable or glob. A loop over
+# a directory yields the directory (trailing slash).
+setup_paths=$(grep -E '^\s*(cp |for |"\$SCRIPT_DIR/)' "$setup" \
+  | grep -oE '\$SCRIPT_DIR/[A-Za-z0-9_./-]+' | sed 's#^\$SCRIPT_DIR/##' | sort -u)
 
-# .claude/ targets listed in the README Option B copy block.
-readme_targets=$(grep -E 'cp <path-to-simpsons-loops>' "$readme" \
-  | grep -oE '\.claude/[^ ]+' | sort -u || true)
+# Paths in the first column of the README install table. A later entry in a
+# row may be cut to its last segments, as the table spells it.
+readme_paths=$(sed -n '/^<details>/,/^<\/details>/p' "$readme" \
+  | grep -E '^\| `' | cut -d'|' -f2 | grep -oE '`[^`]+`' | tr -d '`' | sort -u)
+
+# Does the table entry R describe the setup.sh path S?
+related() {  # $1 = R (table entry), $2 = S (setup.sh path)
+  local r="$1" s="$2"
+  [ "$r" = "$s" ] && return 0
+  case "$s" in */"$r") return 0 ;; esac                  # R abbreviated: run-gates.sh
+  # shellcheck disable=SC2254  # R is a glob on purpose
+  case "$s" in $r|*/$r) return 0 ;; esac                 # R is a glob: claude-agents/*.md
+  case "$s" in
+    templates/setup.sh) case "$r" in templates/*) return 0 ;; esac ;;   # it installs templates/*
+    */) case "$r" in "$s"*) return 0 ;; esac                           # S is a directory R lives in
+        case "$s" in */"${r%/*}"/) return 0 ;; esac ;;                 # ... spelled by its last dir
+  esac
+  return 1
+}
 
 emit() {  # $1=file  $2=issue
   cat <<YAML
@@ -35,32 +51,29 @@ emit() {  # $1=file  $2=issue
   pack: project/$(basename "$0")
   rule: setup-readme-sync
   issue: "$2"
-  fix: "keep setup.sh's .claude/ copy list and README Option B in sync"
+  fix: "keep setup.sh and the README install table in sync"
   tags: [PROJECT_GATE]
 YAML
 }
 
-while IFS= read -r p; do
-  [ -n "$p" ] || continue
-  emit "README.md" "setup.sh copies $p but README Option B does not list it"
-done < <(comm -23 <(printf '%s\n' "$setup_targets") <(printf '%s\n' "$readme_targets"))
+while IFS= read -r s; do
+  [ -n "$s" ] || continue
+  found=0
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    if related "$r" "$s"; then found=1; break; fi
+  done <<<"$readme_paths"
+  [ "$found" = 1 ] || emit README.md "setup.sh installs $s but the README install table does not list it"
+done <<<"$setup_paths"
 
-while IFS= read -r p; do
-  [ -n "$p" ] || continue
-  emit "setup.sh" "README Option B lists $p but setup.sh no longer copies it"
-done < <(comm -13 <(printf '%s\n' "$setup_targets") <(printf '%s\n' "$readme_targets"))
-
-# Skills install as a whole tree (a loop in setup.sh; a `cp -R .../speckit-skills/*`
-# glob in README) rather than per-file cp lines, so the comm checks above don't see
-# them. Guard the pair at directory level: if one side installs skills, so must the other.
-setup_has_skills=$(grep -q 'speckit-skills/' "$setup" && echo yes || echo no)
-readme_has_skills=$(grep -q 'speckit-skills/' "$readme" && echo yes || echo no)
-if [ "$setup_has_skills" != "$readme_has_skills" ]; then
-  if [ "$setup_has_skills" = yes ]; then
-    emit "README.md" "setup.sh installs the speckit-skills/ tree but README Option B does not mention speckit-skills/"
-  else
-    emit "setup.sh" "README Option B installs speckit-skills/ but setup.sh no longer does"
-  fi
-fi
+while IFS= read -r r; do
+  [ -n "$r" ] || continue
+  found=0
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    if related "$r" "$s"; then found=1; break; fi
+  done <<<"$setup_paths"
+  [ "$found" = 1 ] || emit setup.sh "the README install table lists $r but setup.sh does not install it"
+done <<<"$readme_paths"
 
 exit 0

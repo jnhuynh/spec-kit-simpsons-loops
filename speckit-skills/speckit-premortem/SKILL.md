@@ -1,6 +1,6 @@
 ---
 name: speckit-premortem
-description: Run an interactive three-lens premortem (architecture, UX, support/ops) on a clarified feature spec — discover failure modes, disposition each one with the user, encode mitigations into the spec, and maintain a risk register at <FEATURE_DIR>/failure-modes.md.
+description: Use when a clarified spec.md needs its failure modes found and dispositioned with a human, after /speckit-homer-clarify and before /speckit-phase.
 ---
 
 ## User Input

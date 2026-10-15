@@ -1,6 +1,6 @@
 ---
 name: speckit-lisa-analyze
-description: Orchestrate iterative cross-artifact analysis and remediation (Lisa loop) on spec.md, plan.md, and tasks.md until all findings are resolved.
+description: Use when spec.md, plan.md, and tasks.md all exist and need a cross-artifact consistency pass before implementation starts.
 ---
 
 ## User Input

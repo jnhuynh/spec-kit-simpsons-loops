@@ -12,4 +12,4 @@ Detect if the current spec is a child spec by checking FEATURE_DIR for the `--p{
 
 **Skill absent**: if `.claude/skills/speckit-reconcile/SKILL.md` does not exist, log `speckit-reconcile not installed — skipping reconcile` and continue. Run `setup.sh` to install it.
 
-**Post-step stop check**: After the reconcile step completes (whether executed or skipped), check STOP_AFTER_STEP. If equals `reconcile`, output: `Pipeline stopped after reconcile per --stop-after parameter. Skipping: plan, tasks, lisa, ralph, marge.` and skip all remaining steps.
+**Stop check**: apply the pipeline skill's post-step stop check (its Step 5) with the step name `reconcile`.

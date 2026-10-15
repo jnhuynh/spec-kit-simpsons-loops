@@ -1,6 +1,6 @@
 ---
 name: speckit-pr
-description: Write the pull request description from the diff — what changed, how much damage if it is wrong (the damage level, reviewer line, and checklist from the standards engine), where to look, how it was verified, links. Use when asked to write or update a PR description or to open a pull request. Never pushes, never merges, never lowers the damage level.
+description: Use when asked to write or update a pull request description, or to open a pull request, for the checked-out branch.
 ---
 
 ## User Input

@@ -30,5 +30,4 @@ Deploy and validate each phase in production before starting the next. When you 
 If user selects option 1 (default/recommended): stop the pipeline. Set completion status to **split-complete**. Proceed to Step 6 (Report Results).
 If user selects option 2: log the warning and continue to ralph/marge.
 
-**Post-step stop check**: After split completes, if STOP_AFTER_STEP equals `split`, output: `Pipeline stopped after split per --stop-after parameter. Skipping: ralph, marge.` and skip all remaining steps.
-
+**Stop check**: apply the pipeline skill's post-step stop check (its Step 5) with the step name `split`.

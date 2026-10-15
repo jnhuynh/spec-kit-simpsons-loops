@@ -5,7 +5,7 @@
 - **Readability first** — clean, human-readable code with meaningful variable names. Clarity over brevity.
 - **Functional design** — services take inputs, yield deterministic outputs. No hidden side effects.
 - **Maintainability over cleverness** — no premature optimizations. Code must be maintainable by developers who didn't write it.
-- **Simplicity (KISS & YAGNI)** — build only what's needed. Prefer simpler solutions that can be validated before investing in sophisticated alternatives.
+- **Simplicity (KISS & YAGNI)** — build only what's needed _now_. Before adding any speculative structure — a column, model, abstraction, state, status field, snapshot, or async-ordering machinery — apply the **one-way-door test**: if the decision is reversible (it can be added later when a real consumer needs it, without an irreversible migration, backfill, or breaking contract change), default to the smaller solution and **don't build it yet**. Reserve upfront flexibility for true one-way doors (destructive/narrowing migrations, public API contracts, data shapes that would later need a backfill). Concretely: don't add fields, states, or scopes with no current consumer; don't snapshot a value when a derived read of the current value suffices; and don't assume unspecified requirements like extreme asynchrony or arbitrary input ordering — prefer the simpler, more sequential design until a concrete requirement forces otherwise. When a spec, plan, prior artifact, or reviewer pushes for speculative complexity, push back and name it as YAGNI rather than silently implementing it. Capable models bias toward over-building; lean deliberately the other way.
 - **Follow best practices** — established conventions for the languages, frameworks, and packages in use. Community standards over novel approaches.
 
 ## Test-First Development
@@ -45,16 +45,18 @@ Cleanup is mandatory. Every process started during a session must be stopped bef
 
 ## Speckit
 
-- Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation
-- Adjust spec, plan, or tasks instead
-- **Homer (clarify)** → answer up to 5 clarification questions per iteration (self-answered), loop until `ALL_FINDINGS_RESOLVED`
-- **Premortem (human gate)** → `/speckit-premortem` interactive failure-mode discovery across architecture, UX, and support/ops lenses; mitigations encoded into the spec, decisions tracked in `failure-modes.md`; the pipeline halts at this step until the register has zero `open` rows — never self-answered, never automated
-- **Lisa (analyze)** → fix all auto-fixable findings per iteration, then verify with a clean re-scan, loop until `ALL_FINDINGS_RESOLVED`
-- **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`
-- **Marge (review)** → fix all auto-fixable code-review findings per iteration, then verify with a clean re-review, loop until `ALL_FINDINGS_RESOLVED`; skip findings tagged `NEEDS_HUMAN` (design judgment); a finding that reappears after being fixed is escalated to `NEEDS_HUMAN`, never re-fixed
-- **Phased specs** → a child spec (`{parent}--p{N}-{slug}`) is a **phase view**, never a copy. The parent spec holds every user story, requirement, key entity, and success criterion exactly once; the child names the ones in its phase by ID under `## Inherited Scope` and adds only phasing-local `FR-P{N}-###` / `SC-P{N}-###` entries plus a `## Phase Boundary`. Never copy parent prose into a child. Requirement edits and clarifications go to the parent — which is why `homer`, `premortem`, and `phase` never run on a child spec. **Reconcile** (`/speckit-reconcile`) corrects the *parent* where a completed phase shipped something else; there are no conflict markers because nothing is stored twice
-- **Project packs** → repo-specific continuity rules (e.g. sibling files must change together): script packs (`.specify/marge/project/*.sh`) and prose packs (`.specify/marge/project/*.md`, optionally config-backed via `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `specify-marge/README.md` (installed to consumers as `.specify/marge/README.md`)
-- Exit after each iteration — restart with fresh context
+- Constitution at `.specify/memory/constitution.md` is **authoritative** — never modify it during implementation. Adjust spec, plan, or tasks instead.
+- Every loop iteration and pipeline step runs in a fresh sub agent. Exit after each iteration; nothing carries over but the files on disk.
+- **Homer (clarify)** → answer up to 5 clarification questions per iteration (self-answered), loop until `ALL_FINDINGS_RESOLVED`.
+- **Premortem (human gate)** → `/speckit-premortem` works three failure-mode lenses (architecture, UX, support/ops) interactively. Mitigations land in the spec; every risk is tracked in `failure-modes.md`. The pipeline halts here until no row is `open`. Never self-answered, never automated.
+- **Lisa (analyze)** → fix every auto-fixable finding per iteration, then verify with a clean re-scan, loop until `ALL_FINDINGS_RESOLVED`.
+- **Ralph (implement)** → implement one task per iteration, loop until `ALL_TASKS_COMPLETE`. When `tasks.md` carries a `## Pull Request Plan`, work one PR group at a time. Halt at each boundary (`PR_BOUNDARY_REACHED`) so the group can be opened, reviewed, and merged first.
+- **Marge (review)** → fix every auto-fixable code-review finding per iteration, then verify with a clean re-review, loop until `ALL_FINDINGS_RESOLVED`. Skip findings tagged `NEEDS_HUMAN`. A finding that reappears after being fixed is escalated to `NEEDS_HUMAN`, never re-fixed.
+- **Phased specs** → a child spec (`{parent}--p{N}-{slug}`) is a **phase view**, never a copy. The parent holds every user story, requirement, key entity, and success criterion exactly once. The child names the ones in its phase by ID under `## Inherited Scope`. It adds only phase-local `FR-P{N}-###` / `SC-P{N}-###` entries and a `## Phase Boundary`. Requirement edits and clarifications go to the parent, so `homer`, `premortem`, and `phase` never run on a child. `/speckit-reconcile` corrects the parent where a completed phase shipped something else.
+- **Standards checks** → Marge and Lisa run `.specify/scripts/bash/speckit-standards.sh` through the baseline pack `standards.sh`: damage level (`.specify/marge/config/damage-levels.yml`), PR shape, plain language, and the words in `config/lexicon.yml`. A banned word, a requirement id in a PR description, or a new spec without a `## Plain summary` blocks. The damage level is a floor an agent never lowers. `/speckit-pr` writes the pull request description with the level and its checklist. The Stop hook (`.claude/hooks/speckit-standards-stop.sh`) sends an interactive session back once per stop attempt while a blocking finding sits in its uncommitted work.
+- **Project packs** → repo-specific continuity rules (e.g. sibling files must change together) in `.specify/marge/project/`: `.sh` script packs and `.md` prose packs (optionally config-backed via `.specify/marge/config/`). Findings are tagged `PROJECT_GATE` and flow through the normal review pipeline — auto-fixed if mechanical, else `NEEDS_HUMAN` — across Marge, Lisa (planning), and PR review. Contract: `.specify/marge/README.md`.
+
+<!-- ====== PROJECT SPECIFIC ====== -->
 
 ## Karpathy-Inspired Claude Code Guidelines
 
@@ -122,37 +124,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-<!-- ====== PROJECT SPECIFIC ====== -->
-
-<!-- Add project-specific guidelines below (technologies, commands, structure, etc.) -->
-
 ## Source vs Installed Files
 
-**Ship-source lives in non-hidden top-level directories; `setup.sh` never sources install-content from `.specify/` or `.claude/`.** Installed copies are NOT committed in this repo — the paths `setup.sh --self` would generate (`.claude/agents/`, `.claude/skills/`, `.specify/marge/` framework files, `.specify/scripts/bash/speckit-commit.sh`) are gitignored. Run `setup.sh --self` only when you want to dogfood locally; never commit its output. (`$PROJECT_DIR/...` reads that preserve a consumer's existing customizations are fine; `$SCRIPT_DIR/.specify` or `$SCRIPT_DIR/.claude` reads are not.)
+**Ship-source lives in the non-hidden top-level directories** (`speckit-skills/`, `claude-agents/`, `specify-marge/`, `scripts/`, `templates/`), and `setup.sh` never reads install content from `.specify/` or `.claude/`. The README's install table ("What setup.sh installs") is the map from each source to its destination. **Always edit the source files, never an installed copy.**
 
-The source of truth, and where `setup.sh` installs it in a consumer repo:
+Installed copies are not committed here. Everything `setup.sh --self` writes is gitignored; run it only to dogfood locally and never commit its output. (`$PROJECT_DIR/...` reads that preserve a consumer's customizations are fine; `$SCRIPT_DIR/.specify` or `$SCRIPT_DIR/.claude` reads are not.)
 
-- `speckit-skills/*/SKILL.md` → `.claude/skills/` (each skill is a directory; any `reference/` files ride along for progressive disclosure; the legacy per-command copy is removed on install)
-- `claude-agents/*.md` → `.claude/agents/`
-- `specify-marge/baseline/*.md` → seeded into `.specify/marge/baseline/` (idempotent — existing files preserved)
-- `specify-marge/README.md`, `specify-marge/config/README.md`, `specify-marge/run-gates.sh` → refreshed into `.specify/marge/` (framework docs + runner; project packs live in the consumer-owned `.specify/marge/project/`)
-- `scripts/speckit-commit.sh` → refreshed into `.specify/scripts/bash/` (shared commit helper the loop and single-shot agents call)
+What remains committed under the hidden directories is repo-owned or upstream Spec Kit material. That is `.claude/commands/speckit.*.md` (upstream commands, with the Pull Request Plan rules added), `.specify/memory/constitution.md`, `.specify/scripts/bash/` (Spec Kit's own scripts), and `.specify/templates/`. Also the quality gates and the hand-authored project packs in `.specify/marge/project/`.
 
-**Always edit the source files** (`speckit-skills/`, `claude-agents/`, `specify-marge/`, `scripts/`) — never an installed copy. What remains committed under the hidden dirs is repo-owned or upstream Spec Kit material, not Simpsons Loops output: `.claude/commands/speckit.*.md` (upstream Spec Kit commands), `.specify/memory/constitution.md`, `.specify/scripts/bash/` (Spec Kit's own scripts), `.specify/templates/`, quality gates, and the hand-authored project packs in `.specify/marge/project/`.
+This file is `templates/CLAUDE.md` above the separator and repo-specific below it. After editing the template, sync with `bash templates/setup.sh update .`.
 
 ## Active Technologies
-- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`) (002-rerun-setup-pipeline)
-- Filesystem only — shell scripts, markdown files, and configuration files (002-rerun-setup-pipeline)
-- Bash 4+ (shell scripts), Markdown (command files) + Claude CLI (`claude` command), Agent tool, Bash tool (003-fix-pipeline-delegation)
-- Filesystem only — `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
-- Filesystem only -- `.md` command files, `.sh` scripts (003-fix-pipeline-delegation)
-- Bash 4+ (shell scripts), Markdown (command files) + Claude CLI (`claude` command), standard Unix utilities (`grep`, `sed`, `test`) (004-fix-prereq-bootstrap)
-- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `bash`) (005-fix-subagent-quality-gates)
-- Filesystem only — `.md` command files, `.sh` scripts, `.specify/` configuration (005-fix-subagent-quality-gates)
-- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `jq`) (005-fix-subagent-quality-gates)
-- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Agent tool, standard Unix utilities (`grep`, `sed`, `test`) (006-stop-after-param)
-- Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), Claude Code Agent tool, standard Unix utilities (`grep`, `sed`, `test`, `mkdir`) (c31c-feat-phase-aware-specs)
-- Filesystem only -- `.md` command files, `.sh` scripts, spec directories under `specs/` (c31c-feat-phase-aware-specs)
 
-## Recent Changes
-- 002-rerun-setup-pipeline: Added Bash 4+ (shell scripts), Markdown (command/agent files) + Claude CLI (`claude` command), `jq` (optional, for settings updates), standard Unix utilities (`grep`, `sed`, `awk`, `mktemp`, `mv`, `chmod`)
+- Bash 4+ shell scripts that must also run on macOS `/bin/bash` 3.2. Markdown skill and agent files. Claude CLI with the Agent tool. Standard Unix utilities (`grep`, `sed`, `awk`; `jq` optional). Filesystem only: `.md` skill files, `.sh` scripts, spec directories under `specs/`.

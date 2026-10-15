@@ -23,4 +23,4 @@ Run /speckit-premortem to work the failure-mode session(s) interactively, then r
 To bypass intentionally (not recommended): re-run with --skip-premortem.
 ```
 
-**Post-step stop check**: After the premortem gate passes (or is skipped via `--skip-premortem`), check if `STOP_AFTER_STEP` is set and equals `premortem`. If it does, output: `Pipeline stopped after premortem per --stop-after parameter. Skipping: phase, plan, tasks, lisa, split, ralph, marge.` and **skip all remaining steps** — do NOT spawn any further sub-agents. Proceed directly to Step 6 (Report Results). If `STOP_AFTER_STEP` is empty/unset, this check is a no-op — continue to the next step.
+**Stop check**: apply the pipeline skill's post-step stop check (its Step 5) with the step name `premortem`.

@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # run-gates.sh — deterministic SpecKit script-pack runner.
 #
-# Discovers .specify/marge/baseline/*.sh and .specify/marge/project/*.sh (script
-# packs), runs each under a timeout
-# with the pack-contract environment exported, and emits the concatenated findings
-# (a YAML sequence) on stdout. A pack that exits non-zero or times out yields ONE
-# `pack-execution` meta-finding instead of aborting. ONLY findings go to stdout
-# (diagnostics, if any, go to stderr). Contract: .specify/marge/README.md.
+# Runs every script pack in .specify/marge/baseline/ and .specify/marge/project/
+# under a timeout with the pack-contract environment exported. Findings (one YAML
+# sequence) go to stdout, diagnostics to stderr. A pack that exits non-zero or
+# times out yields ONE `pack-execution` meta-finding. Contract: .specify/marge/README.md.
 #
 # Called by /speckit-review and /speckit-review-pr (SPECKIT_STAGE=review) and by
 # the Lisa planning agent (SPECKIT_STAGE=planning). Callers set the stage-scoped

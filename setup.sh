@@ -47,13 +47,13 @@ fi
 echo "Installing Simpsons Loops into: $PROJECT_DIR"
 echo ""
 
-# ── 0b. Deploy CLAUDE.md and constitution.md ─────────────────────────
-# Skip for self-install — the repo has its own CLAUDE.md and constitution
+# ── 1. CLAUDE.md and constitution.md ────────────────────────────────
+# Skipped for --self: this repo maintains its own copies.
 if [[ "$SELF_INSTALL" != true ]]; then
   "$SCRIPT_DIR/templates/setup.sh" init "$PROJECT_DIR"
 fi
 
-# ── 0. Quality gate file (never overwrite) ──────────────────────────
+# ── 2. Full quality gate placeholder (never overwritten) ────────────
 QUALITY_GATE_FILE="$PROJECT_DIR/.specify/quality-gates.sh"
 
 if [[ -f "$QUALITY_GATE_FILE" ]]; then
@@ -89,7 +89,7 @@ exit 1'
   mv "$tmp" "$QUALITY_GATE_FILE"
 fi
 
-# ── 0c. Fast quality gate file (never overwrite) ────────────────────
+# ── 3. Fast quality gate placeholder (never overwritten) ────────────
 QUALITY_GATE_FAST_FILE="$PROJECT_DIR/.specify/quality-gates-fast.sh"
 
 if [[ -f "$QUALITY_GATE_FAST_FILE" ]]; then
@@ -125,9 +125,8 @@ exit 1'
   echo "  Created placeholder fast quality gate file"
 fi
 
-# ── 1. Clean up stale bash scripts ────────────────────────────────
-# Remove previously-installed bash loop scripts and their permissions.
-# Idempotent — safe to run on fresh installations.
+# ── 4. Remove the bash loop scripts of early versions ───────────────
+# The loops moved to sub agents; the scripts and their permissions are stale.
 
 STALE_SCRIPTS=(
   "pipeline.sh"
@@ -179,11 +178,10 @@ if [[ -f "$SETTINGS" ]] && command -v jq &>/dev/null; then
   fi
 fi
 
-# ── 2. Copy files ───────────────────────────────────────────────────
+# ── 5. Agents, skills, runner, commit helper, standards engine ──────
+# Framework code: overwritten on every install.
 
-mkdir -p "$PROJECT_DIR/.claude/commands"
-mkdir -p "$PROJECT_DIR/.claude/agents"
-mkdir -p "$PROJECT_DIR/.claude/skills"
+mkdir -p "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/skills"
 
 cp "$SCRIPT_DIR/claude-agents/homer.md"                         "$PROJECT_DIR/.claude/agents/homer.md"
 cp "$SCRIPT_DIR/claude-agents/lisa.md"                          "$PROJECT_DIR/.claude/agents/lisa.md"
@@ -200,13 +198,9 @@ for stale_agent in specify plan tasks phase split reconcile; do
     echo "  Removed superseded agent: .claude/agents/$stale_agent.md"
   fi
 done
-# Skills (Pattern A: clean overwrite per dir, recursive so reference/ subdirs
-# for progressively-disclosed skills come along). Source is the non-hidden
-# speckit-skills/ ship dir. Skill dirs are hyphenated (e.g. speckit-homer-clarify);
-# each install also removes the dotted predecessors it supersedes — the original
-# command-mode file (.claude/commands/speckit.homer.clarify.md) and the earlier
-# dotted skill dir (.claude/skills/speckit.homer.clarify/) — so an upgrading
-# consumer is not left with duplicate or stale entries.
+# Each skill directory is replaced whole, so its reference/ files ride along.
+# The dotted predecessors of a skill (.claude/commands/speckit.homer.clarify.md,
+# .claude/skills/speckit.homer.clarify/) are removed so an upgrade leaves no duplicates.
 for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
   skill_name=$(basename "$skill_src")                        # hyphen, e.g. speckit-homer-clarify
   rm -rf "$PROJECT_DIR/.claude/skills/$skill_name"
@@ -224,23 +218,17 @@ for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
   fi
 done
 
-# Framework runner for project script packs (Pattern A: OVERWRITE, like the
-# agent/skill copies above). It lives under .specify/marge/ next to the
-# consumer-owned project/, but is framework code, so it is always refreshed —
-# the project/*.sh script packs themselves are authored per repo and preserved.
+# The script-pack runner lives under .specify/marge/ next to the consumer-owned project/.
 mkdir -p "$PROJECT_DIR/.specify/marge"
 cp "$SCRIPT_DIR/specify-marge/run-gates.sh" "$PROJECT_DIR/.specify/marge/run-gates.sh"
 chmod +x "$PROJECT_DIR/.specify/marge/run-gates.sh"
 
-# Shared commit helper used by loop and single-shot agents (Pattern A:
-# OVERWRITE). Lives next to check-prerequisites.sh, which agents already
-# invoke by that path.
+# The commit helper and the standards engine sit next to Spec Kit's own
+# check-prerequisites.sh. The wrapper that calls the engine and the config it
+# reads are seeded once, below, so consumer edits survive.
 mkdir -p "$PROJECT_DIR/.specify/scripts/bash"
 cp "$SCRIPT_DIR/scripts/speckit-commit.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
 chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-commit.sh"
-
-# Standards engine (Pattern A: OVERWRITE). The baseline wrapper that calls it and
-# the two config files it reads are seeded once, below, so consumer edits survive.
 cp "$SCRIPT_DIR/scripts/speckit-standards.sh" "$PROJECT_DIR/.specify/scripts/bash/speckit-standards.sh"
 chmod +x "$PROJECT_DIR/.specify/scripts/bash/speckit-standards.sh"
 
@@ -252,16 +240,16 @@ echo "    .claude/agents/ralph.md"
 echo "    .claude/agents/single-shot.md"
 echo "    .claude/agents/findings-ledger.md"
 echo "    .claude/agents/loop-orchestrator.md"
-  for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
-    echo "    .claude/skills/$(basename "$skill_src")/"
-  done
+for skill_src in "$SCRIPT_DIR/speckit-skills/"*/; do
+  echo "    .claude/skills/$(basename "$skill_src")/"
+done
 echo "    .specify/marge/run-gates.sh"
 echo "    .specify/scripts/bash/speckit-commit.sh"
 echo "    .specify/scripts/bash/speckit-standards.sh"
 
-# ── 2a. Stop hook ───────────────────────────────────────────────────
-# The hook script is framework code (Pattern A: OVERWRITE). Its Stop entry in
-# .claude/settings.json is merged once, on the install that first creates the
+# ── 6. Stop hook ────────────────────────────────────────────────────
+# The script is overwritten on every install. Its Stop entry in
+# .claude/settings.json is added only on the install that first creates the
 # script, so a consumer who deletes the entry has opted out for good.
 HOOK_REL=".claude/hooks/speckit-standards-stop.sh"
 HOOK_DEST="$PROJECT_DIR/$HOOK_REL"
@@ -322,13 +310,10 @@ else
   fi
 fi
 
-# ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
-# Earlier installs used .specify/marge/checks/ (prose packs) and
-# .specify/marge/gates/ (script packs). The current layout splits by ORIGIN:
-# baseline/ (shipped) and project/ (yours), with mode carried by the extension
-# (.md prose, .sh script). Move any existing files into the new layout,
-# preserving consumer customizations: shipped baseline names go to baseline/,
-# everything else (consumer prose packs) and all old script packs go to project/.
+# ── 7. Migrate the checks/ and gates/ layout of early versions ──────
+# Early installs kept prose packs in checks/ and script packs in gates/. Today the
+# directory is the origin (baseline/ shipped, project/ yours) and the extension is
+# the mode. Shipped names move to baseline/; everything else goes to project/.
 MARGE_DIR="$PROJECT_DIR/.specify/marge"
 if [[ -d "$MARGE_DIR/checks" || -d "$MARGE_DIR/gates" ]]; then
   mkdir -p "$MARGE_DIR/baseline" "$MARGE_DIR/project"
@@ -365,13 +350,9 @@ if [[ -d "$MARGE_DIR/checks" || -d "$MARGE_DIR/gates" ]]; then
   echo "  Migrated existing .specify/marge/{checks,gates}/ into baseline//project/"
 fi
 
-# ── 2b. Seed Marge baseline packs ───────────────────────────────────
-# Baseline packs (prose *.md and the one shipped script pack, standards.sh) ship
-# from the non-hidden source dir specify-marge/baseline/.
-# Copy each into the consumer's .specify/marge/baseline/ only if it does not
-# already exist — preserving consumer customizations while bootstrapping fresh
-# installs. Consumer-added packs go in project/ and are never touched here.
-# (Source is non-hidden; setup never reads from the hidden .specify tree.)
+# ── 8. Seed Marge baseline packs (never overwritten) ────────────────
+# The prose packs and the one script pack, standards.sh, are copied only when
+# absent, so consumer edits survive. Consumer packs live in project/, untouched here.
 
 MARGE_BASELINE_DIR="$PROJECT_DIR/.specify/marge/baseline"
 mkdir -p "$MARGE_BASELINE_DIR"
@@ -395,16 +376,15 @@ if ! $marge_seeded; then
   echo "  All Marge baseline packs already present"
 fi
 
-# ── 2c. Refresh Marge contract docs + scaffold project/ ─────────────
-# The glossary + authoring contract (.specify/marge/README.md) and the config
-# data note (config/README.md) are framework docs — always refreshed (Pattern A,
-# like run-gates.sh above). The project/ dir is created empty: consumers author
-# their own packs there (.md prose, .sh script); nothing generic ships into it.
+# ── 9. Refresh the Marge docs, seed the config, create project/ ─────
+# The pack contract (.specify/marge/README.md) and the config note
+# (config/README.md) are framework docs, always refreshed. project/ is created
+# empty for the consumer's own packs; nothing generic ships into it.
 mkdir -p "$PROJECT_DIR/.specify/marge/project" "$PROJECT_DIR/.specify/marge/config"
 cp "$SCRIPT_DIR/specify-marge/README.md"        "$PROJECT_DIR/.specify/marge/README.md"
 cp "$SCRIPT_DIR/specify-marge/config/README.md" "$PROJECT_DIR/.specify/marge/config/README.md"
 
-# Standards config data: seeded once, never overwritten (consumer-owned data).
+# Standards config: seeded once, never overwritten.
 for seed in damage-levels.yml lexicon.yml; do
   if [[ -f "$PROJECT_DIR/.specify/marge/config/$seed" ]]; then
     echo "  .specify/marge/config/$seed already exists — skipped"
@@ -415,22 +395,6 @@ for seed in damage-levels.yml lexicon.yml; do
 done
 echo "    .specify/marge/README.md"
 echo "    .specify/marge/config/README.md"
-
-# ── 3. Update .gitignore ────────────────────────────────────────────
-
-GITIGNORE="$PROJECT_DIR/.gitignore"
-MARKER="# Simpsons loops"
-
-if [[ -f "$GITIGNORE" ]] && grep -qF "$MARKER" "$GITIGNORE"; then
-  echo "  .gitignore already contains Simpsons loops entries — skipped"
-else
-  {
-    echo ""
-    echo "$MARKER"
-    cat "$SCRIPT_DIR/gitignore"
-  } >> "$GITIGNORE"
-  echo "  Appended entries to .gitignore"
-fi
 
 echo ""
 echo "Done! Run /speckit-pipeline for the full end-to-end workflow, or use individual loops:"

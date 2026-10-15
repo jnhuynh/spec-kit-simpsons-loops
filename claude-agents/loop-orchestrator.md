@@ -114,7 +114,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
    - **subagent_type**: `general-purpose`
    - **prompt**: Compose a prompt containing:
      - Instruct the agent to read and follow `<AGENT_FILE>`
-     - When those instructions reference a slash command like `/speckit-<verb>` (older command-mode installs use the dotted `/speckit.<verb>`), read its definition from the first path that exists, in order: `.claude/skills/speckit-<verb>/SKILL.md` (skills mode), `.claude/skills/speckit.<verb>/SKILL.md`, then `.claude/commands/speckit.<verb>.md` (legacy command mode) — and follow those instructions directly
+     - When those instructions reference a slash command like `/speckit-<verb>`, read its definition and follow it directly. Take the first path that exists, in order: `.claude/skills/speckit-<verb>/SKILL.md`, `.claude/skills/speckit.<verb>/SKILL.md`, then `.claude/commands/speckit.<verb>.md` (older command-mode installs use the dotted name)
      - Provide: `Feature directory: <FEATURE_DIR>`
      - Append EXTRA_PROMPT_SUFFIX if non-empty
    - Each sub agent gets a fresh context window, preventing hallucination drift
@@ -131,11 +131,11 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
 
 4. **Stuck detection** (three modes):
 
-   **a. No-progress stuck** (existing): If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`. If `consecutive_stuck_count >= 2`, abort — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
+   **a. No-progress stuck**: If there are NO file changes (empty diff) AND the promise tag was NOT found, increment `consecutive_stuck_count`. If there ARE file changes OR the promise tag was found, reset `consecutive_stuck_count = 0`. If `consecutive_stuck_count >= 2`, abort — report "stuck: 2 consecutive iterations with no file changes and no completion signal". Suggest manual review.
 
-   **b. Stalled** (new): If `progress_history` has 3+ entries AND the last 3 entries show the same work-remaining count (no reduction), abort — report "stalled: 3 consecutive scans each found N findings despite full remediation passes. The loop is making changes but not making progress." Suggest manual review.
+   **b. Stalled**: If `progress_history` has 3+ entries AND the last 3 entries show the same work-remaining count (no reduction), abort — report "stalled: 3 consecutive scans each found N findings despite full remediation passes. The loop is making changes but not making progress." Suggest manual review.
 
-   **c. Oscillating** (new): If `progress_history` has 4+ entries AND the last 4 entries alternate between two values (e.g., 5, 4, 5, 4), abort — report "oscillating: work count alternating between N and M. A fix is likely introducing a new issue." Suggest manual review.
+   **c. Oscillating**: If `progress_history` has 4+ entries AND the last 4 entries alternate between two values (e.g., 5, 4, 5, 4), abort — report "oscillating: work count alternating between N and M. A fix is likely introducing a new issue." Suggest manual review.
 
 5. Otherwise, continue to the next iteration.
 

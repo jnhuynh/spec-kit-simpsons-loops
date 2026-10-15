@@ -1,6 +1,6 @@
 ---
 name: speckit-split
-description: Split a phase-annotated spec into independent child specs, one per phase.
+description: Use when a parent spec.md has a ## Phases section with two or more phases and needs one child spec directory per phase.
 ---
 
 ## User Input
@@ -13,7 +13,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. Resolve the feature directory. If `$ARGUMENTS` contains a directory path, use it as FEATURE_DIR and verify that **both** `FEATURE_DIR/plan.md` and `FEATURE_DIR/tasks.md` exist -- report the missing artifact (e.g. "Run /speckit-plan first" or "Run /speckit-tasks first") and **STOP** if either is absent. (The directory-argument form is how `/speckit-reconcile` step 7 and callers on a child branch target the **parent** spec -- branch-based resolution would point at the wrong directory.) Otherwise run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks` from repo root and parse FEATURE_DIR from the JSON output. The `--require-tasks` flag makes the check require **both** `plan.md` and `tasks.md` to exist before splitting: the spec is decomposed only after the whole-feature plan and task list are in place, so the phase boundaries have been validated against the full implementation design rather than the spec alone. If either artifact is missing, the script reports it (e.g. "Run /speckit-plan first" or "Run /speckit-tasks first") and exits non-zero — stop and surface that message instead of proceeding. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Resolve the feature directory**:
+   - If `$ARGUMENTS` contains a directory path, use it as FEATURE_DIR. This is how `/speckit-reconcile` and callers on a child branch target the **parent** spec; branch-based resolution would point at the wrong directory.
+   - Otherwise run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks` from repo root and parse FEATURE_DIR from the JSON output.
+   - Either way, **both** `FEATURE_DIR/plan.md` and `FEATURE_DIR/tasks.md` must exist. The spec is decomposed only after the whole-feature plan and task list exist, so the phase boundaries were validated against the full design. If either is missing, report it ("Run /speckit-plan first" or "Run /speckit-tasks first") and **STOP**.
 
 2. Read the parent spec at `FEATURE_DIR/spec.md`.
 
@@ -175,12 +178,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    a. If no manifest exists, append a `## Manifest` section at the end of the parent spec.
 
-   b. Before the manifest table, include this notice:
-      ```markdown
-      > **Note**: This spec has been split into phases. Pipeline steps (`/speckit-plan`, `/speckit-tasks`, etc.) should be run on individual child specs listed below, not on this parent spec. This spec remains the **single source of truth** for user stories, requirements, key entities, and success criteria -- the children reference them by ID and never restate them, so requirement edits and clarifications belong here.
-      ```
-
-   c. Generate the manifest table with columns: Phase, Directory, Description, Status, Release Strategy
+   b. Write the notice and the table below. Columns: Phase, Directory, Description, Status, Release Strategy.
 
       ```markdown
       ## Manifest
@@ -193,42 +191,22 @@ You **MUST** consider the user input before proceeding (if not empty).
       | P2: {slug} | {parent}--p2-{slug} | {brief description from rationale} | Draft | {strategy} |
       ```
 
-   d. **Status preservation and phase management**: If a manifest already exists from a previous run:
-      - **Continuing phases**: Preserve manually-set status values for phases present in both the old manifest and the current annotations.
+   c. **Status preservation and phase management**: If a manifest already exists from a previous run:
+      - **Continuing phases**: Preserve the existing status values.
       - **Added phases**: Phases present in the current annotations but absent from the old manifest get status "Draft".
-      - **Removed phases**: Phases present in the old manifest but absent from the current annotations are marked "Cancelled" in the updated manifest. Their child directories remain on disk untouched (never deleted). If a removed phase was already "Cancelled" in the old manifest, its status remains "Cancelled". If a removed phase had status "Complete", report an error per the status transition validation in step 7e (Complete -> Cancelled is invalid).
+      - **Removed phases**: Phases present in the old manifest but absent from the current annotations are marked "Cancelled" (a phase already "Cancelled" stays so). Their child directories remain on disk untouched. A removed phase with status "Complete" is an error per step 7e (Complete -> Cancelled is invalid).
 
-   e. **Manifest ordering**: The manifest table lists all phases in phase-number order. Continuing and added phases appear at their position from the current annotations. Removed phases retain their original phase number from the old manifest and appear in order alongside the current phases. This provides a complete view of all phases -- active and cancelled -- in a single table.
+   d. **Manifest ordering**: The table lists all phases in phase-number order, cancelled ones included at their original number. One table shows every phase, active and cancelled.
 
-   f. **Status transition validation**: When a manifest already exists, validate that any status values in the existing manifest are consistent with the forward-only state machine before writing the updated manifest. For each phase present in both the old and new manifest:
+   e. **Status transition validation**: Statuses move forward only: Draft -> In Progress -> Complete. An active state (Draft, In Progress) may also move to Cancelled. Complete and Cancelled are terminal and never change. Any other transition is invalid.
 
-      **Valid transitions** (allowed):
-      - Draft -> In Progress
-      - In Progress -> Complete
-      - Draft -> Cancelled
-      - In Progress -> Cancelled
-      - Any status -> same status (no change)
-
-      **Invalid transitions** (rejected):
-      - In Progress -> Draft
-      - Complete -> Draft
-      - Complete -> In Progress
-      - Complete -> Cancelled
-      - Cancelled -> Draft
-      - Cancelled -> In Progress
-      - Cancelled -> Complete
-
-      **Note**: Complete is NOT an active state. Both Complete -> Cancelled and Cancelled -> Complete are invalid.
-
-      If the splitting skill would set a status that requires an invalid transition (e.g., a phase marked "Complete" by the developer would be overwritten with "Draft" by a fresh re-run), report an error and **STOP**:
+      This skill itself only writes "Draft" for new phases and "Cancelled" for removed ones; otherwise it preserves what it finds. An invalid transition arises when a developer edited a status by hand before a re-run. Before writing the manifest, validate every phase present in both the old and the new manifest. On an invalid transition, report an error and **STOP**:
       ```
       ERROR: Invalid status transition for Phase {N} ({slug}): {old status} -> {new status}.
       Status transitions must be forward-only: Draft -> In Progress -> Complete. Active states (Draft, In Progress) may transition to Cancelled. Backward transitions and transitions from terminal states (Complete, Cancelled) are not permitted.
       ```
 
-      **Implementation detail**: The splitting skill itself only ever sets status to "Draft" (for new phases) or preserves existing values (per step 7d). Invalid transitions arise when a developer manually sets a status value in the manifest and then the splitting skill re-runs. The validation catches cases where the developer set an invalid transition (e.g., moving a Complete phase back to Draft) before the manifest is written, providing an early error rather than silently accepting an invalid state.
-
-   g. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
+   f. **Idempotency**: Re-running on an unchanged spec with unchanged child specs must produce an identical manifest table.
 
 8. **Report results**:
    - List each child spec directory created or refreshed

@@ -1,6 +1,6 @@
 ---
 name: speckit-review-pr
-description: Post a PR review with inline comments for findings requiring human judgment — one-way doors, concurrency risks, architectural decisions, and project-specific patterns.
+description: Use when an open pull request needs its human-judgment findings (one-way doors, concurrency, architecture, project packs) posted as inline review comments.
 ---
 
 ## User Input

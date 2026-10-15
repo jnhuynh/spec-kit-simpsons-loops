@@ -1,6 +1,6 @@
 ---
 name: speckit-homer-clarify
-description: Orchestrate iterative spec clarification and remediation (Homer loop) on spec.md until all findings are resolved.
+description: Use when a spec.md still has ambiguities to resolve and no human is available to answer them, before planning.
 ---
 
 ## User Input
