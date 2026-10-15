@@ -265,7 +265,7 @@ echo "    .specify/scripts/bash/speckit-standards.sh"
 # script, so a consumer who deletes the entry has opted out for good.
 HOOK_REL=".claude/hooks/speckit-standards-stop.sh"
 HOOK_DEST="$PROJECT_DIR/$HOOK_REL"
-HOOK_CMD='$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh'
+HOOK_CMD='"$CLAUDE_PROJECT_DIR"/.claude/hooks/speckit-standards-stop.sh'
 PROJECT_SETTINGS="$PROJECT_DIR/.claude/settings.json"
 hook_existed=false
 [[ -f "$HOOK_DEST" ]] && hook_existed=true
@@ -276,7 +276,7 @@ echo "    $HOOK_REL"
 
 print_hook_snippet() {
   echo "  To be sent back when a standards check blocks uncommitted work, add this Stop hook to .claude/settings.json:"
-  echo '    {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}'
+  echo '    {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}'
 }
 
 if [[ -f "$PROJECT_SETTINGS" ]] && grep -qF 'speckit-standards-stop.sh' "$PROJECT_SETTINGS"; then

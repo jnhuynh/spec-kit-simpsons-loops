@@ -34,7 +34,11 @@ cd "$root" 2>/dev/null || exit 0
 
 engine=.specify/scripts/bash/speckit-standards.sh
 [ -x "$engine" ] || exit 0
-[ -n "$(git status --porcelain --untracked-files=all 2>/dev/null)" ] || exit 0
+# The engine costs about 15 ms per uncommitted file. Past 300 files it would
+# outrun the 30 s hook timeout and stall every turn, so a tree that large gets
+# no opinion either.
+dirty=$(git status --porcelain --untracked-files=all 2>/dev/null | wc -l | tr -d " ")
+[ "$dirty" -gt 0 ] && [ "$dirty" -le 300 ] || exit 0
 
 # plain-language is advice and the slow group; the blocking rules live in
 # lexicon and pr-shape.

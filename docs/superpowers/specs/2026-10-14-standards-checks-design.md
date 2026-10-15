@@ -329,7 +329,7 @@ Fails open: any error in the script means no opinion, never a stuck session.
 **`setup.sh`**: copies the script. On the install where the script did not previously exist, and `jq` is available, and `.claude/settings.json` has no `Stop` entry whose command contains `speckit-standards-stop.sh`, it merges one:
 
 ```json
-{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}
+{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}
 ```
 
 Atomic write (temp file, `mv`); other hooks untouched; the file is created when absent. Without jq, or when the script already existed, it prints the snippet instead. Removing the entry opts out permanently.

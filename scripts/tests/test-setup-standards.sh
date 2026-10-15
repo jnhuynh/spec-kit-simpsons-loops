@@ -24,7 +24,7 @@ check_file "damage-levels seeded" .specify/marge/config/damage-levels.yml
 check_file "lexicon seeded" .specify/marge/config/lexicon.yml
 check_exec "stop hook installed and executable" .claude/hooks/speckit-standards-stop.sh
 check_eq "stop hook registered once" "$(jq '.hooks.Stop | length' .claude/settings.json 2>/dev/null)" 1
-check_eq "stop hook command" "$(jq -r '.hooks.Stop[0].hooks[0].command' .claude/settings.json 2>/dev/null)" '$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh'
+check_eq "stop hook command" "$(jq -r '.hooks.Stop[0].hooks[0].command' .claude/settings.json 2>/dev/null)" '"$CLAUDE_PROJECT_DIR"/.claude/hooks/speckit-standards-stop.sh'
 check_eq "stop hook timeout" "$(jq '.hooks.Stop[0].hooks[0].timeout' .claude/settings.json 2>/dev/null)" 30
 check_file "speckit-pr skill installed" .claude/skills/speckit-pr/SKILL.md
 check_eq "speckit-pr skill is named" "$(sed -n 2p .claude/skills/speckit-pr/SKILL.md 2>/dev/null)" "name: speckit-pr"

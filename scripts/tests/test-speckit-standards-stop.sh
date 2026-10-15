@@ -76,6 +76,18 @@ printf '# Spec\n\n## User Scenarios\n\nText.\n' > specs/1a2b-feat-x/spec.md
 hook "$(json "$sandbox" false)"
 check_has "plain-summary-missing blocks" "$out" 'plain-summary-missing'
 
+# 4b. A tree with more than 300 uncommitted files is left alone; 300 is still checked.
+printf 'Underwriting here.\n' > note.md
+mkdir -p big; for i in $(seq 1 298); do printf 'x\n' > "big/f$i.md"; done
+hook "$(json "$sandbox" false)"
+check_has "300 uncommitted files are still checked" "$out" 'lexicon-banned'
+printf 'x\n' > big/f299.md
+hook "$(json "$sandbox" false)"
+check_rc "301 uncommitted files: exit 0" "$rc" 0
+check_silent "301 uncommitted files are left alone" "$out"
+rm -rf big
+printf 'We utilize things.\n' > note.md
+
 # 5. A clean tree is silent.
 git add -A; git commit -qm all
 hook "$(json "$sandbox" false)"
