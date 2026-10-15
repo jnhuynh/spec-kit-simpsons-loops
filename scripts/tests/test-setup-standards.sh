@@ -30,6 +30,7 @@ done
 for hinted in .claude/agents/ralph.md .claude/skills/speckit-ralph-implement/SKILL.md .claude/skills/speckit-pipeline/reference/steps/ralph.md; do
   if grep -qF 'Open it with /speckit-pr.' "$hinted" 2>/dev/null; then pass "Ralph hint in $hinted"; else fail "Ralph hint in $hinted"; fi
 done
+if grep -qF 'Open the spec with a "## Plain summary" section' .claude/skills/speckit-pipeline/reference/steps/specify.md 2>/dev/null; then pass "specify step asks for a plain summary"; else fail "specify step asks for a plain summary"; fi
 
 printf '# mine\n' > .specify/marge/baseline/standards.sh
 printf '# mine\n' > .specify/marge/config/lexicon.yml
