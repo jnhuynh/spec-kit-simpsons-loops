@@ -17,7 +17,7 @@ check_has() { if grep -qF -- "$3" <<<"$2"; then pass "$1"; else fail "$1 (missin
 
 # A consumer repo after setup.sh: the engine installed, the fixture config, one commit.
 make_repo() {
-  sandbox=$(mktemp -d)
+  sandbox=${1:-$(mktemp -d)}
   cd "$sandbox" || exit 1
   git init -q -b main 2>/dev/null || { git init -q && git checkout -q -b main; }
   git config user.email t@t; git config user.name t
@@ -137,6 +137,14 @@ hook "$(json "$elsewhere" false)"
 check_rc "not a work tree: exit 0" "$rc" 0
 check_silent "not a work tree is silent" "$out"
 rm -rf "$elsewhere"
+
+# 12. A repo under a path with a space.
+spaced=$(mktemp -d); mkdir "$spaced/with space"
+make_repo "$spaced/with space"
+printf 'Underwriting here.\n' > note.md
+hook "$(json "$sandbox" false)"
+check_has "a path with a space blocks" "$out" 'lexicon-banned'
+cleanup; rm -rf "$spaced"
 
 echo
 if [[ "$failures" -eq 0 ]]; then echo "ALL TESTS PASSED"; else echo "$failures TEST(S) FAILED"; exit 1; fi

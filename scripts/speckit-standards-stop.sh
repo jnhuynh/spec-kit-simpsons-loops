@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code Stop hook. When an interactive session tries to finish with a
-# blocking standards finding in its uncommitted work, this sends it back once
-# with the reason. setup.sh installs it to .claude/hooks/ and registers it under
-# "Stop" in .claude/settings.json; delete that entry to opt out.
+# blocking standards finding in its uncommitted work, this sends it back with
+# the reason, once per stop attempt. setup.sh installs it to .claude/hooks/ and
+# registers it under "Stop" in .claude/settings.json; delete that entry to opt out.
 #
 # Fails open: every exit is 0, and anything unexpected means no opinion, never a
 # stuck session. Only the last step prints.
