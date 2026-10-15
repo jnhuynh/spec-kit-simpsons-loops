@@ -14,7 +14,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Modes
 
 - **Deliver mode** (default) — write the description to the open pull request with `gh`, or create the pull request when the branch is pushed and has none.
-- **Dry-run mode** — if `$ARGUMENTS` contains `--dry-run`, print the description and change nothing: no file edits, no commits, no GitHub calls.
+- **Dry-run mode** — if `$ARGUMENTS` contains `--dry-run`, print the description and change nothing: no file edits, no commits, no GitHub writes. `gh pr view` and `git fetch` are read-only and still run.
 
 `$ARGUMENTS` may also name the pull request: `pr:<number>`, a GitHub pull request URL, or a branch name. With nothing, the current branch is used.
 
@@ -29,34 +29,41 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-flight: engine check
 
 ```bash
-if test -x .specify/scripts/bash/speckit-standards.sh; then echo "engine: OK"; else echo "engine: MISSING"; fi
+if test -x .specify/scripts/bash/speckit-standards.sh && test -f .specify/marge/config/damage-levels.yml; then echo "standards: OK"; else echo "standards: MISSING"; fi
 ```
 
 If **MISSING**, display this error and **STOP**:
 
 ```
-ERROR: Standards engine not found.
+ERROR: Standards engine or its damage levels not found.
 
-Missing: .specify/scripts/bash/speckit-standards.sh
+Needed: .specify/scripts/bash/speckit-standards.sh   (installed by setup.sh)
+        .specify/marge/config/damage-levels.yml       (seeded by setup.sh)
 
-/speckit-pr copies the damage level and its checklist from the engine
-installed by setup.sh. Run setup.sh, then re-run.
+/speckit-pr copies the damage level and its checklist from the engine, and
+the engine is silent without damage-levels.yml. Run setup.sh, then re-run.
 ```
 
 ## Step 1: Base and state
 
-1. Find the pull request. With `pr:<number>` or a pull request URL in `$ARGUMENTS`, run `gh pr view <number> --json number,url,baseRefName,headRefName,state`. With a branch name, run `gh pr view <branch> --json number,url,baseRefName,headRefName,state`. Otherwise:
+1. **BRANCH** is `git branch --show-current`. If `$ARGUMENTS` names a branch that is not the current branch, **STOP**: `Check out <branch> and run again: /speckit-pr reads the local tree.`
+2. Find the pull request. With `pr:<number>` or a pull request URL in `$ARGUMENTS`, run `gh pr view <number> --json number,url,baseRefName,headRefName,state`. Otherwise:
    ```bash
-   git branch --show-current
    gh pr view --json number,url,baseRefName,headRefName,state 2>/dev/null
    ```
    No output from `gh pr view` means there is no pull request yet. That is not an error.
-2. If a pull request exists and its `headRefName` is not the current branch, **STOP**: `Check out <headRefName> and run again: /speckit-pr reads the local tree.` If its `state` is not `OPEN`, **STOP**: `PR #<number> is <state>.`
-3. **BASE**: `origin/<baseRefName>` when a pull request exists. Otherwise the first of `origin/main`, `main`, `master` that this accepts (exit 0):
+3. If a pull request exists and its `headRefName` is not `BRANCH`, **STOP**: `Check out <headRefName> and run again: /speckit-pr reads the local tree.` If its `state` is not `OPEN`, **STOP**: `PR #<number> is <state>.`
+4. **BASE_REF_NAME**: the pull request's `baseRefName`. Without a pull request: `main`, or `master` when neither `origin/main` nor `main` resolves with `git rev-parse --verify --quiet <ref>^{commit}`.
+5. Fetch, so the base and the remote copy of the branch are current. A fetch is a read: it is neither a push nor a checkout.
    ```bash
-   git rev-parse --verify --quiet origin/main^{commit}
+   git fetch origin <BASE_REF_NAME> 2>/dev/null
+   git fetch origin <BRANCH> 2>/dev/null
    ```
-4. **Pushed**: true when `git rev-parse --abbrev-ref @{upstream} 2>/dev/null` prints a name. When pushed, **UNPUSHED** is `git rev-list --count @{upstream}..HEAD`; otherwise it is every commit on the branch.
+   Either may fail (no remote, branch never pushed). Continue.
+6. **BASE**: `origin/<BASE_REF_NAME>` when `git rev-parse --verify --quiet origin/<BASE_REF_NAME>^{commit}` succeeds, else `<BASE_REF_NAME>`.
+7. **PUSHED**: true when `git rev-parse --verify --quiet origin/<BRANCH>^{commit}` succeeds. (Do not use `@{upstream}`: `speckit-commit.sh` pushes without setting one.)
+   - When pushed, **UNPUSHED** is `git rev-list --count origin/<BRANCH>..HEAD`, and **BEHIND** is `git rev-list --count HEAD..origin/<BRANCH>`. If `BEHIND` is above 0, **STOP**: `origin/<BRANCH> has <BEHIND> commits this checkout lacks. Pull them and run again.`
+   - When not pushed, **UNPUSHED** is `git rev-list --count <BASE>..HEAD`.
 
 Capture `PR_NUMBER`, `PR_URL`, `BASE_REF_NAME`, `BASE`, `BRANCH`, `PUSHED`, `UNPUSHED`. Each Bash call is a fresh shell: substitute the literal values in later commands.
 
@@ -83,7 +90,7 @@ MEDIUM       specs/9cad-feat-x/spec.md:14  long-sentence: 31 words: "The nightly
 
 - Exit code 2 means the engine could not run. Print its message and **STOP**.
 - In dry-run mode, edit nothing. Keep the `BLOCK` lines for the report in Step 10.
-- In deliver mode, a `BLOCK` line is fixed now, in the file it names, and committed before the description is written: nothing checks the change again later. Commit with `git commit`, never with `speckit-commit.sh` (it pushes). Subject: `fix(<scope>): [<ticket>] <what was fixed>`, with `<ticket>` and `<scope>` from the branch name as in Step 10. Re-run the engine and confirm no `BLOCK` line remains.
+- In deliver mode, a `BLOCK` line is fixed now, in the file it names, and committed before the description is written: nothing checks the change again later. Stage only the files you edited (`git add <file>`), then commit with `git commit`, never with `speckit-commit.sh` (it pushes). Subject: `fix(<scope>): [<ticket>] <what was fixed>`, with `<ticket>` and `<scope>` from the branch name as in Step 10. Re-run the engine and confirm no `BLOCK` line remains. Recount `UNPUSHED`: a fix commit makes it at least 1.
 - In deliver mode, when the change adds or edits a file under `specs/`, fix its advice findings too (`long-sentence`, `plain-verb`, `invented-phrase`, `lexicon-prefer`) in the same commit: the spec is what the reviewer reads.
 - `specs-mixed-with-code`, `many-boundaries`, `unrated-path`, and `lexicon-new-term` are decisions for a person, not edits. Leave them. They go under "Where to look" in Step 6.
 
@@ -146,7 +153,7 @@ No link, no line.
    ```bash
    bash .specify/scripts/bash/speckit-standards.sh --base <BASE> --body-file <draft> --only pr-shape --blocking-only --format text
    ```
-   A `BLOCK HIGH   PULL_REQUEST:0  requirement-id-in-body: ...` line names the ids to remove. Rewrite the sentence without them, save, and run again until no `BLOCK` line is printed. Never deliver a draft the engine blocks.
+   Only a `PULL_REQUEST:0` line is about the draft: `BLOCK HIGH   PULL_REQUEST:0  requirement-id-in-body: ...` names the ids to remove. Rewrite the sentence without them, save, and run again until no `PULL_REQUEST:0` line is printed. Any other `BLOCK` line is one Step 2 kept in dry-run mode; it goes under `Blocked by:` in Step 10. Never deliver a draft the engine blocks.
 
 ## Step 10: Deliver
 
@@ -178,4 +185,4 @@ When `.github/pull_request_template.md` exists, keep its headings in its order a
 - `/speckit-pr` — describe the current branch: edit its open pull request, or create one when the branch is pushed
 - `/speckit-pr --dry-run` — print the description and change nothing
 - `/speckit-pr pr:42` — pull request 42; its head branch must be checked out
-- `/speckit-pr 9cad-feat-standards-checks` — a branch by name
+- `/speckit-pr 9cad-feat-standards-checks` — a branch by name; it must be the checked-out branch
