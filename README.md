@@ -30,12 +30,13 @@ The pipeline runs these steps in order. Every one of them is also runnable on it
 
 The three unnumbered steps are **optional polish** — they run automatically when their skill is installed, and they are not valid `--from` / `--stop-after` targets.
 
-Two commands sit outside the pipeline:
+Three commands sit outside the pipeline:
 
 | Command | What it does |
 |---------|--------------|
 | `/speckit-brainstorm` | Pre-spec. Stress-tests a vague idea with pointed questions — one at a time, 4-5 typical, 7 hard cap — then emits a feature description ready for `/speckit-specify` or `--description`. |
 | `/speckit-review` | Single-pass code review report, no auto-fix. Marge without the loop. |
+| `/speckit-pr` | After marge, before review. Writes the pull request description from the diff: what changed, how much damage if it is wrong (the damage level and its checklist), where to look, how it was verified, links. Edits the open PR or creates one on a pushed branch. Needs `gh`. Never pushes, never lowers the level. |
 
 > **Note on permissions**
 > The loops instruct sub agents to execute autonomously — no permission prompts, no confirmations, no interactive pauses. Read the agent files before running them.
@@ -156,6 +157,7 @@ Each step is also a slash command, useful when you want to review between stages
 /speckit-ralph-implement            # needs tasks.md and a configured quality gate
 /speckit-marge-review               # needs an implemented branch
 /speckit-review-pr                  # or: pr:42, or --dry-run
+/speckit-pr                         # or: pr:42, a branch name, or --dry-run
 ```
 
 All four loops take an optional numeric argument to override max iterations (`/speckit-homer-clarify 5`).
@@ -163,6 +165,8 @@ All four loops take an optional numeric argument to override max iterations (`/s
 `/speckit-split` and `/speckit-reconcile` normally run inside the pipeline, but both accept a directory argument so you can target a **parent** spec from a child branch (`/speckit-split specs/c31c-feat-billing`).
 
 `/speckit-review-pr` posts a GitHub review with `COMMENT` event type — informational, never a merge gate — covering one-way doors (CRITICAL), concurrency risks and architectural decisions (WARNING), and project patterns (INFO). It is idempotent per commit.
+
+`/speckit-pr` writes the pull request description from the diff, not the spec: what changed, how much damage if it is wrong, where to look, how it was verified, links. The damage section copies the standards engine's level, reviewer line, and checklist (see [Standards checks](#standards-checks)). It edits the open PR, creates one when the branch is pushed, and otherwise prints the description. It never pushes and never lowers the level.
 
 **Automation amplifies whatever it is given.** A sharp spec is worth more than any number of iterations, so brainstorm and clarify before you let the loops run.
 
@@ -296,7 +300,7 @@ The full authoring contract — environment inputs, stdout shape, exit semantics
 
 ### Standards checks
 
-Marge and Lisa also run a deterministic engine, `.specify/scripts/bash/speckit-standards.sh`, through the seeded baseline script pack `standards.sh`. It reports three things about a change:
+Marge and Lisa also run a deterministic engine, `.specify/scripts/bash/speckit-standards.sh`, through the seeded baseline script pack `standards.sh`, and `/speckit-pr` copies its header into the pull request description. It reports three things about a change:
 
 - **Damage level.** `config/damage-levels.yml` maps paths to levels, most to least serious: `critical`, `user-facing`, `specification`, `internal`, `no runtime effect`. A file takes the most specific matching pattern, a change takes its highest file, and each level carries a reviewer line and a checklist. The level is a floor: raise it in the PR description when it understates the risk, never lower it. Fill in the `paths:` lists for your tree; the seed only rates specs, dotfiles, docs, and Markdown.
 - **PR shape.** A requirement id (`FR-001`, `US2`) in a PR description, a new `specs/*/spec.md` without a `## Plain summary` of 150 words or fewer, and a banned word all **block**: Marge must fix them and the engine exits 1. Specs mixed with code, a change spanning two `boundaries:`, and a new unit under `unit_dirs:` rated only by a catch-all are advice for a person (`NEEDS_HUMAN`).
