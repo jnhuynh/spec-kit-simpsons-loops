@@ -22,6 +22,15 @@ ticket=$(printf '%s' "$branch" | cut -f 1 -d '-')
 type="${2:-$(printf '%s' "$branch" | cut -f 2 -d '-')}"
 scope=$(printf '%s' "$branch" | cut -f 3- -d '-')
 
+# Planning artifacts go in their own `docs` commit, before the code, so a
+# reviewer can read the code without scrolling past the spec. The test and
+# the commit are both limited to specs/, so anything already staged elsewhere
+# waits for the code commit.
+git add -A -- specs 2>/dev/null || true
+if ! git diff --cached --quiet -- specs; then
+  git commit -m "docs($scope): [$ticket] $description" -- specs
+fi
+
 git add -A
 if git diff --cached --quiet; then
   echo "speckit-commit: nothing to commit"

@@ -85,6 +85,33 @@ check_zero "nothing-to-commit exits 0" "$rc"
 check_eq "stranded commit still pushed" "$(git rev-parse origin/c31c-feat-billing-overhaul)" "$(git rev-parse HEAD)"
 cleanup_sandbox
 
+# 7. specs/ and code changed together: planning artifacts land in their own
+#    `docs` commit before the code commit, and both are pushed.
+make_sandbox "c31c-feat-billing-overhaul"
+mkdir -p specs/c31c-feat-billing-overhaul
+echo plan > specs/c31c-feat-billing-overhaul/plan.md
+touch file.txt
+rc=0; bash "$SCRIPT" "add billing plan" >/dev/null 2>&1 || rc=$?
+check_zero "specs+code exits 0" "$rc"
+check_eq "code commit is HEAD" "$(git log -1 --format=%s)" "feat(billing-overhaul): [c31c] add billing plan"
+check_eq "docs commit precedes it" "$(git log -1 --format=%s HEAD~1)" "docs(billing-overhaul): [c31c] add billing plan"
+check_eq "docs commit holds only specs/" "$(git show --format= --name-only HEAD~1)" "specs/c31c-feat-billing-overhaul/plan.md"
+check_eq "code commit holds only code" "$(git show --format= --name-only HEAD)" "file.txt"
+check_eq "both commits pushed" "$(git rev-parse origin/c31c-feat-billing-overhaul)" "$(git rev-parse HEAD)"
+cleanup_sandbox
+
+# 8. specs/ only: a single docs commit, nothing else, still pushed.
+make_sandbox "c31c-feat-billing-overhaul"
+mkdir -p specs/c31c-feat-billing-overhaul
+echo spec > specs/c31c-feat-billing-overhaul/spec.md
+before=$(git rev-parse HEAD)
+rc=0; bash "$SCRIPT" "write spec" >/dev/null 2>&1 || rc=$?
+check_zero "specs-only exits 0" "$rc"
+check_eq "specs-only makes one docs commit" "$(git log -1 --format=%s)" "docs(billing-overhaul): [c31c] write spec"
+check_eq "specs-only makes exactly one commit" "$(git rev-parse HEAD~1)" "$before"
+check_eq "specs-only commit pushed" "$(git rev-parse origin/c31c-feat-billing-overhaul)" "$(git rev-parse HEAD)"
+cleanup_sandbox
+
 echo
 if [[ "$failures" -eq 0 ]]; then
   echo "ALL TESTS PASSED"

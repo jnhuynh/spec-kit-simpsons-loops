@@ -19,10 +19,10 @@ The pipeline runs these steps in order. Every one of them is also runnable on it
 | 3 | **premortem** | **human gate** | You work three failure-mode lenses (architecture, UX, support/ops) interactively. Mitigations land in `spec.md`; every risk is tracked in `failure-modes.md`. The pipeline **halts here** until nothing is `open`. |
 | 4 | **phase** | single-shot | Detects deployment boundaries and writes a `## Phases` section. |
 | 5 | **plan** | single-shot | Generates `plan.md`. |
-| 6 | **tasks** | single-shot | Generates a dependency-ordered `tasks.md`. |
+| 6 | **tasks** | single-shot | Generates a dependency-ordered `tasks.md`, including a `## Pull Request Plan` that slices the tasks into reviewable PRs. |
 | 7 | **lisa** | loop | Cross-artifact analysis of spec/plan/tasks. Fixes all auto-fixable findings per iteration, then re-scans to verify. Typically 2-3 iterations. |
 | 8 | **split** | single-shot, multi-phase parents only | Generates one child spec directory per phase. |
-| 9 | **ralph** | loop | Implements one task per iteration, validates against quality gates, commits. |
+| 9 | **ralph** | loop | Implements one task per iteration, validates against quality gates, commits. Works one PR group at a time and **halts at each PR boundary** so the group can be reviewed and merged; resume with `--from ralph`. |
 | — | **simplify** | optional | Invokes `/simplify` for reuse/quality/efficiency fixes. Silently skipped if the skill is absent. |
 | — | **security-review** | optional | Invokes `/security-review` for a security audit. Silently skipped if the skill is absent. |
 | 10 | **marge** | loop | Reviews the branch diff against review packs. Fixes all mechanical findings per iteration, leaves `NEEDS_HUMAN` ones alone, re-reviews to verify. Typically 2-3 iterations. |
@@ -71,6 +71,7 @@ flowchart TD
 - A project already set up with Spec Kit (a `.specify/` directory exists)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - Upstream Spec Kit commands or skills present: `speckit-specify`, `speckit-plan`, `speckit-tasks`, `speckit-analyze`, `speckit-clarify`, `speckit-implement`
+- For PR boundaries: your upstream `speckit-tasks` and `speckit-analyze` commands must carry the Pull Request Plan rules. `setup.sh` does not patch upstream Spec Kit files, so copy the `## Pull Request Plan Rules` section from this repo's `.claude/commands/speckit.tasks.md`, the `G. Pull Request Plan Integrity` pass from `.claude/commands/speckit.analyze.md`, and the `## Pull Request Plan` section from `.specify/templates/tasks-template.md` into yours. Without them Ralph treats `tasks.md` as one PR group and never halts.
 
 Everything else — the loop skills, `speckit-review`, `speckit-split`, `speckit-reconcile`, `speckit-premortem` — is installed by `setup.sh`.
 
@@ -184,6 +185,10 @@ A child spec is a **phase view**, not a copy. The parent holds every user story,
 > entities, and success criteria are defined once in the parent and are **not**
 > restated here. Read the parent sections named below before acting on this phase.
 
+## Plain summary *(mandatory)*
+Members paying by card are captured through the new provider path, dark-launched
+behind a flag. If the flag logic is wrong, captures silently fall back to the old path.
+
 ## Inherited Scope
 | Kind | Parent reference | Parent section |
 |------|------------------|----------------|
@@ -207,7 +212,7 @@ Phase-local additions:
 
 Two ID namespaces keep authorship unambiguous. Inherited IDs (`FR-###`, `SC-###`, `User Story N`) belong to the parent and are never restated. Phase-local IDs (`FR-P{N}-###`, `SC-P{N}-###`) belong to the child and cover only what exists *because* the work is phased — feature flags, dark-launch scaffolding, backfills, compatibility shims.
 
-This is what makes phase PRs reviewable: a child spec's diff contains only its `## Phase Boundary` and its phase-local entries. Nothing else can drift, because nothing else is stored twice. Re-running split is idempotent — it regenerates the derived content (title, `## Inherited Scope`, `Inherited:` lines) while preserving both the authored content (`## Phase Boundary`, `FR-P{N}-###`, `SC-P{N}-###`) and the child's `Created` date and `Status`.
+This is what makes phase PRs reviewable: a child spec's diff contains only its `## Plain summary`, its `## Phase Boundary`, and its phase-local entries. Nothing else can drift, because nothing else is stored twice. Re-running split is idempotent — it regenerates the derived content (title, `## Inherited Scope`, `Inherited:` lines) while preserving both the authored content (`## Plain summary`, `## Phase Boundary`, `FR-P{N}-###`, `SC-P{N}-###`) and the child's `Created` date and `Status`.
 
 It also means requirement edits and clarifications go to the **parent**, which is why `homer`, `premortem`, and `phase` never run on a child. A child-spec run is `reconcile -> plan -> tasks -> lisa -> ralph -> marge`.
 
@@ -219,6 +224,10 @@ It also means requirement edits and clarifications go to the **parent**, which i
 
 **Completion detection** — each loop watches for a promise tag: `<promise>ALL_FINDINGS_RESOLVED</promise>` for Homer, Lisa, and Marge; `<promise>ALL_TASKS_COMPLETE</promise>` for Ralph.
 
+**PR boundaries** — `tasks.md` carries a `## Pull Request Plan` table (written by the tasks step, checked by Lisa) that groups tasks into reviewable PRs. Ralph works the lowest-numbered group with open tasks and, when that group's last task lands, runs the full quality gate and halts with `<promise>PR_BOUNDARY_REACHED</promise>`. Open the PR, merge it, then rerun Ralph (or the pipeline with `--from ralph`) to start the next group. A `tasks.md` without the table is one group, so Ralph never halts.
+
+**Commits** — every iteration commits through `speckit-commit.sh`, which derives `type(scope): [ticket] description` from the branch name. Changes under `specs/` land in their own `docs` commit ahead of the code commit, so a reviewer can read the code without scrolling past the spec.
+
 **Stuck detection** — two consecutive iterations with no file changes and no completion signal abort the loop. Count-based stall and oscillation detectors back this up.
 
 ```mermaid
@@ -227,6 +236,7 @@ flowchart TD
     B --> C["Sub agent runs<br/>one iteration"]
     C --> D{Promise tag?}
     D -->|"Found"| E["Success — exit loop"]
+    D -->|"Halt tag"| E2["Halted at PR boundary — exit loop"]
     D -->|"Not found"| F{Files changed<br/>since last iteration?}
     F -->|"Yes"| G["Reset stuck counter"]
     F -->|"No"| H{Stuck counter >= 2?}

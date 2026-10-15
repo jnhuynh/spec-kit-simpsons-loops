@@ -367,12 +367,13 @@ Report one of:
 - **oscillating** — work count alternating between two values
 - **failure** — a sub agent crashed or errored
 - **stopped** — the pipeline was stopped early by `--stop-after` (use this when the pipeline halted before marge due to the `--stop-after` parameter; all steps in the execution range completed successfully but the full pipeline did not run)
+- **pr-boundary** — ralph completed a PR group from the `## Pull Request Plan` in `tasks.md` and halted so it can be opened, reviewed and merged. Tasks remain; simplify, security-review and marge were skipped. Report the PR just finished, its task range, and the remaining groups
 - **awaiting-human** — the pipeline halted at the premortem gate; the human failure-mode session is incomplete. Run `/speckit-premortem` interactively, then resume with `--from premortem`
 - **split-complete** — the pipeline completed through split and stopped because the user chose to work on child specs individually
 
 #### 6d: Resume Suggestion
 
-If the pipeline did not complete all eleven steps (whether due to `--stop-after`, `awaiting-human`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`. For `awaiting-human`, suggest: "Run `/speckit-premortem` to complete the failure-mode session(s), then resume with `--from premortem`."
+If the pipeline did not complete all eleven steps (whether due to `--stop-after`, `awaiting-human`, `pr-boundary`, failure, stuck, or max iterations), suggest resuming with `--from <next-step>` where `<next-step>` is the first step that was not executed. For `pr-boundary`, suggest: "Open PR `<N>`, get it reviewed and merged, then resume with `--from ralph` to start PR `<N+1>`." For `--stop-after` early termination, suggest: "To continue the pipeline, run with `--from <next-step>`." where `<next-step>` is the step immediately after `STOP_AFTER_STEP`. For `awaiting-human`, suggest: "Run `/speckit-premortem` to complete the failure-mode session(s), then resume with `--from premortem`."
 
 ## Examples
 

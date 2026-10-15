@@ -17,7 +17,11 @@ The calling command MUST have provided all of these values before you begin. Con
 - **EXTRA_PROMPT_SUFFIX**: additional text appended to sub-agent prompts (empty string if none)
 - **REPORT_MODE**: one of `standard`, `tasks`, or `needs_human`
 
-If any value is missing, abort with: "ERROR: Incomplete LOOP_CONFIG. Missing: [list missing fields]. The calling command must provide all configuration values."
+**Optional:**
+
+- **HALT_TAG**: a second signal that stops the loop early **without** meaning the work is finished (e.g. `PR_BOUNDARY_REACHED`). Omit or leave empty when the loop has no such boundary — only Ralph sets one today.
+
+If any required value is missing, abort with: "ERROR: Incomplete LOOP_CONFIG. Missing: [list missing fields]. The calling command must provide all configuration values."
 
 ## Pre-Flight Check
 
@@ -119,6 +123,8 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
 
 1. **Completion check**: Check the sub agent's returned output for the completion promise tag: `<promise><PROMISE_TAG></promise>`. If found, report success and stop looping.
 
+1b. **Halt check**: If HALT_TAG is set and non-empty, check the sub agent's returned output for `<promise><HALT_TAG></promise>`. If found, stop looping with completion status **halted** and carry the sub agent's accompanying message through to the report verbatim — it explains the boundary and what remains. A halt is **not** a failure and **not** stuck: the iteration did its work and reached a deliberate stopping point. Skip stuck, stall and oscillation detection for this iteration.
+
 2. **Progress tracking**: Extract the work-remaining count from the sub agent's output if available. The count is what this iteration's fresh scan found, before fixing: auto-fixable findings (excluding `needs_human`/`reappeared`) for Lisa/Marge, Outstanding coverage categories for Homer, incomplete tasks for Ralph. Under batch remediation this should drop steeply (typically N → 0). Append to `progress_history`.
 
 3. **File change check**: Run `git diff $PRE_ITERATION_SHA --stat` via Bash tool.
@@ -140,7 +146,7 @@ For each iteration (up to MAX_ITERATIONS), spawn ONE sub agent at a time:
 After the loop completes, report:
 
 - Total iterations run
-- Completion status (one of: **success** — completion signal received; **max iterations reached** — limit hit without completion; **stuck** — 2 consecutive iterations with no changes and no completion signal; **stalled** — 3 iterations without reducing work count; **oscillating** — work count alternating between two values; **failure** — sub agent crashed or errored)
+- Completion status (one of: **success** — completion signal received; **halted** — HALT_TAG received at a deliberate boundary, work remains; **max iterations reached** — limit hit without completion; **stuck** — 2 consecutive iterations with no changes and no completion signal; **stalled** — 3 iterations without reducing work count; **oscillating** — work count alternating between two values; **failure** — sub agent crashed or errored)
 
 **Additional reporting based on REPORT_MODE**:
 
