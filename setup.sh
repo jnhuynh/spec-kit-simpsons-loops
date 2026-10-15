@@ -259,6 +259,42 @@ echo "    .specify/marge/run-gates.sh"
 echo "    .specify/scripts/bash/speckit-commit.sh"
 echo "    .specify/scripts/bash/speckit-standards.sh"
 
+# ── 2a. Stop hook ───────────────────────────────────────────────────
+# The hook script is framework code (Pattern A: OVERWRITE). Its Stop entry in
+# .claude/settings.json is merged once, on the install that first creates the
+# script, so a consumer who deletes the entry has opted out for good.
+HOOK_REL=".claude/hooks/speckit-standards-stop.sh"
+HOOK_DEST="$PROJECT_DIR/$HOOK_REL"
+HOOK_CMD='$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh'
+PROJECT_SETTINGS="$PROJECT_DIR/.claude/settings.json"
+hook_existed=false
+[[ -f "$HOOK_DEST" ]] && hook_existed=true
+mkdir -p "$PROJECT_DIR/.claude/hooks"
+cp "$SCRIPT_DIR/scripts/speckit-standards-stop.sh" "$HOOK_DEST"
+chmod +x "$HOOK_DEST"
+echo "    $HOOK_REL"
+
+print_hook_snippet() {
+  echo "  To be sent back when a standards check blocks uncommitted work, add this Stop hook to .claude/settings.json:"
+  echo '    {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/speckit-standards-stop.sh", "timeout": 30}]}]}}'
+}
+
+if [[ -f "$PROJECT_SETTINGS" ]] && grep -qF 'speckit-standards-stop.sh' "$PROJECT_SETTINGS"; then
+  echo "  Stop hook already registered in .claude/settings.json"
+elif ! $hook_existed && command -v jq &>/dev/null; then
+  [[ -f "$PROJECT_SETTINGS" ]] || echo '{}' > "$PROJECT_SETTINGS"
+  tmp=$(mktemp)
+  if jq --arg cmd "$HOOK_CMD" '.hooks.Stop = ((.hooks.Stop // []) + [{hooks: [{type: "command", command: $cmd, timeout: 30}]}])' "$PROJECT_SETTINGS" > "$tmp" 2>/dev/null; then
+    mv "$tmp" "$PROJECT_SETTINGS"
+    echo "  Registered the Stop hook in .claude/settings.json"
+  else
+    rm -f "$tmp"
+    print_hook_snippet
+  fi
+else
+  print_hook_snippet
+fi
+
 # ── 2b-migrate. Migrate an older checks//gates/ layout ──────────────
 # Earlier installs used .specify/marge/checks/ (prose packs) and
 # .specify/marge/gates/ (script packs). The current layout splits by ORIGIN:
