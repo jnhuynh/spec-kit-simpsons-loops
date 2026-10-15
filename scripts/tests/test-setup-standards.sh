@@ -22,6 +22,11 @@ check_exec "engine installed and executable" .specify/scripts/bash/speckit-stand
 check_exec "baseline wrapper seeded and executable" .specify/marge/baseline/standards.sh
 check_file "damage-levels seeded" .specify/marge/config/damage-levels.yml
 check_file "lexicon seeded" .specify/marge/config/lexicon.yml
+check_file "speckit-pr skill installed" .claude/skills/speckit-pr/SKILL.md
+check_eq "speckit-pr skill is named" "$(sed -n 2p .claude/skills/speckit-pr/SKILL.md 2>/dev/null)" "name: speckit-pr"
+for phrase in 'reads the local tree' 'change nothing' 'never push' 'Never lower' '--body-file' '## What changed' '## How much damage if it is wrong' '## Where to look' '## How it was verified' '## Links'; do
+  if grep -qF -- "$phrase" .claude/skills/speckit-pr/SKILL.md 2>/dev/null; then pass "speckit-pr skill says: $phrase"; else fail "speckit-pr skill says: $phrase"; fi
+done
 
 printf '# mine\n' > .specify/marge/baseline/standards.sh
 printf '# mine\n' > .specify/marge/config/lexicon.yml
