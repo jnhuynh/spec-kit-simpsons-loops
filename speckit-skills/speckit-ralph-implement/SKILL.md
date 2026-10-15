@@ -89,10 +89,10 @@ Run only when the loop exited via the **halted** path (`<promise>PR_BOUNDARY_REA
    - This instruction, with the real spec dir substituted:
 
    ```
-   PR <N> is complete (<range>). Open it, get it reviewed and merged, then resume:
+   PR <N> is complete (<range>). Open it with /speckit-pr.
+   Get it reviewed and merged, then resume:
      /speckit-ralph-implement <FEATURE_DIR>
    Remaining: PR <N+1> (<range>), PR <N+2> (<range>), ...
-   Open it with /speckit-pr.
    ```
 
    Ralph does not create branches or run `gh` — the commits for this group are already pushed to the feature branch.

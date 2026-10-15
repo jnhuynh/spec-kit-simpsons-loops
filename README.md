@@ -36,7 +36,7 @@ Three commands sit outside the pipeline:
 |---------|--------------|
 | `/speckit-brainstorm` | Pre-spec. Stress-tests a vague idea with pointed questions — one at a time, 4-5 typical, 7 hard cap — then emits a feature description ready for `/speckit-specify` or `--description`. |
 | `/speckit-review` | Single-pass code review report, no auto-fix. Marge without the loop. |
-| `/speckit-pr` | After marge, before review. Writes the pull request description from the diff: what changed, how much damage if it is wrong (the damage level and its checklist), where to look, how it was verified, links. Edits the open PR or creates one on a pushed branch. Needs `gh`. Never pushes, never lowers the level. |
+| `/speckit-pr` | At a Ralph PR boundary, or after marge and before `/speckit-review-pr`. Writes the pull request description from the diff: what changed, how much damage if it is wrong (the damage level and its checklist), where to look, how it was verified, links. Edits the open PR or creates one on a pushed branch. Needs `gh`. Never pushes, never lowers the level. |
 
 > **Note on permissions**
 > The loops instruct sub agents to execute autonomously — no permission prompts, no confirmations, no interactive pauses. Read the agent files before running them.
