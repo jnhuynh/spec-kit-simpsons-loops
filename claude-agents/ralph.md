@@ -54,7 +54,7 @@ If validation fails:
    ```bash
    bash .specify/scripts/bash/speckit-commit.sh "[task summary]"
    ```
-3. **PR boundary check** - Re-read tasks.md. If the current PR group (from Phase 0c) now has no incomplete tasks and a **higher-numbered** PR group still has some, this is a PR boundary. Output the following halt tag, followed by the PR number just finished, its task range, and the remaining groups with their ranges:
+3. **PR boundary check** - Re-read tasks.md. If the current PR group (from Phase 0c) now has no incomplete tasks and a **higher-numbered** PR group still has some, this is a PR boundary. Output the following halt tag, followed by the PR number just finished, its task range, the remaining groups with their ranges, and the line `Open it with /speckit-pr.`:
 
    <promise>PR_BOUNDARY_REACHED</promise>
 

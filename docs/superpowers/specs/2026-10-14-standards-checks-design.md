@@ -192,12 +192,12 @@ Condensed copies of Reset's `damage-levels.yml` and `lexicon.yml`, keeping every
 **`text`** (people and `/speckit-pr`):
 
 ```
-Damage level: critical (set by db/migrate/20261014_x.rb, app/services/pay/send.rb and 2 more)
+Damage level: critical (set by db/migrate/20261014_x.rb, app/services/pay/send.rb, app/policies/x.rb and 1 more)
 Read every line. Work the checklist.
   - What happens if this runs twice?
   - Who can reach this? Can a secret or personal data end up in a log?
 BLOCK HIGH   PULL_REQUEST:0  requirement-id-in-body: the description leans on requirement ids: FR-003
-MEDIUM       specs/9cad-feat-x/spec.md:14  long-sentence: 31 words: "The nightly job writes…"
+MEDIUM specs/9cad-feat-x/spec.md:14  long-sentence: 31 words: "The nightly job writes…"
 ```
 
 `set by` lists up to three files; `nothing in this change raises it` when the default level won. `No findings.` when there are none.
