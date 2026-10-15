@@ -15,6 +15,7 @@
 .claude/agents/
 .claude/skills/
 .claude/hooks/
+.claude/settings.json
 .specify/marge/baseline/
 .specify/marge/README.md
 .specify/marge/config/README.md
