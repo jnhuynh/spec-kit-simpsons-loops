@@ -24,7 +24,7 @@ check_file "damage-levels seeded" .specify/marge/config/damage-levels.yml
 check_file "lexicon seeded" .specify/marge/config/lexicon.yml
 check_file "speckit-pr skill installed" .claude/skills/speckit-pr/SKILL.md
 check_eq "speckit-pr skill is named" "$(sed -n 2p .claude/skills/speckit-pr/SKILL.md 2>/dev/null)" "name: speckit-pr"
-for phrase in 'reads the local tree' 'change nothing' 'never push' 'Never lower' '--body-file' 'origin/<BRANCH>' 'Only a `PULL_REQUEST:0` line' 'damage-levels.yml' 'Recount' 'names a branch that is not the current branch' 'read-only' 'git fetch origin' '## What changed' '## How much damage if it is wrong' '## Where to look' '## How it was verified' '## Links'; do
+for phrase in 'reads the local tree' 'change nothing' 'never push' 'Never lower' '--body-file' 'origin/<BRANCH>' 'Only a `PULL_REQUEST:0` line' 'damage-levels.yml' 'Recount' 'names a branch that is not the current branch' 'read-only' 'git fetch origin' 'no pull requests found' 'uncommitted changes are not in this description' 'MEDIUM specs/9cad-feat-x/spec.md:5' '## What changed' '## How much damage if it is wrong' '## Where to look' '## How it was verified' '## Links'; do
   if grep -qF -- "$phrase" .claude/skills/speckit-pr/SKILL.md 2>/dev/null; then pass "speckit-pr skill says: $phrase"; else fail "speckit-pr skill says: $phrase"; fi
 done
 for hinted in .claude/agents/ralph.md .claude/skills/speckit-ralph-implement/SKILL.md .claude/skills/speckit-pipeline/reference/steps/ralph.md; do

@@ -47,11 +47,11 @@ the engine is silent without damage-levels.yml. Run setup.sh, then re-run.
 ## Step 1: Base and state
 
 1. **BRANCH** is `git branch --show-current`. If `$ARGUMENTS` names a branch that is not the current branch, **STOP**: `Check out <branch> and run again: /speckit-pr reads the local tree.`
-2. Find the pull request. With `pr:<number>` or a pull request URL in `$ARGUMENTS`, run `gh pr view <number> --json number,url,baseRefName,headRefName,state`. Otherwise:
+2. Find the pull request. With `pr:<number>` or a pull request URL in `$ARGUMENTS`, run `gh pr view <number> --json number,url,baseRefName,headRefName,state 2>&1`. Otherwise:
    ```bash
-   gh pr view --json number,url,baseRefName,headRefName,state 2>/dev/null
+   gh pr view --json number,url,baseRefName,headRefName,state 2>&1
    ```
-   No output from `gh pr view` means there is no pull request yet. That is not an error.
+   `no pull requests found` means there is none yet; that is not an error. Any other failure (not signed in, offline) is: **STOP** with the message gh printed. When `gh` is not installed, continue as if there were no pull request; Step 10 then prints instead of delivering.
 3. If a pull request exists and its `headRefName` is not `BRANCH`, **STOP**: `Check out <headRefName> and run again: /speckit-pr reads the local tree.` If its `state` is not `OPEN`, **STOP**: `PR #<number> is <state>.`
 4. **BASE_REF_NAME**: the pull request's `baseRefName`. Without a pull request: `main`, or `master` when neither `origin/main` nor `main` resolves with `git rev-parse --verify --quiet <ref>^{commit}`.
 5. Fetch, so the base and the remote copy of the branch are current. A fetch is a read: it is neither a push nor a checkout.
@@ -76,16 +76,17 @@ bash .specify/scripts/bash/speckit-standards.sh --base <BASE> --format text
 Keep the whole output. The first lines are the damage level header, copied in Step 5:
 
 ```
-Damage level: critical (set by db/migrate/20261014_x.rb, app/services/pay/send.rb and 2 more)
+Damage level: critical (set by app/policies/x.rb, app/services/pay/send.rb, app/services/pay/z.rb and 2 more)
 Read every line. Work the checklist.
   - What happens if this runs twice?
+  - Who can reach this? Can a secret or personal data end up in a log?
 ```
 
 Then the findings, one per line, blocking ones first with a `BLOCK` prefix:
 
 ```
-BLOCK HIGH   specs/9cad-feat-x/spec.md:0  plain-summary-missing: a new spec opens with a plain summary ...
-MEDIUM       specs/9cad-feat-x/spec.md:14  long-sentence: 31 words: "The nightly job writes…"
+BLOCK HIGH   specs/9cad-feat-x/spec.md:1  plain-summary-missing: a new spec must open with a "## Plain summary" section
+MEDIUM specs/9cad-feat-x/spec.md:5  long-sentence: 31 words: "The nightly job writes every open order to the ledger before the…"
 ```
 
 - Exit code 2 means the engine could not run. Print its message and **STOP**.
@@ -166,7 +167,7 @@ The description ends with the attribution lines the session gives (the `🤖 Gen
 - **No pull request, pushed, `UNPUSHED` is 0**: `gh pr create --base <BASE_REF_NAME> --head <BRANCH> --title "<title>" --body-file <draft>`. Print the URL it returns.
 - **Not pushed, or `UNPUSHED` above 0 with no pull request, or `gh` missing**: print the title and the description, then `Not on the remote. Push it, then run /speckit-pr again:` and the command `git push -u origin <BRANCH>`. You never push it.
 
-End with a report: what was delivered (edited #N, created #N, or printed), `UNPUSHED` when above 0 (`<n> local commits are not on the remote; push before review`), and the fix commit from Step 2 when one was made.
+End with a report: what was delivered (edited #N, created #N, or printed), `UNPUSHED` when above 0 (`<n> local commits are not on the remote; push before review`), and the fix commit from Step 2 when one was made, and, when `git status --porcelain` prints anything, `<n> uncommitted changes are not in this description`.
 
 ## Template
 
