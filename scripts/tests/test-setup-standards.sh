@@ -27,6 +27,9 @@ check_eq "speckit-pr skill is named" "$(sed -n 2p .claude/skills/speckit-pr/SKIL
 for phrase in 'reads the local tree' 'change nothing' 'never push' 'Never lower' '--body-file' '## What changed' '## How much damage if it is wrong' '## Where to look' '## How it was verified' '## Links'; do
   if grep -qF -- "$phrase" .claude/skills/speckit-pr/SKILL.md 2>/dev/null; then pass "speckit-pr skill says: $phrase"; else fail "speckit-pr skill says: $phrase"; fi
 done
+for hinted in .claude/agents/ralph.md .claude/skills/speckit-ralph-implement/SKILL.md .claude/skills/speckit-pipeline/reference/steps/ralph.md; do
+  if grep -qF 'Open it with /speckit-pr.' "$hinted" 2>/dev/null; then pass "Ralph hint in $hinted"; else fail "Ralph hint in $hinted"; fi
+done
 
 printf '# mine\n' > .specify/marge/baseline/standards.sh
 printf '# mine\n' > .specify/marge/config/lexicon.yml
